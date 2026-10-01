@@ -80,7 +80,18 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         // Invoices must state their payment form (error 3244 since 2022-01-01, found against the SUNAT beta service). Receipts do not carry it.
         if (data.DocumentTypeCode == "01")
         {
-            root.Add(new XElement(Cac + "PaymentTerms", new XElement(Cbc + "ID", "FormaPago"), new XElement(Cbc + "PaymentMeansID", data.PaymentForm)));
+            root.Add(new XElement(Cac + "PaymentTerms", new XElement(Cbc + "ID", "FormaPago"), new XElement(Cbc + "PaymentMeansID", data.PaymentForm), data.PaymentForm == "Credito" ? Amount("Amount", data.Installments!.Sum(i => i.Amount), currency) : null));
+
+            // Each installment is another FormaPago term: Cuota001, Cuota002, ... with its amount and due date (rules 3245-3256).
+            for (var i = 0; data.PaymentForm == "Credito" && i < data.Installments!.Count; i++)
+            {
+                root.Add(new XElement(
+                    Cac + "PaymentTerms",
+                    new XElement(Cbc + "ID", "FormaPago"),
+                    new XElement(Cbc + "PaymentMeansID", $"Cuota{(i + 1).ToString("D3", CultureInfo.InvariantCulture)}"),
+                    Amount("Amount", data.Installments[i].Amount, currency),
+                    new XElement(Cbc + "PaymentDueDate", data.Installments[i].DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
+            }
         }
 
         foreach (var allowance in GlobalAllowances(data))
@@ -281,9 +292,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             }
         }
 
-        if (data.PaymentForm != "Contado")
+        if (CheckPayment(data) is { } badPayment)
         {
-            return Unsupported("Solo se admite la forma de pago al contado; el crédito exige cuotas y aún no está soportado.");
+            return badPayment;
         }
 
         if (string.IsNullOrWhiteSpace(data.Series) || data.Number < 1 || string.IsNullOrWhiteSpace(data.OperationTypeCode))
@@ -292,6 +303,45 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         }
 
         return null;
+    }
+
+    /// <summary>Highest installment number the identifier <c>Cuota[0-9]{3}</c> can carry (rule 3246).</summary>
+    private const int MaxInstallments = 999;
+
+    /// <summary>
+    /// The payment form and its installments agree: cash carries none; credit carries one to 999 whose amounts add up to the payable amount (rules 3265, 3266, 3319)
+    /// and fall due after the issue date (3267); only an invoice has a payment form (the receipt sheet defines none).
+    /// </summary>
+    private static Error? CheckPayment(UblInvoiceData data)
+    {
+        static Error Unsupported(string detail) => Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", detail);
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
+
+        var installments = data.Installments ?? [];
+        switch (data.PaymentForm)
+        {
+            case "Contado":
+                return installments.Count == 0 ? null : Invalid("Una venta al contado no lleva cuotas.");
+            case "Credito":
+                if (data.DocumentTypeCode != "01")
+                {
+                    return Unsupported("Solo las facturas tienen forma de pago al crédito.");
+                }
+
+                if (installments.Count is 0 or > MaxInstallments)
+                {
+                    return Invalid($"Una venta al crédito lleva de 1 a {MaxInstallments} cuotas.");
+                }
+
+                if (installments.Any(i => i.Amount <= 0 || i.DueDate <= data.IssueDate))
+                {
+                    return Invalid("Cada cuota debe tener un monto mayor que cero y vencer después de la fecha de emisión.");
+                }
+
+                return installments.Sum(i => i.Amount) == data.Totals.PayableAmount ? null : Invalid("Las cuotas deben sumar el importe total de la venta.");
+            default:
+                return Unsupported($"La forma de pago '{data.PaymentForm}' no está soportada (Contado o Credito).");
+        }
     }
 
     /// <summary>One cac:AllowanceCharge: a discount (<c>ChargeIndicator</c> false) or a charge (true) of catalogue 53, with the base it applies to when the structure asks for it.</summary>

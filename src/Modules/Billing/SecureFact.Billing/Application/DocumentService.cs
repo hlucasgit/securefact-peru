@@ -111,6 +111,11 @@ internal sealed partial class DocumentService(
             return calculated.Error;
         }
 
+        if (ValidateInstallments(series, request.IssueDate, request.Installments, calculated.Value.PayableAmount) is { } badInstallments)
+        {
+            return badInstallments;
+        }
+
         return await IssueAsync(
             tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, request.Currency, buyer!, request.Lines, calculated.Value, null, cancellationToken);
     }
@@ -538,12 +543,60 @@ internal sealed partial class DocumentService(
         var note = d.ReferencedDocumentId is { } referencedId
             ? new NoteInfo(d.ReasonCode!, d.Reason!, referencedId, d.ReferencedDocumentTypeCode!, d.ReferencedSeries!, d.ReferencedNumber!.Value)
             : null;
-        return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments);
+        return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
+            stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null);
+    }
+
+    /// <summary>Highest installment number the sheet allows: the identifier is <c>Cuota</c> followed by three digits (rule 3246).</summary>
+    private const int MaxInstallments = 999;
+
+    /// <summary>
+    /// Sale on credit (sheet Factura2_0, "Forma de pago al crédito"): only invoices carry a payment form; each installment has an amount (3253, 3266) and a due date after the
+    /// issue date (3267); the net pending amount is the sum of the installments (3319) and cannot exceed the payable amount (3265). With no detraction or withholding supported,
+    /// the net pending amount is the whole payable amount, so the installments must add up to it.
+    /// </summary>
+    private static Error? ValidateInstallments(Series series, DateOnly issueDate, IReadOnlyList<Installment>? installments, decimal payable)
+    {
+        if (installments is null)
+        {
+            return null;
+        }
+
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Cuotas inválidas", detail);
+
+        if (series.DocumentTypeCode != DocumentTypes.Invoice)
+        {
+            return Invalid("Solo las facturas se venden al crédito: las boletas no llevan forma de pago.");
+        }
+
+        if (installments.Count is 0 or > MaxInstallments)
+        {
+            return Invalid($"Una venta al crédito lleva de 1 a {MaxInstallments} cuotas.");
+        }
+
+        decimal sum = 0;
+        for (var i = 0; i < installments.Count; i++)
+        {
+            var installment = installments[i];
+            if (installment is null || installment.Amount <= 0 || decimal.Round(installment.Amount, 2) != installment.Amount || installment.Amount > payable)
+            {
+                return Invalid($"La cuota {i + 1} debe tener un monto mayor que cero, con hasta 2 decimales y sin superar el importe total.");
+            }
+
+            if (installment.DueDate <= issueDate)
+            {
+                return Invalid($"La cuota {i + 1} debe vencer después de la fecha de emisión.");
+            }
+
+            sum += installment.Amount;
+        }
+
+        return sum == payable ? null : Invalid($"Las cuotas suman {sum:0.00} y el importe total es {payable:0.00}: deben coincidir.");
     }
 
     private sealed record StoredLine(TaxableLine? Tax);
 
-    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments);
+    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments);
 
     private static StoredRequest? ReadStoredRequest(string json)
     {

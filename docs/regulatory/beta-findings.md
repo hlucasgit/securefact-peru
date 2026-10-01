@@ -19,6 +19,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Descuentos y cargos** (R-047): una factura con descuentos y cargos de línea (00, 47, 01, 48) y globales (02, 49, 03, 50), más una línea exonerada, aceptada con código 0 y sin observaciones; igual como boleta con `sendBill`; un resumen diario con cargo y descuento que no afectan la base, aceptado.
 
+- **Venta al crédito** (R-048): una factura con forma de pago `Credito` y dos cuotas (`Cuota001`, `Cuota002`, con monto y fecha) aceptada con código 0, sin observaciones.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

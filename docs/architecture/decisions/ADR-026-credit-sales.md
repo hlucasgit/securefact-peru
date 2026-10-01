@@ -1,0 +1,28 @@
+# ADR-026: Venta al crédito con cuotas
+
+- Estado: Aceptada · Fecha: 2026-10-01
+
+## Fuentes
+Hoja `Factura2_0` de las reglas de validación del 26.08.2026 (S16), bloques «Información adicional - Forma de pago al contado» y «Forma de pago al crédito» (reglas 3244–3256, 3265–3267, 3319, 2071), hoja `Boleta2_0` (sin forma de pago), hojas de notas (el crédito solo aparece en el motivo 13) y la prueba contra el beta del 2026-10-01.
+
+## Decisión
+- **Alcance**: facturas (01). La boleta no tiene forma de pago en su hoja; una boleta con cuotas se rechaza.
+- **Entrada** (`POST /api/v1/documents`): `installments`, lista de `{ amount, dueDate }`. Sin la lista, la venta es al contado (como hasta ahora). Con ella, es al crédito.
+- **Validación en Billing, antes de numerar** (`SF-BIL-006`, sin hueco en la serie): de 1 a 999 cuotas (el identificador es `Cuota` más tres dígitos, regla 3246); cada monto mayor que cero, con hasta 2 decimales y sin superar el importe total (3253, 3266); cada vencimiento posterior a la fecha de emisión (3267); la suma de las cuotas igual al importe total.
+- **UBL**: un `cac:PaymentTerms` `FormaPago`/`Credito` con el **monto neto pendiente de pago** (`Amount`, con `currencyID`) y uno más por cuota, `FormaPago`/`Cuota001`, `Cuota002`…, con su `Amount` y `PaymentDueDate` (3245–3256, 3319). El generador repite las comprobaciones y rechaza (`SF-CPE-003`) cuotas incoherentes, y (`SF-CPE-002`) crédito en una boleta o una forma de pago desconocida.
+- **Persistencia**: como los descuentos (ADR-025), las cuotas viven en la solicitud original que se conserva con el documento; `DocumentDto.Installments` las expone. No hay migración. La idempotencia ya cubre el plan: la misma clave con otro plan es un conflicto.
+- **PDF**: tras las líneas, «Forma de pago: Crédito», el monto neto pendiente y la lista de cuotas con su vencimiento (pagina como las líneas).
+
+## Supuestos (P)
+- El monto neto pendiente es el importe total, porque no se soportan detracción ni retención (la hoja lo define como el importe menos ellas). La suma de las cuotas debe igualar el importe total: es más estricto que la regla 3265 (que solo exige que no lo supere). Una entrega inicial pagada al emitir no se puede modelar todavía.
+- Se exige al menos una cuota siempre; la hoja lo exige cuando el adquirente tiene RUC (3249, 3251, 3254, 3256) y lo deja opcional en otros casos.
+- No se exige orden creciente de los vencimientos (la hoja no lo pide); el número de cuota es la posición en la lista.
+- La impresión de la forma de pago en la representación impresa es una decisión de producto: la norma consultada (S21) no la fija.
+
+## Verificado en el beta (2026-10-01)
+Una factura al crédito con dos cuotas (a 30 y 60 días): aceptada, código 0, sin observaciones.
+
+## Límites
+- Sin notas de crédito de motivo 13 (ajuste de montos y fechas de cuotas, reglas 3257, 3319–3321), que sigue pendiente (ADR-023).
+- Las notas de otros motivos sobre una factura al crédito no cambian las cuotas; la factura conserva su plan.
+- Sin entrega inicial, sin detracción ni retención sobre el monto neto.

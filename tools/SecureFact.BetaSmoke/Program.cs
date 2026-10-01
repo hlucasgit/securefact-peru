@@ -47,10 +47,14 @@ GlobalAdjustments? adjustments = discount ? new GlobalAdjustments(DiscountAffect
 var totals = provider.GetRequiredService<ITaxCalculator>()
     .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m), adjustments)).Value;
 var receipt = args.Contains("boleta", StringComparer.Ordinal);
+// "credit": an invoice sold on credit with two installments (the sheet's "Forma de pago al crédito").
+var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
 var data = new UblInvoiceData(
     receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", "0101",
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"), receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
-    ublLines, totals, 0.18m, Adjustments: adjustments);
+    ublLines, totals, 0.18m,
+    credit ? "Credito" : "Contado", adjustments,
+    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {

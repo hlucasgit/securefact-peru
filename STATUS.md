@@ -34,7 +34,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Novedades de la séptima tanda — primera aceptación real
 - **Factura, boleta (`sendBill`) y resumen diario (`sendSummary` + `getStatus`) aceptados por el beta de SUNAT** (CDR código 0) con `tools/SecureFact.BetaSmoke`. Hallazgos en `docs/regulatory/beta-findings.md`: faltaba la forma de pago (3244), valores de atributos del UBL, carpeta `dummy/` y marca de tiempo en el CDR real; todo corregido.
 - Confirmado en el beta: base64 en línea, `SOAPAction` vacío, firma RSA-SHA256, certificado autofirmado, nombre del resumen con fecha de generación.
-- Pendiente de prueba: crédito con cuotas; la política de producción (cadena de certificados, boletas con `sendBill`).
+- Pendiente de prueba: la política de producción (cadena de certificados, boletas con `sendBill`).
 
 ## Representación impresa
 - `GET /api/v1/electronic-documents/{id}/pdf` (permiso `documents.read`, aislado por tenant): PDF A4 determinista con los datos mínimos del Anexo II de la RS 114-2019 (fuente S21), QR según S19 y el `DigestValue` firmado. Pruebas: 455 pasan.
@@ -55,9 +55,13 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - El beta destapó que las líneas exoneradas, inafectas y gratuitas necesitaban `cbc:Percent` (2992); corregido. Pruebas: 560 pasan (330 unitarias, 6 arquitectura, 6 integración, 218 seguridad/API).
 - Pendiente: factor porcentual como entrada, desglose de descuentos en el PDF, anticipos.
 
+## Venta al crédito
+- Facturas al crédito con cuotas (`installments` en `POST /api/v1/documents`): Billing valida el plan antes de numerar, el UBL lleva `FormaPago` `Credito` y una `CuotaNNN` por vencimiento, el PDF imprime las cuotas. Aceptada en el beta (ADR-026). Pruebas: 569 pasan (336 unitarias, 6 arquitectura, 6 integración, 221 seguridad/API).
+- Pendiente: nota de crédito de motivo 13 (ajuste de cuotas), entrega inicial, detracción y retención.
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
-- Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción y crédito sin probar.
+- Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
 - Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; CI sin ejecutar en GitHub; cobertura sin medir.
 - ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.
 - Notas de crédito/débito esperan el CDR (Fase 4).

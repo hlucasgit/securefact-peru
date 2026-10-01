@@ -45,10 +45,14 @@ public sealed record DocumentLineRequest(
     TaxableLine Tax,
     string? ProductCode = null);
 
+/// <summary>One installment (cuota) of an invoice sold on credit: the amount due and the day it falls due.</summary>
+public sealed record Installment(decimal Amount, DateOnly DueDate);
+
 /// <summary>
 /// Tax rates are never accepted from the client: the platform resolves them from versioned rules at the issue date.
 /// The buyer is given either inline (<paramref name="Buyer"/>) or by reference (<paramref name="CustomerId"/>), never both; a referenced
-/// customer is copied into the document as a snapshot.
+/// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
+/// amounts must add up to the payable amount and every due date must fall after the issue date.
 /// </summary>
 public sealed record CreateDocumentRequest(
     Guid SeriesId,
@@ -57,7 +61,8 @@ public sealed record CreateDocumentRequest(
     BuyerSnapshot? Buyer,
     IReadOnlyList<DocumentLineRequest> Lines,
     GlobalAdjustments? Adjustments = null,
-    Guid? CustomerId = null);
+    Guid? CustomerId = null,
+    IReadOnlyList<Installment>? Installments = null);
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
@@ -117,7 +122,8 @@ public sealed record DocumentDto(
     TaxCalculationResult Totals,
     DateTimeOffset CreatedAt,
     NoteInfo? Note = null,
-    GlobalAdjustments? Adjustments = null)
+    GlobalAdjustments? Adjustments = null,
+    IReadOnlyList<Installment>? Installments = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

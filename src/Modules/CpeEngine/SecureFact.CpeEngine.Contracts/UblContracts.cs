@@ -3,6 +3,9 @@ using SecureFact.TaxEngine.Contracts;
 
 namespace SecureFact.CpeEngine.Contracts;
 
+/// <summary>One installment of a credit sale: the amount due and its due date.</summary>
+public sealed record UblInstallment(decimal Amount, DateOnly DueDate);
+
 public sealed record UblParty(string DocumentTypeCode, string DocumentNumber, string LegalName, string? TradeName = null, string? EstablishmentCode = null);
 
 /// <param name="DiscountAffectingBase">Line discount, code 00 of catalogue 53 (the taxable base is reduced).</param>
@@ -28,7 +31,8 @@ public sealed record UblLine(
 /// what was calculated and numbered (§17: no XML straight from API DTOs).
 /// </summary>
 /// <param name="OperationTypeCode">Catalogue 51 code, e.g. <c>0101</c> internal sale.</param>
-/// <param name="PaymentForm">Forma de pago of an invoice: only <c>Contado</c> is supported; credit needs installments and is refused (SUNAT errors 3245–3267).</param>
+/// <param name="PaymentForm">Forma de pago of an invoice: <c>Contado</c>, or <c>Credito</c> together with <paramref name="Installments"/> (SUNAT rules 3244–3267, 3319).</param>
+/// <param name="Installments">The installments of a credit sale: at least one, their amounts adding up to the payable amount, each due after the issue date.</param>
 /// <param name="Adjustments">Global discounts and charges (catalogue 53 codes 02, 03, 49, 50) exactly as given to the TaxEngine; the generator states them and checks that they agree with <paramref name="Totals"/>.</param>
 public sealed record UblInvoiceData(
     string DocumentTypeCode,
@@ -44,7 +48,8 @@ public sealed record UblInvoiceData(
     TaxCalculationResult Totals,
     decimal IgvRate,
     string PaymentForm = "Contado",
-    GlobalAdjustments? Adjustments = null);
+    GlobalAdjustments? Adjustments = null,
+    IReadOnlyList<UblInstallment>? Installments = null);
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)

@@ -92,7 +92,9 @@ internal sealed class ElectronicDocumentService(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, note.ReasonCode, note.Reason,
                 note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value))
             : ubl.GenerateInvoice(new UblInvoiceData(
-                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value, Adjustments: d.Adjustments));
+                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value,
+                d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
+                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList()));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -455,7 +457,8 @@ internal sealed class ElectronicDocumentService(
             new PrintedTotals(d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount, d.Totals.TotalAllowances, d.Totals.TotalCharges),
             payload.Value, entity.DigestValue,
             d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
-            await IsVoidedAsync(entity.Id, cancellationToken));
+            await IsVoidedAsync(entity.Id, cancellationToken),
+            d.Installments?.Select((i, index) => new PrintedInstallment(index + 1, i.DueDate, i.Amount)).ToList());
         return printer.Render(printed);
     }
 

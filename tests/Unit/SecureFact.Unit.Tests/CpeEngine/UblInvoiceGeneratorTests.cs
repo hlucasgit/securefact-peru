@@ -209,6 +209,72 @@ public class UblInvoiceGeneratorTests
         Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent", Namespaces)); // the document totals do not carry it
     }
 
+    // ---------- sale on credit ----------
+
+    private static readonly UblInstallment[] TwoInstallments = [new(100m, new DateOnly(2026, 10, 30)), new(136m, new DateOnly(2026, 11, 30))];
+
+    private static UblInvoiceData OnCredit(params UblInstallment[] installments) =>
+        Data("01", ("10", 2m, 100m)) with { PaymentForm = "Credito", Installments = installments.Length == 0 ? TwoInstallments : installments };
+
+    [Fact]
+    public void An_invoice_on_credit_validates_against_the_schema_and_states_the_net_amount_and_each_installment()
+    {
+        var result = _generator.GenerateInvoice(OnCredit());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+
+        var terms = xml.XPathSelectElements("/inv:Invoice/cac:PaymentTerms", Namespaces).ToList();
+        Assert.Equal(["Credito", "Cuota001", "Cuota002"], terms.Select(t => t.XPathSelectElement("cbc:PaymentMeansID", Namespaces)!.Value).ToArray());
+        Assert.All(terms, t => Assert.Equal("FormaPago", t.XPathSelectElement("cbc:ID", Namespaces)!.Value));
+        Assert.Equal(["236.00", "100.00", "136.00"], terms.Select(t => t.XPathSelectElement("cbc:Amount", Namespaces)!.Value).ToArray());
+        Assert.All(terms, t => Assert.Equal("PEN", t.XPathSelectElement("cbc:Amount", Namespaces)!.Attribute("currencyID")!.Value));
+        Assert.Null(terms[0].XPathSelectElement("cbc:PaymentDueDate", Namespaces));
+        Assert.Equal(["2026-10-30", "2026-11-30"], terms.Skip(1).Select(t => t.XPathSelectElement("cbc:PaymentDueDate", Namespaces)!.Value).ToArray());
+    }
+
+    [Fact]
+    public void Installments_are_numbered_with_three_digits_and_an_invoice_on_credit_may_have_up_to_999()
+    {
+        var data = Data("01", ("10", 1m, 1000m)); // payable 1180.00
+        var installments = Enumerable.Range(1, 998).Select(i => new UblInstallment(1m, new DateOnly(2026, 10, 1).AddDays(i))).ToList();
+        installments.Add(new UblInstallment(182m, new DateOnly(2030, 1, 1)));
+
+        var result = _generator.GenerateInvoice(data with { PaymentForm = "Credito", Installments = installments });
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var ids = Parse(result.Value).XPathSelectElements("/inv:Invoice/cac:PaymentTerms/cbc:PaymentMeansID", Namespaces).Select(e => e.Value).ToList();
+        Assert.Equal("Cuota999", ids[^1]);
+        Assert.Equal("Cuota010", ids[10]);
+        var tooMany = installments.Take(998).Append(new UblInstallment(91m, new DateOnly(2030, 1, 1))).Append(new UblInstallment(91m, new DateOnly(2030, 1, 2))).ToList();
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data with { PaymentForm = "Credito", Installments = tooMany }).Error.Code);
+    }
+
+    [Fact]
+    public void Credit_without_consistent_installments_is_refused()
+    {
+        var valid = OnCredit();
+
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(valid with { Installments = [] }).Error.Code); // credit with no installment
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(valid with { Installments = [new(100m, new DateOnly(2026, 10, 30))] }).Error.Code); // does not add up
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(valid with { Installments = [new(236m, new DateOnly(2026, 9, 30))] }).Error.Code); // due on the issue date
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(valid with { Installments = [new(0m, new DateOnly(2026, 10, 30)), new(236m, new DateOnly(2026, 10, 30))] }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(valid with { PaymentForm = "Contado" }).Error.Code); // cash with installments
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(valid with { PaymentForm = "Otra" }).Error.Code);
+        var receipt = Data("03", ("10", 2m, 100m)) with { PaymentForm = "Credito", Installments = TwoInstallments };
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(receipt).Error.Code); // the receipt has no payment form
+    }
+
+    [Fact]
+    public void A_receipt_and_a_cash_invoice_state_no_installments()
+    {
+        var cash = Parse(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m))).Value);
+
+        Assert.Equal(["Contado"], cash.XPathSelectElements("/inv:Invoice/cac:PaymentTerms/cbc:PaymentMeansID", Namespaces).Select(e => e.Value).ToArray());
+        Assert.Empty(cash.XPathSelectElements("//cbc:PaymentDueDate", Namespaces));
+    }
+
     // ---------- discounts and charges ----------
 
     private static readonly UblLine DiscountedLine = new(1, "Producto con ajustes", "NIU", "P001", 2m, 100m, null, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m);

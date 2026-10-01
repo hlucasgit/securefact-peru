@@ -75,6 +75,33 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             page.Line(Left, y, Right, y, 0.25);
         }
 
+        if (document.Installments is { Count: > 0 } installments)
+        {
+            // Payment form on credit: the net pending amount and the installments, as a compact list that follows the lines and paginates like them.
+            if (y - 30 < Margin + FooterHeight)
+            {
+                page = NewPage(pdf, document, denomination, number, firstPage: false, out y);
+            }
+
+            y -= 12;
+            page.Text(PdfFont.Bold, 8, Left, y, "Forma de pago: Crédito");
+            page.Text(PdfFont.Regular, 8, Left + 130, y, $"Monto neto pendiente de pago: {symbol} {Money(installments.Sum(i => i.Amount))}");
+            y -= 11;
+            foreach (var installment in installments)
+            {
+                if (y - 11 < Margin + FooterHeight)
+                {
+                    page = NewPage(pdf, document, denomination, number, firstPage: false, out y);
+                    y -= 4;
+                }
+
+                page.Text(PdfFont.Regular, 8, Left + 10, y, $"Cuota {installment.Number.ToString(CultureInfo.InvariantCulture)}");
+                page.Text(PdfFont.Regular, 8, Left + 70, y, $"Vence: {installment.DueDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}");
+                page.TextRight(PdfFont.Regular, 8, Left + 260, y, $"{symbol} {Money(installment.Amount)}");
+                y -= 11;
+            }
+        }
+
         if (y < Margin + FooterHeight)
         {
             page = NewPage(pdf, document, denomination, number, firstPage: false, out y);

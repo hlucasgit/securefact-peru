@@ -196,6 +196,33 @@ public class PrintedRepresentationTests
     }
 
     [Fact]
+    public void A_sale_on_credit_prints_the_payment_form_the_net_amount_and_the_installments()
+    {
+        var credit = Document() with { Installments = [new PrintedInstallment(1, new DateOnly(2026, 10, 30), 100m), new PrintedInstallment(2, new DateOnly(2026, 11, 30), 136m)] };
+
+        var content = string.Concat(PageContents(_renderer.Render(credit).Value));
+
+        Assert.Contains("(Forma de pago: Crédito)", content, StringComparison.Ordinal);
+        Assert.Contains("(Monto neto pendiente de pago: S/ 236.00)", content, StringComparison.Ordinal);
+        Assert.Contains("(Cuota 1)", content, StringComparison.Ordinal);
+        Assert.Contains("(Vence: 30/11/2026)", content, StringComparison.Ordinal);
+        Assert.Contains("(S/ 136.00)", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cuota", string.Concat(PageContents(_renderer.Render(Document()).Value)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Many_installments_paginate_and_the_totals_stay_on_the_last_page()
+    {
+        var installments = Enumerable.Range(1, 90).Select(i => new PrintedInstallment(i, new DateOnly(2026, 10, 1).AddDays(i), 2m)).ToList();
+
+        var pages = PageContents(_renderer.Render(Document(lines: 20) with { Installments = installments }).Value);
+
+        Assert.True(pages.Count >= 2);
+        Assert.Equal(1, pages.Count(p => p.Contains("IMPORTE TOTAL", StringComparison.Ordinal)));
+        Assert.Contains("(Cuota 90)", string.Concat(pages), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_voided_document_carries_the_word_ANULADO_on_every_page_and_the_rest_is_unchanged()
     {
         var plain = _renderer.Render(Document(lines: 120)).Value;
