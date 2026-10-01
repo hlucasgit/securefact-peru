@@ -94,6 +94,11 @@ if (reply.CdrZip is { } cdrZip)
     }
 }
 
+if (args.Contains("void", StringComparer.Ordinal))
+{
+    return await VoidRoundTripAsync(provider, certificate, algorithm, ruc, user, password, data);
+}
+
 if (args.Contains("nc", StringComparer.Ordinal) || args.Contains("nd", StringComparer.Ordinal))
 {
     return await NoteRoundTripAsync(provider, certificate, algorithm, ruc, user, password, lima, number, data, args.Contains("nc", StringComparer.Ordinal));
@@ -202,6 +207,52 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
                 Console.WriteLine($"Note {note.Code}: {note.Message}");
             }
 
+            return 0;
+        }
+    }
+
+    return 5;
+}
+
+static async Task<int> VoidRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, UblInvoiceData original)
+{
+    var today = original.IssueDate;
+    var generated = provider.GetRequiredService<IVoidedDocumentsGenerator>().Generate(new VoidedData(
+        ruc, "EMPRESA DE PRUEBA SAC", original.IssueDate, today, (int)(original.Number % 90000) + 1, [new VoidedLineData(1, "01", original.Series, original.Number, "Error en la emision de prueba")]));
+    if (!generated.IsSuccess) { Console.Error.WriteLine($"RA: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
+    var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);
+    if (!signed.IsSuccess) { Console.Error.WriteLine($"Sign: {signed.Error.Code} {signed.Error.Detail}"); return 1; }
+    var zip = provider.GetRequiredService<ICpePackager>().Zip(generated.Value.FileBaseName, signed.Value.Xml);
+    var channel = provider.GetRequiredService<ICpeSubmissionChannel>();
+    var credentials = new SunatCredentials(ruc, user, password);
+    await Task.Delay(TimeSpan.FromSeconds(10)); // the beta answered 401 to a second call made within a few seconds of the first
+    Console.WriteLine($"Sending voided-documents communication {generated.Value.FileBaseName}.zip to the SUNAT BETA service...");
+    var sent = await channel.SendSummaryAsync(credentials, generated.Value.ZipFileName, zip.Value);
+    Console.WriteLine($"sendSummary outcome: {sent.Outcome} ticket={sent.Ticket}");
+    if (sent.Fault is { } fault) { Console.WriteLine($"Fault: code={fault.Code?.ToString(CultureInfo.InvariantCulture)} message={fault.Message}"); return 3; }
+    for (var attempt = 1; attempt <= 8; attempt++)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(4));
+        var status = await channel.GetStatusAsync(credentials, sent.Ticket!);
+        Console.WriteLine($"getStatus #{attempt}: {status.Outcome}");
+        if (status.Fault is { } sf) { Console.WriteLine($"Fault: code={sf.Code?.ToString(CultureInfo.InvariantCulture)} message={sf.Message}"); return 3; }
+        if (status.CdrZip is { } cdrZip)
+        {
+            var cdr = provider.GetRequiredService<ICdrParser>().ParseZip(cdrZip);
+            if (!cdr.IsSuccess)
+            {
+                Console.WriteLine($"CDR could not be parsed: {cdr.Error.Detail}");
+                if (provider.GetRequiredService<ICpePackager>().Unzip(cdrZip) is { IsSuccess: true } raw)
+                {
+                    Console.WriteLine(System.Text.RegularExpressions.Regex.Replace(raw.Value.Content, "<Signature.*?</Signature>", "<Signature…/>", System.Text.RegularExpressions.RegexOptions.Singleline));
+                }
+
+                return 4;
+            }
+
+            Console.WriteLine($"CDR: status={cdr.Value.Status} code={cdr.Value.ResponseCode} ref={cdr.Value.ReferenceId}");
+            Console.WriteLine($"Description: {cdr.Value.Description}");
+            foreach (var n in cdr.Value.Observations) { Console.WriteLine($"Note {n.Code}: {n.Message}"); }
             return 0;
         }
     }

@@ -26,6 +26,7 @@ public static class AuditActions
     public const string ElectronicDocumentFailed = "cpe.electronic_document.failed";
     public const string ElectronicDocumentRetried = "cpe.electronic_document.retried";
     public const string SummaryCreated = "cpe.summary.created";
+    public const string VoidCommunicationCreated = "cpe.void_communication.created";
     public const string ElectronicDocumentRecovered = "cpe.electronic_document.recovered";
     public const string SolCredentialsSet = "certificates.sol_credentials.set";
     public const string SolCredentialsCleared = "certificates.sol_credentials.cleared";

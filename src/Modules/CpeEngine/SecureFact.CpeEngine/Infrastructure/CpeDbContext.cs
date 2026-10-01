@@ -53,6 +53,8 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.Version).IsRowVersion();
             b.Ignore(e => e.Snapshot);
             b.Ignore(e => e.IsSummary);
+            b.Ignore(e => e.IsVoidCommunication);
+            b.Ignore(e => e.IsTicketBatch);
             b.HasIndex(e => new { e.TenantId, e.DocumentId }).IsUnique();
             b.HasIndex(e => new { e.TenantId, e.FileBaseName }).IsUnique();
             b.HasIndex(e => new { e.State, e.NextAttemptAt });
@@ -83,6 +85,7 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.SummaryId).HasColumnName("summary_id");
             b.Property(e => e.ElectronicDocumentId).HasColumnName("electronic_document_id");
             b.Property(e => e.LineNumber).HasColumnName("line_number");
+            b.Property(e => e.Reason).HasColumnName("reason").HasMaxLength(100);
             b.Property(e => e.ReleasedAt).HasColumnName("released_at");
             b.HasIndex(e => e.SummaryId);
 

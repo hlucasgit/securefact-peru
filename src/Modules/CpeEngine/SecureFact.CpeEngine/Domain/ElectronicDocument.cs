@@ -96,13 +96,25 @@ internal sealed class ElectronicDocument : ITenantOwned
     };
 
     /// <summary>A daily summary has no billing document: it uses its own id as document id, "RC" as type and its correlative as number.</summary>
+    public static ElectronicDocument CreateVoidCommunication(
+        Guid id, Guid tenantId, Guid companyId, DateOnly referenceDate, int correlative, string fileBaseName, string signedXml, string digestValue, DateTimeOffset now) =>
+        Create(id, tenantId, id, companyId, VoidType, "RA", correlative, fileBaseName, signedXml, digestValue, now, referenceDate);
+
     public static ElectronicDocument CreateSummary(
         Guid id, Guid tenantId, Guid companyId, DateOnly referenceDate, int correlative, string fileBaseName, string signedXml, string digestValue, DateTimeOffset now) =>
         Create(id, tenantId, id, companyId, SummaryType, "RC", correlative, fileBaseName, signedXml, digestValue, now, referenceDate);
 
     public const string SummaryType = "RC";
 
+    /// <summary>A voided-documents communication ("comunicación de baja"): sent like a summary, but it voids documents that already have a final answer.</summary>
+    public const string VoidType = "RA";
+
     public bool IsSummary => DocumentTypeCode == SummaryType;
+
+    public bool IsVoidCommunication => DocumentTypeCode == VoidType;
+
+    /// <summary>Sent with <c>sendSummary</c>, answered with a ticket and followed with <c>getStatus</c>.</summary>
+    public bool IsTicketBatch => IsSummary || IsVoidCommunication;
 
     public void MoveTo(EDocumentSnapshot snapshot, DateTimeOffset now)
     {
@@ -206,8 +218,12 @@ internal sealed class SummaryItem : ITenantOwned
     /// <summary>Set when the summary was rejected: the receipt can then be reported again.</summary>
     public DateTimeOffset? ReleasedAt { get; private set; }
 
-    public static SummaryItem Create(Guid tenantId, Guid summaryId, Guid electronicDocumentId, int lineNumber) => new()
+    /// <summary>Voided-documents communications only: why the document is voided.</summary>
+    public string? Reason { get; private set; }
+
+    public static SummaryItem Create(Guid tenantId, Guid summaryId, Guid electronicDocumentId, int lineNumber, string? reason = null) => new()
     {
+        Reason = reason,
         Id = Guid.CreateVersion7(),
         TenantId = tenantId,
         SummaryId = summaryId,

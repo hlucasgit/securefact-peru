@@ -54,8 +54,8 @@ public static class SunatCodes
 public sealed record CdrObservation(string Code, string Message);
 
 /// <param name="ProcessId">Reception process number (<c>cbc:ID</c>).</param>
-/// <param name="ReceivedDate">Date SUNAT received the document (<c>cbc:IssueDate</c>).</param>
-/// <param name="ReceivedTime">Time SUNAT received the document (<c>cbc:IssueTime</c>).</param>
+/// <param name="ReceivedDate">Date SUNAT received the document (<c>cbc:IssueDate</c>); null when SUNAT leaves it empty (voided-documents CDRs from the beta).</param>
+/// <param name="ReceivedTime">Time SUNAT received the document (<c>cbc:IssueTime</c>); null together with the date.</param>
 /// <param name="ResponseDate">Date the CDR was generated.</param>
 /// <param name="ResponseTime">Time the CDR was generated.</param>
 /// <param name="SunatRuc">RUC of the issuer of the CDR (SUNAT).</param>
@@ -66,8 +66,8 @@ public sealed record CdrObservation(string Code, string Message);
 /// <param name="Observations">Notes attached to the response.</param>
 public sealed record CdrInfo(
     string ProcessId,
-    DateOnly ReceivedDate,
-    TimeOnly ReceivedTime,
+    DateOnly? ReceivedDate,
+    TimeOnly? ReceivedTime,
     DateOnly ResponseDate,
     TimeOnly ResponseTime,
     string SunatRuc,

@@ -157,7 +157,7 @@ internal sealed class ElectronicDocumentService(
         }
 
         var isNote = entity.DocumentTypeCode is DocumentTypes.CreditNote or DocumentTypes.DebitNote;
-        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or ElectronicDocument.SummaryType) && !(isNote && entity.ReferenceTypeCode == DocumentTypes.Invoice))
+        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or ElectronicDocument.SummaryType or ElectronicDocument.VoidType) && !(isNote && entity.ReferenceTypeCode == DocumentTypes.Invoice))
         {
             return Error.Validation(ErrorCodes.CpeUnsupported, "Envío no soportado", "Las boletas y sus notas se informan en el resumen diario: cree el resumen y envíelo.");
         }
@@ -196,7 +196,7 @@ internal sealed class ElectronicDocumentService(
         }
 
         var children = await LoadChildrenAsync(entity, cancellationToken);
-        if (children.Any(c => c.Document.State != EDocumentState.ReadyToSend))
+        if (entity.IsSummary && children.Any(c => c.Document.State != EDocumentState.ReadyToSend))
         {
             return Error.Conflict(ErrorCodes.CpeInvalidTransition, "Transición de estado inválida", "Alguna boleta del resumen ya no está lista para enviarse.");
         }
@@ -218,7 +218,7 @@ internal sealed class ElectronicDocumentService(
         ChannelReply reply;
         try
         {
-            reply = entity.IsSummary
+            reply = entity.IsTicketBatch
                 ? await channel.SendSummaryAsync(credentials, entity.FileBaseName + ".zip", package.Value, cancellationToken)
                 : await channel.SendBillAsync(credentials, entity.FileBaseName + ".zip", package.Value, cancellationToken);
         }
@@ -375,14 +375,23 @@ internal sealed class ElectronicDocumentService(
     public async Task<Result<ElectronicDocumentDto>> GetAsync(Guid electronicDocumentId, CancellationToken cancellationToken)
     {
         var entity = await db.ElectronicDocuments.AsNoTracking().SingleOrDefaultAsync(e => e.Id == electronicDocumentId, cancellationToken);
-        return entity is null ? Missing : ToDto(entity);
+        return entity is null ? Missing : ToDto(entity) with { Voided = await IsVoidedAsync(entity.Id, cancellationToken) };
     }
 
     public async Task<Result<ElectronicDocumentDto>> GetByDocumentAsync(Guid documentId, CancellationToken cancellationToken)
     {
         var entity = await db.ElectronicDocuments.AsNoTracking().SingleOrDefaultAsync(e => e.DocumentId == documentId, cancellationToken);
-        return entity is null ? Missing : ToDto(entity);
+        return entity is null ? Missing : ToDto(entity) with { Voided = await IsVoidedAsync(entity.Id, cancellationToken) };
     }
+
+    /// <summary>A document is voided once a voided-documents communication that covers it was accepted by SUNAT.</summary>
+    private Task<bool> IsVoidedAsync(Guid electronicDocumentId, CancellationToken cancellationToken) =>
+        db.SummaryItems.AsNoTracking()
+            .Where(i => i.ElectronicDocumentId == electronicDocumentId && i.ReleasedAt == null)
+            .Join(
+                db.ElectronicDocuments.AsNoTracking().Where(e => e.DocumentTypeCode == ElectronicDocument.VoidType && e.State == EDocumentState.Accepted),
+                i => i.SummaryId, e => e.Id, (i, e) => i)
+            .AnyAsync(cancellationToken);
 
     public async Task<Result<IReadOnlyList<ElectronicDocumentEventDto>>> ListEventsAsync(Guid electronicDocumentId, CancellationToken cancellationToken)
     {
@@ -524,10 +533,10 @@ internal sealed class ElectronicDocumentService(
         var now = clock.GetUtcNow();
         switch (reply.Outcome)
         {
-            case ChannelOutcome.CdrReceived when reply.CdrZip is { } zip && !entity.IsSummary:
+            case ChannelOutcome.CdrReceived when reply.CdrZip is { } zip && !entity.IsTicketBatch:
                 return HandleCdr(entity, children, companyRuc, zip, now);
 
-            case ChannelOutcome.TicketIssued when entity.IsSummary && !string.IsNullOrWhiteSpace(reply.Ticket):
+            case ChannelOutcome.TicketIssued when entity.IsTicketBatch && !string.IsNullOrWhiteSpace(reply.Ticket):
                 entity.RecordTicket(reply.Ticket);
                 Lifecycle.Transition(db, machine, entity, EDocumentEvent.TicketIssued, $"Ticket {reply.Ticket}.", now);
                 Propagate(entity, children, EDocumentEvent.TicketIssued, $"Resumen recibido por SUNAT (ticket {reply.Ticket}).", now, null);
@@ -562,7 +571,7 @@ internal sealed class ElectronicDocumentService(
         }
 
         var cdr = parsed.Value;
-        var expectedReference = entity.IsSummary ? entity.FileBaseName[(companyRuc.Length + 1)..] : $"{entity.Series}-{entity.Number}";
+        var expectedReference = entity.IsTicketBatch ? entity.FileBaseName[(companyRuc.Length + 1)..] : $"{entity.Series}-{entity.Number}";
         if (cdr.ReferenceId != expectedReference || cdr.TaxpayerRuc != companyRuc)
         {
             entity.KeepRawCdr(zip);
@@ -621,7 +630,7 @@ internal sealed class ElectronicDocumentService(
 
     private async Task<IReadOnlyList<Child>> LoadChildrenAsync(ElectronicDocument summary, CancellationToken cancellationToken)
     {
-        if (!summary.IsSummary)
+        if (!summary.IsTicketBatch)
         {
             return [];
         }
@@ -638,6 +647,20 @@ internal sealed class ElectronicDocumentService(
     /// </summary>
     private void Propagate(ElectronicDocument summary, IReadOnlyList<Child> children, EDocumentEvent @event, string detail, DateTimeOffset now, (CdrInfo Cdr, string ObservationsJson)? outcome)
     {
+        if (summary.IsVoidCommunication)
+        {
+            // The voided documents already have a final answer and never change state. A rejected communication frees them to be voided again.
+            if (@event == EDocumentEvent.CdrRejected)
+            {
+                foreach (var child in children)
+                {
+                    child.Item.Release(now);
+                }
+            }
+
+            return;
+        }
+
         if (!summary.IsSummary)
         {
             return;

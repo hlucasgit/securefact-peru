@@ -146,7 +146,7 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
         const string summary = ElectronicDocument.SummaryType;
 
         var sends = await db.ElectronicDocuments.AsNoTracking()
-            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.ReadyToSend && (e.DocumentTypeCode == DocumentTypes.Invoice || e.DocumentTypeCode == summary
+            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.ReadyToSend && (e.DocumentTypeCode == DocumentTypes.Invoice || e.DocumentTypeCode == summary || e.DocumentTypeCode == ElectronicDocument.VoidType
                     || ((e.DocumentTypeCode == DocumentTypes.CreditNote || e.DocumentTypeCode == DocumentTypes.DebitNote) && e.ReferenceTypeCode == DocumentTypes.Invoice))
                 && (e.NextAttemptAt == null || e.NextAttemptAt <= now))
             .OrderBy(e => e.CreatedAt)

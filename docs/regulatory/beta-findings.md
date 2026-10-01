@@ -13,6 +13,9 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 - **Notas** (R-045): nota de crédito (motivo 01) y de débito (motivo 02) de una factura, y nota de crédito (motivo 07) de una boleta, enviadas con `sendBill` después de aceptarse el original, aceptadas sin observaciones. Series `FC01`, `FD01` y `BC01`.
 - **HTTP 401 intermitente**: una de las llamadas (un `sendBill` justo después de otro con las mismas credenciales) devolvió 401 y la siguiente, con las mismas credenciales, fue aceptada. El canal sigue tratando el 401 como no reintentable: reintentar con una clave SOL incorrecta podría bloquear la cuenta.
 
+- **Comunicación de baja** (R-046): una factura aceptada y su baja (`sendSummary` + `getStatus`): aceptada con código 0; `ReferenceID` = `RA-AAAAMMDD-n`; el CDR trae `cbc:IssueDate` vacío (el analizador lo admite).
+- **HTTP 401 tras una llamada reciente**: dos veces, una segunda llamada hecha a los pocos segundos de la primera con las mismas credenciales recibió 401; con unos segundos de espera fue aceptada. Parece un límite de ritmo del beta, no un error de credenciales.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

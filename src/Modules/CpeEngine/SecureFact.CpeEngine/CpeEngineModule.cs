@@ -17,6 +17,7 @@ public static class CpeEngineModule
             .AddSingleton<IQrPayloadGenerator, QrPayloadGenerator>()
             .AddSingleton<IUblDocumentGenerator, UblInvoiceGenerator>()
             .AddSingleton<ISummaryDocumentGenerator, SummaryDocumentGenerator>()
+            .AddSingleton<IVoidedDocumentsGenerator, VoidedDocumentsGenerator>()
             .AddSingleton<IPrintedRepresentationRenderer, Printing.PdfPrintedRepresentationRenderer>()
             .AddSingleton<IXmlSigner, XmlDsigSigner>()
             .AddSingleton<ICpePackager, ZipCpePackager>()
@@ -35,6 +36,7 @@ public static class CpeEngineModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IElectronicDocumentService, ElectronicDocumentService>();
         services.AddScoped<ISummaryService, SummaryService>();
+        services.AddScoped<IVoidService, VoidService>();
         services.AddScoped<SecureFact.SharedKernel.Messaging.IIntegrationEventConsumer, DocumentIssuedHandler>();
         services.AddSingleton<ICpeWorkProcessor, CpeWorkProcessor>();
         return services;

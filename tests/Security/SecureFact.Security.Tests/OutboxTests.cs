@@ -184,7 +184,7 @@ public sealed class OutboxTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.Created, (await UploadCertificateAsync(setup)).StatusCode);
         Assert.Equal(OutboxReport.Empty, await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId)); // still waiting out the backoff
 
-        await ExecuteAsync($"UPDATE billing.outbox_message SET next_attempt_at = now() WHERE tenant_id = '{setup.TenantId}'");
+        await ExecuteAsync($"UPDATE billing.outbox_message SET next_attempt_at = now() - interval '5 seconds' WHERE tenant_id = '{setup.TenantId}'");
         var delivered = await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId);
 
         Assert.Equal(new OutboxReport(1, 0, 0), delivered);
@@ -202,7 +202,7 @@ public sealed class OutboxTests(ApiFixture api)
 
         Assert.Equal(new OutboxReport(0, 1, 1), report);
         Assert.Equal(1, await CountAsync(setup.TenantId, "dead_at IS NOT NULL"));
-        await ExecuteAsync($"UPDATE billing.outbox_message SET next_attempt_at = now() WHERE tenant_id = '{setup.TenantId}'");
+        await ExecuteAsync($"UPDATE billing.outbox_message SET next_attempt_at = now() - interval '5 seconds' WHERE tenant_id = '{setup.TenantId}'");
         Assert.Equal(OutboxReport.Empty, await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId)); // dead messages are never claimed
 
         var dead = (await setup.Owner.GetFromJsonAsync<List<DeadOutboxMessage>>("/api/v1/outbox/dead", ApiFixture.JsonOptions))!;

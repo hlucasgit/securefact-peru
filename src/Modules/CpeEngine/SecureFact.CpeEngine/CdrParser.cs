@@ -64,7 +64,7 @@ internal sealed partial class CdrParser(ICpePackager packager) : ICdrParser
         var codeText = Text(response?.Element(Cbc + "ResponseCode"));
         var description = Text(response?.Element(Cbc + "Description"));
 
-        if (processId.Length == 0 || receivedDate is null || receivedTime is null || responseDate is null || responseTime is null
+        if (processId.Length == 0 || responseDate is null || responseTime is null
             || sunat.Length == 0 || taxpayer.Length == 0 || referenceId.Length == 0)
         {
             return Bad("Faltan datos obligatorios en el CDR (identificador, fechas, horas, RUC o documento).");
@@ -92,7 +92,7 @@ internal sealed partial class CdrParser(ICpePackager packager) : ICdrParser
         }
 
         return new CdrInfo(
-            processId, receivedDate.Value, receivedTime.Value, responseDate.Value, responseTime.Value,
+            processId, receivedDate, receivedTime, responseDate.Value, responseTime.Value,
             sunat, taxpayer, referenceId, code, description, observations);
     }
 
@@ -112,7 +112,8 @@ internal sealed partial class CdrParser(ICpePackager packager) : ICdrParser
             return (DateOnly.FromDateTime(stamp), TimeOnly.FromDateTime(stamp));
         }
 
-        return (ParseDate(date), ParseTime(time));
+        var parsed = ParseDate(date);
+        return (parsed, parsed is null ? null : ParseTime(time));
     }
 
     private static DateOnly? ParseDate(string value) =>

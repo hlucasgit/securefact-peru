@@ -80,6 +80,21 @@ public class CdrParserTests
     }
 
     [Fact]
+    public void The_cdr_of_a_voided_documents_communication_may_leave_the_received_date_empty()
+    {
+        // The beta answered a "comunicación de baja" with an empty cbc:IssueDate (2026-10-01).
+        var xml = BetaCdr.Replace("<cbc:IssueDate>2026-10-01T11:42:05</cbc:IssueDate>", "<cbc:IssueDate/>", StringComparison.Ordinal)
+            .Replace("F001-42126", "RA-20261001-44127", StringComparison.Ordinal);
+
+        var result = _parser.Parse(xml);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        Assert.Null(result.Value.ReceivedDate);
+        Assert.Equal("RA-20261001-44127", result.Value.ReferenceId);
+        Assert.Equal(CdrStatus.Accepted, result.Value.Status);
+    }
+
+    [Fact]
     public void An_accepted_cdr_without_notes_is_plain_accepted()
     {
         var cdr = _parser.Parse(Cdr()).Value;

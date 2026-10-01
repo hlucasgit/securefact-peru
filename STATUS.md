@@ -45,6 +45,10 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
 - Pendiente: motivos 11–13, acumulado de notas de crédito, bajas.
 
+## Comunicación de baja
+- `POST /api/v1/voids`: baja de facturas y notas de facturas aceptadas (≤ 7 días), una comunicación por fecha; se envía y sigue como un resumen; «anulado» se deriva de la comunicación aceptada. Aceptada en el beta. Pruebas: 538 pasan.
+- Pendiente: baja de boletas por resumen con estado 3, bloquear notas sobre documentos anulados, indicar «anulado» en el PDF.
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción, crédito, notas, bajas y descuentos sin probar.

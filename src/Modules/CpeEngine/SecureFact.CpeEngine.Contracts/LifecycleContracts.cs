@@ -83,6 +83,7 @@ public interface IEDocumentStateMachine
 
 /// <summary>Electronic side of a numbered billing document: its signed XML, its state with SUNAT and the CDR.</summary>
 /// <param name="CdrResponseCode">SUNAT response code from the CDR; null until a CDR arrives.</param>
+/// <param name="Voided">True when a voided-documents communication that SUNAT accepted covers this document: it stays in the record but is annulled.</param>
 /// <param name="LastErrorCode">Last transport or SUNAT fault code (never a secret), for support.</param>
 public sealed record ElectronicDocumentDto(
     Guid Id,
@@ -108,7 +109,8 @@ public sealed record ElectronicDocumentDto(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? SentAt,
     DateTimeOffset? ProcessedAt,
-    DateOnly IssueDate);
+    DateOnly IssueDate,
+    bool Voided = false);
 
 public sealed record ElectronicDocumentEventDto(Guid Id, EDocumentState From, EDocumentState To, EDocumentEvent Event, int Attempt, string? Detail, DateTimeOffset OccurredAt);
 

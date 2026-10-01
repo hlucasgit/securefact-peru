@@ -51,5 +51,14 @@ internal static class CpeEndpoints
 
         summaries.MapGet("/{id:guid}", async (Guid id, ISummaryService service, HttpContext http, CancellationToken ct) =>
             (await service.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
+
+        var voids = app.MapGroup("/api/v1/voids").WithTags("CPE");
+
+        voids.MapPost(string.Empty, async (CreateVoidRequest body, IVoidService service, HttpContext http, CancellationToken ct) =>
+            (await service.CreateAsync(body, ct)).ToHttp(http, created => Results.Created($"/api/v1/voids/{created[0].Document.Id}", created)))
+            .RequireAuthorization(Permissions.CpeSend);
+
+        voids.MapGet("/{id:guid}", async (Guid id, IVoidService service, HttpContext http, CancellationToken ct) =>
+            (await service.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
     }
 }
