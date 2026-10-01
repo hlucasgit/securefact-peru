@@ -45,6 +45,26 @@ public static partial class RlsSql
     }
 
     /// <summary>
+    /// Platform-wide reference data (e.g. SUNAT catalogues): every scope may read; only the explicit platform scope may write, and the runtime
+    /// role additionally has no INSERT/UPDATE/DELETE privilege, so loading data is an owner-side operation.
+    /// </summary>
+    public static string EnableGlobalReference(string schema, string table)
+    {
+        Validate(schema);
+        Validate(table);
+        return $"""
+            ALTER TABLE {schema}.{table} ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE {schema}.{table} FORCE ROW LEVEL SECURITY;
+            DROP POLICY IF EXISTS global_read ON {schema}.{table};
+            DROP POLICY IF EXISTS platform_write ON {schema}.{table};
+            CREATE POLICY global_read ON {schema}.{table} FOR SELECT USING (true);
+            CREATE POLICY platform_write ON {schema}.{table} FOR ALL
+              USING (current_setting('app.scope', true) = 'platform')
+              WITH CHECK (current_setting('app.scope', true) = 'platform');
+            """;
+    }
+
+    /// <summary>
     /// Grants runtime privileges to the application role when it exists. The role is created by infrastructure
     /// (not by migrations) and has neither ownership of the tables nor BYPASSRLS.
     /// </summary>

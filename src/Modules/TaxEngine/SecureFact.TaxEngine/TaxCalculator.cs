@@ -22,6 +22,9 @@ internal sealed class TaxCalculator : ITaxCalculator
 
     private static readonly Dictionary<string, LineKind> Affectations = BuildAffectations();
 
+    /// <summary>Catalogue 07 codes the calculator understands; a test keeps this in sync with the official catalogue.</summary>
+    internal static IReadOnlyCollection<string> SupportedAffectationCodes => Affectations.Keys;
+
     public Result<TaxCalculationResult> Calculate(TaxCalculationRequest request)
     {
         try

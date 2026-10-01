@@ -14,6 +14,14 @@
     <Project Path="src/Modules/Billing/SecureFact.Billing.Contracts/SecureFact.Billing.Contracts.csproj" />
     <Project Path="src/Modules/Billing/SecureFact.Billing/SecureFact.Billing.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Catalogs/">
+    <Project Path="src/Modules/Catalogs/SecureFact.Catalogs.Contracts/SecureFact.Catalogs.Contracts.csproj" />
+    <Project Path="src/Modules/Catalogs/SecureFact.Catalogs/SecureFact.Catalogs.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/CpeEngine/">
+    <Project Path="src/Modules/CpeEngine/SecureFact.CpeEngine.Contracts/SecureFact.CpeEngine.Contracts.csproj" />
+    <Project Path="src/Modules/CpeEngine/SecureFact.CpeEngine/SecureFact.CpeEngine.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/SecureFact.Identity.Contracts/SecureFact.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/SecureFact.Identity/SecureFact.Identity.csproj" />
@@ -42,5 +50,8 @@
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/SecureFact.Unit.Tests/SecureFact.Unit.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/SecureFact.CatalogImporter/SecureFact.CatalogImporter.csproj" />
   </Folder>
 </Solution>

@@ -30,7 +30,7 @@ internal static partial class BillingRules
     [GeneratedRegex(@"^\d{8}$")]
     private static partial Regex Dni();
 
-    private static readonly string[] SupportedBuyerDocumentTypes = ["0", "1", "4", "6", "7", "A"];
+    internal static readonly string[] SupportedBuyerDocumentTypes = ["0", "1", "4", "6", "7", "A"];
 
     /// <summary>
     /// Maximum age of the issue date when the document is created (SEE-del Contribuyente: 3 calendar days, S02; the same value is applied

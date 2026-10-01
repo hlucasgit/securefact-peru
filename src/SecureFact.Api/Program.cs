@@ -5,6 +5,8 @@ using SecureFact.Api.Infrastructure;
 using SecureFact.Api.Security;
 using SecureFact.Audit;
 using SecureFact.Billing;
+using SecureFact.Catalogs;
+using SecureFact.CpeEngine;
 using SecureFact.Identity;
 using SecureFact.Organizations;
 using SecureFact.Identity.Contracts;
@@ -90,6 +92,8 @@ if (appConnection is not null)
     builder.Services.AddTenancyModule(appConnection);
     builder.Services.AddOrganizationsModule(appConnection);
     builder.Services.AddTaxEngineModule();
+    builder.Services.AddCpeEngineModule();
+    builder.Services.AddCatalogsModule(appConnection);
     builder.Services.AddBillingModule(appConnection);
     builder.Services.AddIdentityModule(appConnection, options => builder.Configuration.GetSection("Identity").Bind(options));
 }
@@ -106,6 +110,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await AuditModule.MigrateAsync(migrationsConnection);
     await OrganizationsModule.MigrateAsync(migrationsConnection);
     await BillingModule.MigrateAsync(migrationsConnection);
+    await CatalogsModule.MigrateAsync(migrationsConnection);
     return;
 }
 
@@ -148,6 +153,7 @@ app.MapUserAndTenantEndpoints();
 app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
 app.MapBillingEndpoints();
+app.MapCatalogEndpoints();
 
 app.Run();
 

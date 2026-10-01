@@ -27,6 +27,10 @@ public static class ErrorCodes
     public const string TaxPrecisionExceeded = "SF-TAX-003";
     public const string TaxAmountOverflow = "SF-TAX-004";
 
+    public const string CpeInvalidQrField = "SF-CPE-001";
+
+    public const string CatalogNotFound = "SF-CAT-001";
+
     public const string InvalidCompany = "SF-ORG-001";
     public const string CompanyNotFound = "SF-ORG-002";
     public const string CompanyAlreadyExists = "SF-ORG-003";

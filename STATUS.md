@@ -1,7 +1,13 @@
-# STATUS — 2026-10-01 (tras la hora de trabajo autónomo)
+# STATUS — 2026-10-01 (segunda hora autónoma)
 
 ## Estado general
 Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almacenamiento S3 de código; el CI no se ha ejecutado). **Fase 2 en curso**: ya existen el motor tributario, las series, la numeración atómica y la emisión idempotente de facturas/boletas. Último commit en `origin/main`: `3bfc54b`. El trabajo de esta hora está **sin commitear**.
+
+## Novedades de la segunda hora
+- **Catalogs**: 42 catálogos oficiales (794 códigos) importados del libro de reglas del 26.08.2026 con `tools/SecureFact.CatalogImporter`; esquema `catalog` con vigencias y versiones, lectura por API (`/api/v1/catalogs`), carga solo del lado del dueño del esquema. Pruebas de que semilla = libro almacenado = hash registrado, y de que TaxEngine/Billing no se desvían de los catálogos oficiales (**ADR-015**).
+- **CpeEngine** (inicio): contenido del QR según el Anexo N.° 6 §6.4.3, leído de la fuente primaria (S19). Hallazgo: la guía XML de factura **no** trata el QR; las leyendas del catálogo 52 sí están en la guía (S20).
+- XSD de SUNAT: el propietario descargó el zip; UBL 2.1 y UBLPE 2.0 extraídos y verificados.
+- **Pruebas: 213 pasan en Release con warnings-as-errors** (112 unitarias, 6 de arquitectura, 6 de integración, 89 de seguridad/API). Cobertura no medida.
 
 ## Módulos
 `SharedKernel`, `Platform` (RLS, ámbito de datos, cifrado de envoltura), `Tenancy`, `Identity`, `Audit`, `Organizations`, **`TaxEngine`** (nuevo), **`Billing`** (nuevo), `Api`. Ver ADR-001…014.
@@ -19,7 +25,7 @@ Nuevo: fórmulas de totales y tolerancias de la hoja de reglas (S16). Supuestos 
 
 ## Riesgos y deuda
 - Auditoría escrita después del cambio de negocio (ADR-012) hasta tener outbox.
-- Catálogos transcritos en código (afectaciones, tributos); falta el módulo `Catalogs` que los importe del xlsx (requiere autorizar la descarga).
+- Catálogos con lista externa (moneda, unidad, país, ubigeo, producto SUNAT) sin cargar completos; la tasa del IGV y los plazos (Parámetros 004/012/024) siguen siendo entradas, no reglas servidas por un `IRuleProvider`.
 - `docs/regulatory/sources.md` S18 (guías XML) sin leer: QR, leyendas y estructura UBL dependen de ellas.
 - Sin clientes/productos como entidades propias (el adquirente va en cada documento).
 - Notas de crédito/débito esperan el flujo de CDR (Fase 4).
@@ -27,6 +33,6 @@ Nuevo: fórmulas de totales y tolerancias de la hoja de reglas (S16). Supuestos 
 ## Pendientes
 1. ✔ Descargas autorizadas y hechas: xlsx, guías XML y 19 XSD UBL 2.1 en `docs/regulatory/assets/` (con hashes). El zip de XSD lo descargó el propietario; UBL 2.1 y UBLPE 2.0 están extraídos y verificados por hash.
 2. Commit y push.
-3. `Catalogs` (importación versionada), `Customers`, `Products`, reglas con vigencia como servicio (`IRuleProvider`).
+3. `Customers`, `Products`, reglas con vigencia como servicio (`IRuleProvider`: plazos Parámetro 004, tasas Parámetros 012/024).
 4. Cerrar Fase 1: outbox + `IMessageBus` (RabbitMQ) + `IObjectStorage` (S3) y ejecutar el CI.
 5. Fase 3: leer guías XML, generador UBL, XSD, firma, CDR, QR, PDF.
