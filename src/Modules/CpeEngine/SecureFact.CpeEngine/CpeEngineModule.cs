@@ -16,6 +16,7 @@ public static class CpeEngineModule
         services
             .AddSingleton<IQrPayloadGenerator, QrPayloadGenerator>()
             .AddSingleton<IUblDocumentGenerator, UblInvoiceGenerator>()
+            .AddSingleton<ISummaryDocumentGenerator, SummaryDocumentGenerator>()
             .AddSingleton<IXmlSigner, XmlDsigSigner>()
             .AddSingleton<ICpePackager, ZipCpePackager>()
             .AddSingleton<ICdrParser, CdrParser>()
