@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Nota de crédito de motivo 13 (ajuste de montos y/o fechas de cuotas) sobre facturas al crédito: sin líneas, con las cuotas nuevas e importe total cero; aceptada en el beta (ADR-026).
 - Venta al crédito con cuotas en facturas: validación del plan en Billing, UBL con `Credito` y `CuotaNNN`, PDF con las cuotas; aceptada en el beta (ADR-026).
 - Descuentos y cargos de línea y globales en facturas y boletas: UBL con `AllowanceCharge`, base y factor, totales, resumen diario, PDF y Billing; aceptados en el beta (ADR-025). Las líneas exoneradas, inafectas y gratuitas llevan ahora su tasa (rechazo 2992 del beta).
 - El PDF de un documento anulado (baja aceptada por SUNAT) lleva «ANULADO» en cada página (ADR-024).

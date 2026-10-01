@@ -61,7 +61,8 @@ public sealed record UblDocument(string Xml, string FileBaseName)
 
 /// <summary>
 /// Canonical input of a credit (07) or debit (08) note. The note modifies exactly one invoice (01) or receipt (03); the reason comes from
-/// catalogue 09 (credit) or 10 (debit) and is explained in <see cref="ReasonDescription"/> (1-500 characters).
+/// catalogue 09 (credit) or 10 (debit) and is explained in <see cref="ReasonDescription"/> (1-500 characters). A credit note of reason 13 (adjustment of the
+/// amounts or dates of the installments) modifies an invoice sold on credit, has a payable amount of zero and states the new <paramref name="Installments"/>.
 /// </summary>
 public sealed record UblNoteData(
     string DocumentTypeCode,
@@ -79,7 +80,8 @@ public sealed record UblNoteData(
     UblParty Buyer,
     IReadOnlyList<UblLine> Lines,
     TaxCalculationResult Totals,
-    decimal IgvRate);
+    decimal IgvRate,
+    IReadOnlyList<UblInstallment>? Installments = null);
 
 public interface IUblDocumentGenerator
 {

@@ -66,7 +66,9 @@ public sealed record CreateDocumentRequest(
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
-/// cannot be dated before it. <see cref="ReasonCode"/> is catalogue 09 (credit: 01-10) or 10 (debit: 01-03); <see cref="Reason"/> explains it.
+/// cannot be dated before it. <see cref="ReasonCode"/> is catalogue 09 (credit: 01-10 and 13) or 10 (debit: 01-03); <see cref="Reason"/> explains it.
+/// Reason 13 adjusts the installments of an invoice sold on credit: it gives the new <paramref name="Installments"/> and no lines (the note carries a single line worth
+/// zero, because nothing is sold or returned); every other reason gives lines and no installments.
 /// </summary>
 public sealed record CreateNoteRequest(
     Guid SeriesId,
@@ -74,8 +76,9 @@ public sealed record CreateNoteRequest(
     DateOnly IssueDate,
     string ReasonCode,
     string Reason,
-    IReadOnlyList<DocumentLineRequest> Lines,
-    GlobalAdjustments? Adjustments = null);
+    IReadOnlyList<DocumentLineRequest>? Lines,
+    GlobalAdjustments? Adjustments = null,
+    IReadOnlyList<Installment>? Installments = null);
 
 /// <summary>What a note modifies and why.</summary>
 public sealed record NoteInfo(string ReasonCode, string Reason, Guid ReferencedDocumentId, string ReferencedDocumentTypeCode, string ReferencedSeries, long ReferencedNumber);

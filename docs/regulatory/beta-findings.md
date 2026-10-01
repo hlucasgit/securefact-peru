@@ -21,6 +21,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Venta al crédito** (R-048): una factura con forma de pago `Credito` y dos cuotas (`Cuota001`, `Cuota002`, con monto y fecha) aceptada con código 0, sin observaciones.
 
+- **Nota de crédito de motivo 13** (R-049): sobre una factura al crédito aceptada, con dos cuotas nuevas, una línea gravada de valor cero e importe total cero: aceptada, código 0, sin observaciones.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

@@ -207,7 +207,12 @@ internal sealed partial class DocumentService(
         return ToDto(document);
     }
 
-    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"];
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "13"];
+
+    /// <summary>Catalogue 09 code of the credit note that adjusts the amounts or dates of the installments of a credit invoice.</summary>
+    private const string InstallmentAdjustmentReason = "13";
+
+    private static readonly DocumentLineRequest InstallmentAdjustmentLine = new("Ajuste de montos y/o fechas de cuotas", "ZZ", new TaxableLine(1m, 0m, "10"));
 
     private static readonly HashSet<string> DebitReasons = ["01", "02", "03"];
 
@@ -223,13 +228,31 @@ internal sealed partial class DocumentService(
             return Error.Validation(ErrorCodes.InvalidRequest, "Idempotency-Key inválida", "Envíe el encabezado Idempotency-Key con 8 a 100 caracteres alfanuméricos, '.', '_', ':' o '-'.");
         }
 
-        if (request is null || request.Lines is not { Count: > 0 and <= MaxLines })
+        if (request is null)
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Nota inválida", "La solicitud de la nota es obligatoria.");
+        }
+
+        // The adjustment of installments (reason 13) sells and returns nothing: it has no lines of its own and the note carries one line worth zero.
+        var adjustsInstallments = request.ReasonCode?.Trim() == InstallmentAdjustmentReason;
+        if (adjustsInstallments)
+        {
+            if (request.Lines is { Count: > 0 })
+            {
+                return Error.Validation(ErrorCodes.InvalidDocument, "Nota inválida", "La nota de ajuste de cuotas (motivo 13) no lleva líneas: solo las nuevas cuotas.");
+            }
+        }
+        else if (request.Lines is not { Count: > 0 and <= MaxLines })
         {
             return Error.Validation(ErrorCodes.InvalidDocument, "Nota inválida", $"La nota requiere entre 1 y {MaxLines} líneas.");
         }
 
         var requestJson = JsonSerializer.Serialize(request, Json);
         var requestHash = SHA256.HashData(Encoding.UTF8.GetBytes(requestJson));
+        if (adjustsInstallments)
+        {
+            request = request with { Lines = [InstallmentAdjustmentLine] };
+        }
 
         var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == request.SeriesId, cancellationToken);
         if (series is null)
@@ -261,7 +284,7 @@ internal sealed partial class DocumentService(
             return rates.Error;
         }
 
-        var calculated = calculator.Calculate(new TaxCalculationRequest(request.Lines.Select(l => l.Tax).ToList(), rates.Value, request.Adjustments));
+        var calculated = calculator.Calculate(new TaxCalculationRequest(request.Lines!.Select(l => l.Tax).ToList(), rates.Value, request.Adjustments));
         if (!calculated.IsSuccess)
         {
             return calculated.Error;
@@ -274,9 +297,9 @@ internal sealed partial class DocumentService(
         }
 
         var buyer = new BuyerSnapshot(referenced.BuyerDocumentTypeCode, referenced.BuyerDocumentNumber, referenced.BuyerName, referenced.BuyerAddress, referenced.BuyerEmail);
-        var note = new NoteInfo(request.ReasonCode.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
+        var note = new NoteInfo(request.ReasonCode!.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
         return await IssueAsync(
-            tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines, calculated.Value, note, cancellationToken);
+            tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines!, calculated.Value, note, cancellationToken);
     }
 
     /// <summary>Rules 3286 / 4028 (S16 NotaCredito2_0): the note total and each sale-value category may not exceed the original.</summary>
@@ -304,7 +327,7 @@ internal sealed partial class DocumentService(
 
         // The validation-rules sheets of the notes define no line or global discounts/charges (only the invoice and receipt sheets do): a note states net values.
         if ((request.Adjustments is { } adjustments && adjustments != new GlobalAdjustments())
-            || request.Lines.Any(l => l?.Tax is { } t && (t.DiscountAffectingBase != 0 || t.ChargeAffectingBase != 0 || t.DiscountNotAffectingBase != 0 || t.ChargeNotAffectingBase != 0)))
+            || request.Lines!.Any(l => l?.Tax is { } t && (t.DiscountAffectingBase != 0 || t.ChargeAffectingBase != 0 || t.DiscountNotAffectingBase != 0 || t.ChargeNotAffectingBase != 0)))
         {
             return Invalid("Notas sin descuentos ni cargos", "Una nota no lleva descuentos ni cargos (ni de línea ni globales): indique los valores netos.");
         }
@@ -334,7 +357,12 @@ internal sealed partial class DocumentService(
         var credit = series.DocumentTypeCode == DocumentTypes.CreditNote;
         if (!(credit ? CreditReasons : DebitReasons).Contains(request.ReasonCode?.Trim() ?? string.Empty))
         {
-            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 10 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
+            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 10 o 13 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
+        }
+
+        if (ValidateNoteInstallments(request, referenced) is { } badInstallments)
+        {
+            return badInstallments;
         }
 
         var reason = request.Reason?.Trim() ?? string.Empty;
@@ -377,7 +405,7 @@ internal sealed partial class DocumentService(
             return Invalid("Fecha de emisión fuera de plazo", $"La fecha de emisión no puede tener más de {(int)maxAge.Value} días de antigüedad.");
         }
 
-        return ValidateLines(request.Lines);
+        return ValidateLines(request.Lines!);
     }
 
     private static Error? ValidateLines(IReadOnlyList<DocumentLineRequest> lines)
@@ -545,6 +573,56 @@ internal sealed partial class DocumentService(
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null);
+    }
+
+    /// <summary>
+    /// Reason 13 (sheet NotaCredito2_0, rules 3257, 3259, 3260, 3319–3321): it modifies an invoice sold on credit, gives the new installments, each due after the
+    /// issue date of the invoice, and their sum (the new net pending amount) may not exceed the invoice total. No other reason carries installments.
+    /// </summary>
+    private static Error? ValidateNoteInstallments(CreateNoteRequest request, Document referenced)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Cuotas inválidas", detail);
+
+        var installments = request.Installments;
+        if (request.ReasonCode?.Trim() != InstallmentAdjustmentReason)
+        {
+            return installments is { Count: > 0 } ? Invalid("Solo la nota de crédito de motivo 13 lleva cuotas.") : null;
+        }
+
+        if (referenced.DocumentTypeCode != DocumentTypes.Invoice)
+        {
+            return Invalid("El motivo 13 (ajuste de cuotas) solo modifica facturas.");
+        }
+
+        if (ReadStoredRequest(referenced.OriginalRequestJson)?.Installments is not { Count: > 0 })
+        {
+            return Invalid("El motivo 13 solo modifica una factura vendida al crédito, y esta se vendió al contado.");
+        }
+
+        if (installments is not { Count: > 0 and <= MaxInstallments })
+        {
+            return Invalid($"El motivo 13 lleva de 1 a {MaxInstallments} cuotas.");
+        }
+
+        var total = JsonSerializer.Deserialize<TaxCalculationResult>(referenced.TotalsJson, Json)!.PayableAmount;
+        decimal sum = 0;
+        for (var i = 0; i < installments.Count; i++)
+        {
+            var installment = installments[i];
+            if (installment is null || installment.Amount <= 0 || decimal.Round(installment.Amount, 2) != installment.Amount)
+            {
+                return Invalid($"La cuota {i + 1} debe tener un monto mayor que cero, con hasta 2 decimales.");
+            }
+
+            if (installment.DueDate <= referenced.IssueDate)
+            {
+                return Invalid($"La cuota {i + 1} debe vencer después de la fecha de emisión de la factura.");
+            }
+
+            sum += installment.Amount;
+        }
+
+        return sum <= total ? null : Invalid($"Las cuotas suman {sum:0.00}, más que el importe de la factura ({total:0.00}).");
     }
 
     /// <summary>Highest installment number the sheet allows: the identifier is <c>Cuota</c> followed by three digits (rule 3246).</summary>

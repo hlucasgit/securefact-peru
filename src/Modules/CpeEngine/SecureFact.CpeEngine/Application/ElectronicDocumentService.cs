@@ -90,7 +90,8 @@ internal sealed class ElectronicDocumentService(
         var generated = d.Note is { } note
             ? ubl.GenerateNote(new UblNoteData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, note.ReasonCode, note.Reason,
-                note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value))
+                note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value,
+                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList()))
             : ubl.GenerateInvoice(new UblInvoiceData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,

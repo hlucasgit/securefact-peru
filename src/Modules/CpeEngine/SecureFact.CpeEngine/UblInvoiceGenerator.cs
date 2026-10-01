@@ -80,18 +80,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         // Invoices must state their payment form (error 3244 since 2022-01-01, found against the SUNAT beta service). Receipts do not carry it.
         if (data.DocumentTypeCode == "01")
         {
-            root.Add(new XElement(Cac + "PaymentTerms", new XElement(Cbc + "ID", "FormaPago"), new XElement(Cbc + "PaymentMeansID", data.PaymentForm), data.PaymentForm == "Credito" ? Amount("Amount", data.Installments!.Sum(i => i.Amount), currency) : null));
-
-            // Each installment is another FormaPago term: Cuota001, Cuota002, ... with its amount and due date (rules 3245-3256).
-            for (var i = 0; data.PaymentForm == "Credito" && i < data.Installments!.Count; i++)
-            {
-                root.Add(new XElement(
-                    Cac + "PaymentTerms",
-                    new XElement(Cbc + "ID", "FormaPago"),
-                    new XElement(Cbc + "PaymentMeansID", $"Cuota{(i + 1).ToString("D3", CultureInfo.InvariantCulture)}"),
-                    Amount("Amount", data.Installments[i].Amount, currency),
-                    new XElement(Cbc + "PaymentDueDate", data.Installments[i].DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
-            }
+            root.Add(PaymentTerms(data.PaymentForm, data.Installments, currency));
         }
 
         foreach (var allowance in GlobalAllowances(data))
@@ -120,7 +109,33 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     }
 
     /// <summary>Reasons whose structure is supported today: credit 01-10 and debit 01-03. Export (11), IVAP (12) and credit-installment (13) adjustments are not.</summary>
-    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"];
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "13"];
+
+    /// <summary>Reason of a credit note that adjusts the installments of a credit invoice (catalogue 09, code 13).</summary>
+    private const string InstallmentAdjustmentReason = "13";
+
+    /// <summary>
+    /// The payment terms: one <c>FormaPago</c> term with the form (and, on credit, the net pending amount) and one more per installment (Cuota001, Cuota002, ...)
+    /// with its amount and due date (rules 3245-3256).
+    /// </summary>
+    private static List<XElement> PaymentTerms(string form, IReadOnlyList<UblInstallment>? installments, string currency)
+    {
+        var terms = new List<XElement>
+        {
+            new(Cac + "PaymentTerms", new XElement(Cbc + "ID", "FormaPago"), new XElement(Cbc + "PaymentMeansID", form), form == "Credito" ? Amount("Amount", installments!.Sum(i => i.Amount), currency) : null),
+        };
+        for (var i = 0; form == "Credito" && i < installments!.Count; i++)
+        {
+            terms.Add(new XElement(
+                Cac + "PaymentTerms",
+                new XElement(Cbc + "ID", "FormaPago"),
+                new XElement(Cbc + "PaymentMeansID", $"Cuota{(i + 1).ToString("D3", CultureInfo.InvariantCulture)}"),
+                Amount("Amount", installments[i].Amount, currency),
+                new XElement(Cbc + "PaymentDueDate", installments[i].DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
+        }
+
+        return terms;
+    }
 
     private static readonly HashSet<string> DebitReasons = ["01", "02", "03"];
 
@@ -180,6 +195,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             SignatureInfo(data.Issuer),
             Supplier(data.Issuer),
             Customer(data.Buyer),
+            data.ReasonCode == InstallmentAdjustmentReason ? PaymentTerms("Credito", data.Installments, currency) : null,
             TaxTotal(totals, data.IgvRate, currency),
             new XElement(
                 Cac + (credit ? "LegalMonetaryTotal" : "RequestedMonetaryTotal"),
@@ -201,6 +217,32 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         var fileBase = $"{data.Issuer.DocumentNumber}-{data.DocumentTypeCode}-{data.Series}-{data.Number.ToString(CultureInfo.InvariantCulture)}";
         return new UblDocument(buffer.ToString(), fileBase);
+    }
+
+    /// <summary>
+    /// Reason 13 modifies an invoice (rule 3259) and states the new installments (3257, 3249); its payable amount is zero (3315). No other reason carries installments.
+    /// </summary>
+    private static Error? CheckNoteInstallments(UblNoteData data)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de nota inválidos", detail);
+
+        var installments = data.Installments ?? [];
+        if (data.ReasonCode != InstallmentAdjustmentReason)
+        {
+            return installments.Count == 0 ? null : Invalid("Solo la nota de crédito de motivo 13 lleva cuotas.");
+        }
+
+        if (data.DocumentTypeCode != "07" || data.ReferencedDocumentTypeCode != "01")
+        {
+            return Invalid("El motivo 13 (ajuste de cuotas) es de una nota de crédito sobre una factura.");
+        }
+
+        if (installments.Count is 0 or > MaxInstallments || installments.Any(i => i.Amount <= 0))
+        {
+            return Invalid($"El motivo 13 lleva de 1 a {MaxInstallments} cuotas con monto mayor que cero.");
+        }
+
+        return data.Totals.PayableAmount == 0 ? null : Invalid("El importe total de una nota de motivo 13 debe ser cero.");
     }
 
     private static Error? ValidateNote(UblNoteData data)
@@ -231,6 +273,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         if (data.ReferencedDocumentTypeCode is not ("01" or "03") || string.IsNullOrWhiteSpace(data.ReferencedSeries) || data.ReferencedNumber < 1)
         {
             return Invalid("La nota debe modificar una factura (01) o boleta (03) identificada por serie y número.");
+        }
+
+        if (CheckNoteInstallments(data) is { } badInstallments)
+        {
+            return badInstallments;
         }
 
         if (data.Totals.TotalIvap != 0 || data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)

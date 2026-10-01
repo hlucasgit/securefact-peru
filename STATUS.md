@@ -43,7 +43,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Notas de crédito y de débito
 - Emisión, UBL, documento electrónico (espera a que el original esté aceptado), PDF y envío de notas de facturas; aceptadas en el beta (crédito 01, débito 02, crédito 07 de boleta). Pruebas: 491 pasan.
 - Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
-- Pendiente: motivos 11–13, acumulado de notas de crédito.
+- Pendiente: motivos 11–12, acumulado de notas de crédito.
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).
@@ -57,7 +57,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 
 ## Venta al crédito
 - Facturas al crédito con cuotas (`installments` en `POST /api/v1/documents`): Billing valida el plan antes de numerar, el UBL lleva `FormaPago` `Credito` y una `CuotaNNN` por vencimiento, el PDF imprime las cuotas. Aceptada en el beta (ADR-026). Pruebas: 569 pasan (336 unitarias, 6 arquitectura, 6 integración, 221 seguridad/API).
-- Pendiente: nota de crédito de motivo 13 (ajuste de cuotas), entrega inicial, detracción y retención.
+- Nota de crédito de motivo 13 (ajuste de cuotas): sin líneas, con las cuotas nuevas e importe total cero; aceptada en el beta. Pruebas: 578 pasan (343 unitarias, 6 arquitectura, 6 integración, 223 seguridad/API).
+- Pendiente: entrega inicial, detracción y retención; motivos 11–12 de notas.
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

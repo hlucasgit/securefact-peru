@@ -112,6 +112,11 @@ if (args.Contains("void", StringComparer.Ordinal))
     return await VoidRoundTripAsync(provider, certificate, algorithm, ruc, user, password, data);
 }
 
+if (args.Contains("nc13", StringComparer.Ordinal))
+{
+    return await NoteRoundTripAsync(provider, certificate, algorithm, ruc, user, password, lima, number, data, true, adjustInstallments: true);
+}
+
 if (args.Contains("nc", StringComparer.Ordinal) || args.Contains("nd", StringComparer.Ordinal))
 {
     return await NoteRoundTripAsync(provider, certificate, algorithm, ruc, user, password, lima, number, data, args.Contains("nc", StringComparer.Ordinal));
@@ -119,14 +124,18 @@ if (args.Contains("nc", StringComparer.Ordinal) || args.Contains("nd", StringCom
 
 return 0;
 
-static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, DateTimeOffset lima, long number, UblInvoiceData original, bool credit)
+static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, DateTimeOffset lima, long number, UblInvoiceData original, bool credit, bool adjustInstallments = false)
 {
-    var reason = Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
-    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10")], new TaxRates(0.18m))).Value;
+    var reason = adjustInstallments ? "13" : Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
+
+    // Reason 13 (adjustment of the installments): nothing is sold, so the line is worth zero (rule 3315 asks for a payable amount of zero).
+    var affectation = Environment.GetEnvironmentVariable("SF_BETA_NC13_AFFECTATION") ?? "10";
+    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : "10")], new TaxRates(0.18m))).Value;
     var note = new UblNoteData(
         credit ? "07" : "08", original.DocumentTypeCode == "03" ? "BC01" : "FC01", number, original.IssueDate, TimeOnly.FromDateTime(lima.DateTime), "PEN", reason,
         credit ? "Anulacion de la operacion" : "Aumento en el valor", original.DocumentTypeCode, original.Series, original.Number, original.Issuer, original.Buyer,
-        [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")], totals, 0.18m);
+        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", "ZZ", null, 1, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : "10")], totals, 0.18m,
+        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null);
     var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateNote(note);
     if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL note: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
     var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);

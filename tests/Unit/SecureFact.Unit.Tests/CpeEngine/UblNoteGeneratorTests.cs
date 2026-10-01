@@ -57,6 +57,10 @@ public class UblNoteGeneratorTests
             ublLines, totals, 0.18m);
     }
 
+    /// <summary>A credit note of reason 13: nothing is sold (the line is worth zero, the payable amount is zero) and the new installments are stated.</summary>
+    internal static UblNoteData Adjustment() =>
+        Note("07", "13", "01", ("10", 1m, 0m)) with { Installments = [new(40m, new DateOnly(2026, 11, 15)), new(78m, new DateOnly(2026, 12, 15))] };
+
     private static List<string> SchemaErrors(XDocument document, string type)
     {
         var copy = new XDocument(document);
@@ -201,13 +205,44 @@ public class UblNoteGeneratorTests
         }
     }
 
+    // ---------- reason 13: adjustment of installments ----------
+
+    [Fact]
+    public void A_credit_note_of_reason_13_validates_against_the_schema_and_states_the_new_installments()
+    {
+        var result = _generator.GenerateNote(Adjustment());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml, "07"));
+        Assert.Equal("13", xml.XPathSelectElement("/cn:CreditNote/cac:DiscrepancyResponse/cbc:ResponseCode", Namespaces)!.Value);
+        var terms = xml.XPathSelectElements("/cn:CreditNote/cac:PaymentTerms", Namespaces).ToList();
+        Assert.Equal(["Credito", "Cuota001", "Cuota002"], terms.Select(t => t.XPathSelectElement("cbc:PaymentMeansID", Namespaces)!.Value).ToArray());
+        Assert.Equal(["118.00", "40.00", "78.00"], terms.Select(t => t.XPathSelectElement("cbc:Amount", Namespaces)!.Value).ToArray());
+        Assert.Equal(["2026-11-15", "2026-12-15"], terms.Skip(1).Select(t => t.XPathSelectElement("cbc:PaymentDueDate", Namespaces)!.Value).ToArray());
+        Assert.Equal("0.00", xml.XPathSelectElement("/cn:CreditNote/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value); // rule 3315
+    }
+
+    [Fact]
+    public void Notes_of_other_reasons_state_no_payment_terms()
+    {
+        var xml = XDocument.Parse(_generator.GenerateNote(Note("07", "01")).Value.Xml);
+
+        Assert.Empty(xml.XPathSelectElements("//cac:PaymentTerms", Namespaces));
+    }
+
     // ---------- refusals ----------
 
     public static TheoryData<string, UblNoteData, string> InvalidData() => new()
     {
         { "invoice type", Note() with { DocumentTypeCode = "01" }, ErrorCodes.CpeInvalidDocument },
         { "credit reason 11", Note("07", "11"), ErrorCodes.CpeUnsupported },
-        { "credit reason 13", Note("07", "13"), ErrorCodes.CpeUnsupported },
+        { "credit reason 13 without installments", Note("07", "13"), ErrorCodes.CpeInvalidDocument },
+        { "credit reason 13 with a payable amount", Note("07", "13") with { Installments = [new(118m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },
+        { "installments on another reason", Note("07", "01") with { Installments = [new(118m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },
+        { "reason 13 on a receipt", Adjustment() with { ReferencedDocumentTypeCode = "03", ReferencedSeries = "B001" }, ErrorCodes.CpeInvalidDocument },
+        { "reason 13 with a zero installment", Adjustment() with { Installments = [new(0m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },
+        { "reason 13 on a debit note", Adjustment() with { DocumentTypeCode = "08" }, ErrorCodes.CpeUnsupported },
         { "debit reason 10", Note("08", "10"), ErrorCodes.CpeUnsupported },
         { "no reason text", Note() with { ReasonDescription = " " }, ErrorCodes.CpeInvalidDocument },
         { "long reason", Note() with { ReasonDescription = new string('x', 501) }, ErrorCodes.CpeInvalidDocument },

@@ -18,7 +18,7 @@ public sealed class CreditSaleApiTests(ApiFixture api)
 {
     private static int _rucCounter = 23_000_000;
 
-    private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, SeriesDto Invoice, SeriesDto Receipt);
+    private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, SeriesDto Invoice, SeriesDto Receipt, SeriesDto CreditOfInvoice, SeriesDto DebitOfInvoice);
 
     private static string NewRuc()
     {
@@ -59,7 +59,7 @@ public sealed class CreditSaleApiTests(ApiFixture api)
         async Task<SeriesDto> SeriesAsync(string type, string code) =>
             (await (await owner.PostAsJsonAsync("/api/v1/series", new { companyId = company.Id, documentTypeCode = type, code })).Content.ReadFromJsonAsync<SeriesDto>(ApiFixture.JsonOptions))!;
 
-        return new Setup(tenantId, owner, company, await SeriesAsync("01", "F001"), await SeriesAsync("03", "B001"));
+        return new Setup(tenantId, owner, company, await SeriesAsync("01", "F001"), await SeriesAsync("03", "B001"), await SeriesAsync("07", "FC01"), await SeriesAsync("08", "FD01"));
     }
 
     private static readonly object[] OneLine = [new { description = "Servicio", unitCode = "ZZ", tax = new { quantity = 2m, unitValue = 100m, igvAffectationCode = "10" } }];
@@ -175,6 +175,110 @@ public sealed class CreditSaleApiTests(ApiFixture api)
         }
 
         Assert.Equal(before, await LastNumberAsync()); // nothing was numbered: no gap in the series
+    }
+
+    // ---------- credit note of reason 13: adjustment of the installments ----------
+
+    private static object AdjustmentBody(SeriesDto series, DocumentDto invoice, object[]? installments, string reason = "13", object[]? lines = null) => new
+    {
+        seriesId = series.Id,
+        referencedDocumentId = invoice.Id,
+        issueDate = Iso(TodayInLima()),
+        reasonCode = reason,
+        reason = "Ampliación del plazo de pago",
+        lines,
+        installments,
+    };
+
+    private static async Task<HttpResponseMessage> PostNoteAsync(HttpClient client, object body, string? key = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/notes") { Content = JsonContent.Create(body) };
+        request.Headers.Add("Idempotency-Key", key ?? Guid.NewGuid().ToString("N"));
+        return await client.SendAsync(request);
+    }
+
+    private static async Task<DocumentDto> CreditInvoiceAsync(Setup setup)
+    {
+        var response = await PostAsync(setup.Owner, Body(setup.Invoice, false, [Cuota(100m, Day(30)), Cuota(136m, Day(60))]));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+    }
+
+    [Fact]
+    public async Task A_credit_note_of_reason_13_replaces_the_installments_with_a_zero_value_note_and_is_accepted()
+    {
+        var setup = await NewTenantAsync("Credit Adjust SAC");
+        var invoice = await CreditInvoiceAsync(setup);
+
+        var response = await PostNoteAsync(setup.Owner, AdjustmentBody(setup.CreditOfInvoice, invoice, [Cuota(60m, Day(45)), Cuota(80m, Day(90))]));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var note = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(0m, note.Totals.PayableAmount);
+        Assert.Equal("13", note.Note!.ReasonCode);
+        var line = Assert.Single(note.Lines);
+        Assert.Equal(0m, line.LineExtensionAmount);
+        Assert.Equal([60m, 80m], note.Installments!.Select(i => i.Amount).ToArray());
+
+        // The note waits for the invoice to be accepted, then goes by sendBill like any note of an invoice.
+        var invoiceElectronic = (await (await setup.Owner.PostAsync($"/api/v1/documents/{invoice.Id}/electronic", null)).Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, $"{invoice.Series}-{invoice.Number}")));
+        Assert.Equal(EDocumentState.Accepted, (await (await setup.Owner.PostAsync($"/api/v1/electronic-documents/{invoiceElectronic.Id}/send", null)).Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!.State);
+
+        var prepared = await setup.Owner.PostAsync($"/api/v1/documents/{note.Id}/electronic", null);
+        Assert.Equal(HttpStatusCode.OK, prepared.StatusCode);
+        var electronic = (await prepared.Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        XNamespace cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
+        XNamespace cbc = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
+        var root = XDocument.Parse(xml).Root!;
+        Assert.Equal(["Credito", "Cuota001", "Cuota002"], root.Elements(cac + "PaymentTerms").Select(t => t.Element(cbc + "PaymentMeansID")!.Value).ToArray());
+        Assert.Equal("13", root.Element(cac + "DiscrepancyResponse")!.Element(cbc + "ResponseCode")!.Value);
+        Assert.Equal("0.00", root.Element(cac + "LegalMonetaryTotal")!.Element(cbc + "PayableAmount")!.Value);
+
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, $"{note.Series}-{note.Number}")));
+        var sent = (await (await setup.Owner.PostAsync($"/api/v1/electronic-documents/{electronic.Id}/send", null)).Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(EDocumentState.Accepted, sent.State);
+        Assert.Contains("(Cuota 2)", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_note_of_reason_13_that_breaks_the_rules_is_refused()
+    {
+        var setup = await NewTenantAsync("Credit Adjust Rules SAC");
+        var credit = await CreditInvoiceAsync(setup);
+        var cash = (await (await PostAsync(setup.Owner, Body(setup.Invoice, false, null))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var receipt = (await (await PostAsync(setup.Owner, Body(setup.Receipt, true, null))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        object[] valid = [Cuota(236m, Day(90))];
+        object[] oneLine = [new { description = "Servicio", unitCode = "ZZ", tax = new { quantity = 1m, unitValue = 10m, igvAffectationCode = "10" } }];
+
+        var cases = new (string Name, object Body)[]
+        {
+            ("a cash invoice", AdjustmentBody(setup.CreditOfInvoice, cash, valid)),
+            ("a receipt", AdjustmentBody(setup.CreditOfInvoice, receipt, valid)),
+            ("no installments", AdjustmentBody(setup.CreditOfInvoice, credit, null)),
+            ("empty installments", AdjustmentBody(setup.CreditOfInvoice, credit, [])),
+            ("lines given", AdjustmentBody(setup.CreditOfInvoice, credit, valid, lines: oneLine)),
+            ("more than the invoice", AdjustmentBody(setup.CreditOfInvoice, credit, [Cuota(236.01m, Day(90))])),
+            ("due before the invoice", AdjustmentBody(setup.CreditOfInvoice, credit, [Cuota(236m, Day(-1))])),
+            ("due on the invoice date", AdjustmentBody(setup.CreditOfInvoice, credit, [Cuota(236m, Day(0))])),
+            ("zero amount", AdjustmentBody(setup.CreditOfInvoice, credit, [Cuota(0m, Day(30))])),
+            ("a debit note", AdjustmentBody(setup.DebitOfInvoice, credit, valid)),
+            ("installments on another reason", AdjustmentBody(setup.CreditOfInvoice, credit, valid, reason: "01", lines: oneLine)),
+        };
+        foreach (var (name, body) in cases)
+        {
+            var response = await PostNoteAsync(setup.Owner, body);
+            Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
+            Assert.Equal("SF-BIL-006", ProblemCode(await response.Content.ReadAsStringAsync()));
+        }
+
+        // Nothing was numbered: the first valid adjustment is number 1 of the series, and a repeated key returns the same note.
+        var first = (await (await PostNoteAsync(setup.Owner, AdjustmentBody(setup.CreditOfInvoice, credit, valid), "adjust-key-001")).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var again = (await (await PostNoteAsync(setup.Owner, AdjustmentBody(setup.CreditOfInvoice, credit, valid), "adjust-key-001")).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, first.Number);
+        Assert.Equal(first.Id, again.Id);
     }
 
     [Fact]
