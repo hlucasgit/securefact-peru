@@ -263,6 +263,100 @@ public sealed class NotesApiTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostNoteAsync(anonymous, NoteBody(setup.CreditOfInvoice, invoice))).StatusCode);
     }
 
+    // ---------- accumulated credit ----------
+
+    [Fact]
+    public async Task Credit_notes_accumulate_and_a_document_cannot_be_credited_more_than_once()
+    {
+        var setup = await NewTenantAsync("Notes Accumulate SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false); // 2 x 100 + IGV = 236.00
+
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 1m));
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, "07", "Devolución por ítem", quantity: 1m)); // 236.00 in total: exactly the invoice
+
+        var third = await PostNoteAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, "07", "Otra devolución", quantity: 1m));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, third.StatusCode);
+        Assert.Equal("SF-BIL-010", await ProblemCodeAsync(third));
+        Assert.Contains("236.00", await third.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        // A debit note is not credit, and another document has its own account.
+        await NoteOkAsync(setup.Owner, NoteBody(setup.DebitOfInvoice, invoice, "02", "Aumento en el valor", quantity: 5m));
+        var other = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, other, quantity: 2m));
+
+        // The same goes for a receipt, where a partial credit leaves only the rest.
+        var receipt = await IssueAsync(setup.Owner, setup.Receipt, receipt: true, quantity: 3m);
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfReceipt, receipt, "06", "Devolución parcial", quantity: 1m));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PostNoteAsync(setup.Owner, NoteBody(setup.CreditOfReceipt, receipt, "06", "Devolución parcial", quantity: 3m))).StatusCode);
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfReceipt, receipt, "06", "Devolución del resto", quantity: 2m));
+    }
+
+    [Fact]
+    public async Task A_refused_accumulation_takes_no_number_and_two_simultaneous_notes_fit_only_once()
+    {
+        var setup = await NewTenantAsync("Notes Accumulate Race SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+
+        var responses = await Task.WhenAll(
+            PostNoteAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m)),
+            PostNoteAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m)));
+
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Created);
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.UnprocessableEntity);
+        var created = (await responses.Single(r => r.StatusCode == HttpStatusCode.Created).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, created.Number);
+
+        // The refused one consumed no number: the series stops at 1.
+        var series = (await setup.Owner.GetFromJsonAsync<List<SeriesDto>>($"/api/v1/series?companyId={setup.Company.Id}", ApiFixture.JsonOptions))!.Single(x => x.Id == setup.CreditOfInvoice.Id);
+        Assert.Equal(1, series.LastNumber);
+    }
+
+    [Fact]
+    public async Task A_credit_note_that_sunat_rejected_stops_counting_and_the_credit_is_available_again()
+    {
+        var setup = await NewTenantAsync("Notes Accumulate Rejected SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+        var first = await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PostNoteAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 1m))).StatusCode);
+
+        var invoiceElectronic = await PrepareAsync(setup.Owner, invoice.Id);
+        var noteElectronic = await PrepareAsync(setup.Owner, first.Id);
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, "F001-1")));
+        await setup.Owner.PostAsync($"/api/v1/electronic-documents/{invoiceElectronic.Id}/send", null);
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, "FC01-1", "2047", "rechazada")));
+        var rejected = (await (await setup.Owner.PostAsync($"/api/v1/electronic-documents/{noteElectronic.Id}/send", null)).Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(EDocumentState.Rejected, rejected.State);
+
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m));
+    }
+
+    [Fact]
+    public async Task A_credit_note_that_was_voided_stops_counting()
+    {
+        var setup = await NewTenantAsync("Notes Accumulate Voided SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+        var first = await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m));
+        var invoiceElectronic = await PrepareAsync(setup.Owner, invoice.Id);
+        var noteElectronic = await PrepareAsync(setup.Owner, first.Id);
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, "F001-1")));
+        await setup.Owner.PostAsync($"/api/v1/electronic-documents/{invoiceElectronic.Id}/send", null);
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, "FC01-1")));
+        await setup.Owner.PostAsync($"/api/v1/electronic-documents/{noteElectronic.Id}/send", null);
+
+        var voided = await setup.Owner.PostAsJsonAsync("/api/v1/voids", new { companyId = setup.Company.Id, items = new[] { new { documentId = first.Id, reason = "Nota emitida por error" } } });
+        Assert.Equal(HttpStatusCode.Created, voided.StatusCode);
+        var communication = Assert.Single((await voided.Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+
+        // Voiding is not final until SUNAT accepts it: the note still counts, and then it does not.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PostNoteAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m))).StatusCode);
+        api.Sunat.EnqueueSummary(ChannelReply.Issued("T-1"));
+        await setup.Owner.PostAsync($"/api/v1/electronic-documents/{communication.Document.Id}/send", null);
+        api.Sunat.EnqueueStatus(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, communication.Document.FileBaseName[(setup.Company.Ruc.Length + 1)..])));
+        await setup.Owner.PostAsync($"/api/v1/electronic-documents/{communication.Document.Id}/poll", null);
+
+        await NoteOkAsync(setup.Owner, NoteBody(setup.CreditOfInvoice, invoice, quantity: 2m));
+    }
+
     // ---------- electronic document ----------
 
     [Fact]

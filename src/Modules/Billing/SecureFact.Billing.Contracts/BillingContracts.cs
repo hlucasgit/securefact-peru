@@ -141,6 +141,16 @@ public interface IVoidStatusProvider
     Task<bool> IsVoidedOrBeingVoidedAsync(Guid documentId, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Tells Billing which documents no longer count: the ones SUNAT rejected and the ones that were voided. The electronic-invoicing module implements it; without it
+/// Billing counts every document.
+/// </summary>
+public interface IIneffectiveDocumentsProvider
+{
+    /// <summary>The subset of <paramref name="documentIds"/> that was rejected by SUNAT or is voided.</summary>
+    Task<IReadOnlySet<Guid>> FindAsync(IReadOnlyCollection<Guid> documentIds, CancellationToken cancellationToken);
+}
+
 public interface IDocumentService
 {
     /// <summary>

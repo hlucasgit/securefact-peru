@@ -38,6 +38,7 @@ public static class CpeEngineModule
         services.AddScoped<ISummaryService, SummaryService>();
         services.AddScoped<IVoidService, VoidService>();
         services.AddScoped<SecureFact.Billing.Contracts.IVoidStatusProvider, VoidStatusProvider>();
+        services.AddScoped<SecureFact.Billing.Contracts.IIneffectiveDocumentsProvider, IneffectiveDocumentsProvider>();
         services.AddScoped<SecureFact.SharedKernel.Messaging.IIntegrationEventConsumer, DocumentIssuedHandler>();
         services.AddSingleton<ICpeWorkProcessor, CpeWorkProcessor>();
         return services;

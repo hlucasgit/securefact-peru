@@ -24,6 +24,7 @@ internal sealed partial class DocumentService(
     IRuleProvider rules,
     ICustomerAdministration customers,
     IVoidStatusProvider voidStatus,
+    IIneffectiveDocumentsProvider ineffective,
     ITaxCalculator calculator,
     TimeProvider clock,
     IAuditTrail audit) : IDocumentService
@@ -151,6 +152,17 @@ internal sealed partial class DocumentService(
             await transaction.RollbackAsync(cancellationToken);
             return (await TryReplayAsync(tenantId, idempotencyKey, requestHash, cancellationToken))
                 ?? Error.Conflict(ErrorCodes.IdempotencyConflict, "Solicitud en conflicto", "No se pudo resolver la clave de idempotencia; reintente.");
+        }
+
+        // Credit notes on the same document are serialised and counted together before a number is taken, so two requests cannot both fit under the original.
+        if (note is not null && series.DocumentTypeCode == DocumentTypes.CreditNote)
+        {
+            var exceeded = await CheckAccumulatedCreditAsync(note.ReferencedDocumentId, totals, cancellationToken);
+            if (exceeded is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return exceeded;
+            }
         }
 
         // Atomic, gap-free allocation: the increment commits or rolls back together with the document that uses the number.
@@ -300,6 +312,48 @@ internal sealed partial class DocumentService(
         var note = new NoteInfo(request.ReasonCode!.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
         return await IssueAsync(
             tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines!, calculated.Value, note, cancellationToken);
+    }
+
+    /// <summary>
+    /// Credit notes accumulate: all the credit notes that still count on a document, this one included, may not credit more than the document itself, in total and in each
+    /// sale-value category. SUNAT checks each note against the original only (rules 3286 and 4028 compare one note with the document); this stricter control is the platform's
+    /// own, so that a document cannot be credited twice. Notes SUNAT rejected and notes that were voided do not count. Debit notes are not netted against it.
+    /// The check runs inside the issuing transaction under an advisory lock on the referenced document.
+    /// </summary>
+    private async Task<Error?> CheckAccumulatedCreditAsync(Guid referencedId, TaxCalculationResult note, CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({referencedId.ToString("D")}, 0))", cancellationToken);
+
+        var referenced = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == referencedId, cancellationToken);
+        var priors = await db.Documents.AsNoTracking()
+            .Where(d => d.ReferencedDocumentId == referencedId && d.DocumentTypeCode == DocumentTypes.CreditNote)
+            .Select(d => new { d.Id, d.TotalsJson })
+            .ToListAsync(cancellationToken);
+        if (priors.Count == 0)
+        {
+            return null;
+        }
+
+        var dead = await ineffective.FindAsync(priors.Select(p => p.Id).ToList(), cancellationToken);
+        var counted = priors.Where(p => !dead.Contains(p.Id)).Select(p => JsonSerializer.Deserialize<TaxCalculationResult>(p.TotalsJson, Json)!).ToList();
+        if (counted.Count == 0)
+        {
+            return null;
+        }
+
+        var original = JsonSerializer.Deserialize<TaxCalculationResult>(referenced.TotalsJson, Json)!;
+        var credited = counted.Append(note).ToList();
+        var exceeds = credited.Sum(n => n.PayableAmount) > original.PayableAmount
+            || credited.Sum(n => n.TotalTaxableGravado) > original.TotalTaxableGravado
+            || credited.Sum(n => n.TotalExempt) > original.TotalExempt
+            || credited.Sum(n => n.TotalUnaffected) > original.TotalUnaffected
+            || credited.Sum(n => n.TotalFree) > original.TotalFree
+            || credited.Sum(n => n.TotalIgv) > original.TotalIgv;
+        return exceeds
+            ? Error.Validation(
+                ErrorCodes.NoteExceedsOriginal, "Notas acumuladas por encima del original",
+                $"Las notas de crédito vigentes de este documento ({counted.Sum(n => n.PayableAmount):0.00}) más esta ({note.PayableAmount:0.00}) superan su importe total ({original.PayableAmount:0.00}).")
+            : null;
     }
 
     /// <summary>Rules 3286 / 4028 (S16 NotaCredito2_0): the note total and each sale-value category may not exceed the original.</summary>

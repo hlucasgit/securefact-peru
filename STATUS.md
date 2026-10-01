@@ -43,7 +43,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Notas de crédito y de débito
 - Emisión, UBL, documento electrónico (espera a que el original esté aceptado), PDF y envío de notas de facturas; aceptadas en el beta (crédito 01, débito 02, crédito 07 de boleta). Pruebas: 491 pasan.
 - Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
-- Pendiente: motivos 11–12, acumulado de notas de crédito.
+- Acumulado de notas de crédito (control propio): las notas vigentes de un documento no acreditan más que él; no cuentan las rechazadas ni las anuladas (ADR-023). Pruebas: 582 pasan (343 unitarias, 6 arquitectura, 6 integración, 227 seguridad/API).
+- Pendiente: motivos 11–12.
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).
