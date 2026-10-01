@@ -37,10 +37,16 @@ var lima = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSyst
 var number = (long)lima.TimeOfDay.TotalSeconds + 1;
 var totals = provider.GetRequiredService<ITaxCalculator>()
     .Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10")], new TaxRates(0.18m))).Value;
+var receipt = args.Contains("boleta", StringComparer.Ordinal);
 var data = new UblInvoiceData(
-    "01", "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", "0101",
-    new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"), new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
+    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", "0101",
+    new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"), receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
     [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")], totals, 0.18m);
+
+if (args.Contains("summary", StringComparer.Ordinal))
+{
+    return await SummaryRoundTripAsync(provider, certificate, algorithm, ruc, user, password, lima, number);
+}
 
 var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateInvoice(data);
 if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
@@ -89,3 +95,66 @@ if (reply.CdrZip is { } cdrZip)
 }
 
 return 0;
+
+static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, DateTimeOffset lima, long number)
+{
+    var today = DateOnly.FromDateTime(lima.DateTime);
+    var reference = Environment.GetEnvironmentVariable("SF_BETA_REFERENCE_DAYS_AGO") is { } ago ? today.AddDays(-int.Parse(ago, CultureInfo.InvariantCulture)) : today;
+    var line = new SummaryLineData(1, "B001", number, "1", "12345678", "PEN", 118m, 100m, 0m, 0m, 18m, 0.18m);
+    var generated = provider.GetRequiredService<ISummaryDocumentGenerator>().Generate(new SummaryData(ruc, "EMPRESA DE PRUEBA SAC", reference, today, (int)number, [line]));
+    if (!generated.IsSuccess) { Console.Error.WriteLine($"RC: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
+    var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);
+    if (!signed.IsSuccess) { Console.Error.WriteLine($"Sign: {signed.Error.Code} {signed.Error.Detail}"); return 1; }
+    var zip = provider.GetRequiredService<ICpePackager>().Zip(generated.Value.FileBaseName, signed.Value.Xml);
+    if (!zip.IsSuccess) { Console.Error.WriteLine($"Zip: {zip.Error.Code} {zip.Error.Detail}"); return 1; }
+
+    var channel = provider.GetRequiredService<ICpeSubmissionChannel>();
+    var credentials = new SunatCredentials(ruc, user, password);
+    Console.WriteLine($"Sending summary {generated.Value.FileBaseName}.zip to the SUNAT BETA service...");
+    var sent = await channel.SendSummaryAsync(credentials, generated.Value.ZipFileName, zip.Value);
+    Console.WriteLine($"sendSummary outcome: {sent.Outcome} ticket={sent.Ticket}");
+    if (sent.Fault is { } fault)
+    {
+        Console.WriteLine($"Fault: side={fault.Side} code={fault.Code?.ToString(CultureInfo.InvariantCulture)} kind={fault.Kind} message={fault.Message}");
+        return 3;
+    }
+
+    if (sent.Ticket is not { } ticket) { return 3; }
+    for (var attempt = 1; attempt <= 8; attempt++)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(4));
+        var status = await channel.GetStatusAsync(credentials, ticket);
+        Console.WriteLine($"getStatus #{attempt}: {status.Outcome}");
+        if (status.Fault is { } statusFault)
+        {
+            Console.WriteLine($"Fault: side={statusFault.Side} code={statusFault.Code?.ToString(CultureInfo.InvariantCulture)} message={statusFault.Message}");
+            return 3;
+        }
+
+        if (status.CdrZip is { } cdrZip)
+        {
+            var cdr = provider.GetRequiredService<ICdrParser>().ParseZip(cdrZip);
+            if (!cdr.IsSuccess)
+            {
+                Console.WriteLine($"CDR could not be parsed: {cdr.Error.Detail}");
+                if (provider.GetRequiredService<ICpePackager>().Unzip(cdrZip) is { IsSuccess: true } raw)
+                {
+                    Console.WriteLine(System.Text.RegularExpressions.Regex.Replace(raw.Value.Content, "<ds:Signature.*?</ds:Signature>|<Signature.*?</Signature>", "<Signature…/>", System.Text.RegularExpressions.RegexOptions.Singleline));
+                }
+
+                return 4;
+            }
+
+            Console.WriteLine($"CDR: status={cdr.Value.Status} code={cdr.Value.ResponseCode} ref={cdr.Value.ReferenceId} process={cdr.Value.ProcessId}");
+            Console.WriteLine($"Description: {cdr.Value.Description}");
+            foreach (var note in cdr.Value.Observations)
+            {
+                Console.WriteLine($"Note {note.Code}: {note.Message}");
+            }
+
+            return 0;
+        }
+    }
+
+    return 5;
+}

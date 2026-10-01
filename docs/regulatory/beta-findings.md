@@ -7,6 +7,9 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 - **Firma** (R-032): XMLDSig envuelta, C14N 1.0, **RSA-SHA256 / SHA-256**, aceptada por el beta; el beta no exige un certificado de una entidad certificadora reconocida.
 - La respuesta llega como ZIP con el CDR; el CDR de aceptación trae código `0` y «La Factura numero F001-N, ha sido aceptada». Sin observaciones tras las correcciones de abajo.
 
+- **Boleta con `sendBill`** (R-039): el beta aceptó una boleta (03, serie B001, DNI) enviada directamente («La Boleta numero B001-N, ha sido aceptada»). Que producción lo permita para el emisor **no está confirmado**; el pipeline sigue enviando boletas por resumen.
+- **Resumen diario** (R-040, R-041): `sendSummary` devolvió ticket, `getStatus` devolvió el CDR en el primer intento (código `0`, «El Resumen diario RC-…, ha sido aceptado») y su `ReferenceID` es el identificador `RC-AAAAMMDD-n`. Aceptó un resumen cuyo nombre lleva la **fecha de generación** (hoy) con las boletas del día anterior (`ReferenceDate` = ayer): resuelto el supuesto de R-040.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|
