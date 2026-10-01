@@ -264,6 +264,12 @@
           "System.Composition.Runtime": "9.0.0"
         }
       },
+      "securefact.audit.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "securefact.platform": {
         "type": "Project",
         "dependencies": {

@@ -14,6 +14,21 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
             return true;
         }
 
+        if (exception is BadHttpRequestException badRequest)
+        {
+            var invalid = new ProblemDetails
+            {
+                Type = "https://docs.securefact.pe/errors/SF-VAL-005",
+                Title = "Solicitud inválida",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "El cuerpo o los parámetros de la solicitud no son válidos.",
+            };
+            ProblemDetailsExtensions.Enrich(invalid, httpContext, ErrorCodes.InvalidRequest);
+            httpContext.Response.StatusCode = badRequest.StatusCode;
+            await httpContext.Response.WriteAsJsonAsync(invalid, cancellationToken);
+            return true;
+        }
+
         LogUnhandled(exception, httpContext.Request.Method, httpContext.Request.Path);
 
         var problem = new ProblemDetails

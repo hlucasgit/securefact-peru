@@ -24,11 +24,11 @@ Orden de trabajo (incremental, cada paso con pruebas):
 1. Entorno de desarrollo: `docker compose` (postgres, redis, rabbitmq, minio), `.env.example`, `Directory.Build.props`, gestión central de paquetes.
 2. Esqueleto: `SharedKernel`, `Api` (health, ProblemDetails RFC 9457, correlation ID, OpenAPI), `Workers`.
 3. Pruebas de arquitectura (NetArchTest): límites de módulos y capas.
-4. Logging estructurado + OpenTelemetry (trazas, métricas, logs) con saneamiento.
+4. ✔ Logging estructurado + OpenTelemetry (trazas, métricas, logs) con saneamiento.
 5. ✔ **Tenancy**: `ITenantContext`, RLS + filtros EF + pruebas cross-tenant (resolución desde credenciales llega con Identity).
-6. **Identity/RBAC**: usuarios, roles, permisos explícitos, sesiones, MFA, bloqueo, revocación.
-7. **Audit**: append-only con cadena de hash.
-8. **Organizations**: empresas (RUC), establecimientos.
+6. ✔ **Identity/RBAC**: usuarios, roles, permisos explícitos, sesiones, MFA, bloqueo, revocación.
+7. ✔ **Audit**: append-only con cadena de hash.
+8. ✔ **Organizations**: empresas (RUC), establecimientos.
 9. Outbox + `IMessageBus` (RabbitMQ) + `IObjectStorage` (MinIO).
 10. CI (build, tests, escaneos), SBOM, Dependabot/Renovate, gitleaks.
 

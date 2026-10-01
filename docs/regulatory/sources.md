@@ -24,6 +24,16 @@ Método de acceso: el portal `cpe.sunat.gob.pe` responde HTTP 403 a clientes aut
 | S14 | Fuente secundaria | Prensa/blogs sobre RS 108-2022 (elimina la homologación como requisito de inscripción PSE) | varios | RS 108-2022/SUNAT | 2026-09-30 | 2022 | U | **Contradice** el texto del portal (S01) que aún menciona "inscripción y homologación". Pendiente leer el texto de la RS. No es fuente normativa. |
 | S15 | Usuario | UIT 2026 = S/ 5,500 | — | DS pendiente de identificar | — | 2026-01-01 | U | Umbral 150 UIT = S/ 825,000 (PSE). Verificar en El Peruano / MEF. |
 
+## Revisión 2026-10-01 (continuación)
+
+Acceso de archivos: se leyeron en memoria con el navegador (xlsx con SheetJS, zip con JSZip, PDF con pdf.js). **Descargarlos al repositorio requiere autorización explícita del usuario** (pendiente de preguntar); `curl` con cabeceras de navegador sí obtiene el xlsx, pero no se ejecutó.
+
+| # | Source | Document | URL | Resolution | ReviewedAt | EffectiveFrom | Estado | Impact |
+|---|--------|----------|-----|------------|------------|---------------|--------|--------|
+| S16 | SUNAT – Portal CPE | **Reglas de validación CPE, actualizado al 26.08.2026** (xlsx, 855 113 bytes, SHA-256 `cb5e871cfe3b81abea7faf25b156e5d35b21e8c4837979350919926612da73b6`). Hojas: General, Firma, Factura2_0, Boleta2_0, NotaCredito2_0, NotaDebito2_0, Resumen Diario1_1, Comunicación de Baja1_0, Retenciones1_0, Percepciones1_0, LiquidacionCompra2_0, CDR-OSE, CódigosRetorno (2 080 filas), **Catálogos (Anexo N.°8)**, Listados, Parámetros, Control de Cambios | https://cpe.sunat.gob.pe/sites/default/files/2026-08/Reglas%20de%20validaci%C3%B3n%20-%20actualizado%20al%2026.08.2026.xlsx | — | 2026-10-01 | 2026-08-26 | V (leído en memoria; archivo **no** almacenado en el repositorio) | Fuente oficial de catálogos (47 catálogos), códigos de retorno y validaciones por tag. Ver `current-baseline.md` §10. |
+| S17 | SUNAT – Portal CPE | **XSD** (zip, 609 363 bytes, SHA-256 `5cac9d9353521340fbc15d23f465a4946b004535b9ff411541c87da01694dbd5`): UBL 2.1 estándar OASIS (Invoice, CreditNote, DebitNote, ApplicationResponse, DespatchAdvice…, xmldsig, XAdES) y UBL 2.0 con extensiones `UBLPE-*` (Invoice, CreditNote, DebitNote, Perception, Retention, SummaryDocuments, VoidedDocuments) | https://cpe.sunat.gob.pe/sites/default/files/inline-files/Archivos%20XSD%20(1).zip | — | 2026-10-01 | 2022-02-28 | V (listado de contenido; archivo no almacenado) | Fase 3: validación XSD. Resumen diario y baja siguen en UBL 2.0 (`UBLPE-*`). |
+| S18 | SUNAT – Portal CPE | Guías de elaboración XML 2.1: Factura (2 070 772 B), Boleta (1 535 786 B), Nota de Crédito (1 236 314 B), Nota de Débito (1 346 362 B), Resumen Diario 2.0 (929 271 B) | https://cpe.sunat.gob.pe/guias-y-manuales | — | 2026-10-01 | — | P (descargadas en memoria para medir tamaño; **no leídas**) | Fase 3: estructura UBL por documento, QR, leyendas. |
+
 ## Pendiente de revisión (antes de la fase que los necesite)
 
 - Catálogos SUNAT vigentes (identificar la norma y anexo que los aprueba; no se cita número de memoria) y la tabla de parámetros 742 de códigos de error.

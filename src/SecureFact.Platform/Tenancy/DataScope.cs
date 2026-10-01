@@ -50,10 +50,31 @@ public sealed class DataScope : IDataScope
         PlatformReason = reason;
     }
 
+    /// <summary>
+    /// Temporarily switches to platform scope for a narrowly-defined internal operation (e.g. looking up an account
+    /// during login, before any tenant is known). The previous scope is restored on dispose.
+    /// </summary>
+    public IDisposable Elevate(string reason)
+    {
+        var restore = new Restore(this, Kind, Current, PlatformReason);
+        UsePlatform(reason);
+        return restore;
+    }
+
     public void Clear()
     {
         Kind = DataScopeKind.Anonymous;
         Current = null;
         PlatformReason = null;
+    }
+
+    private sealed class Restore(DataScope owner, DataScopeKind kind, TenantId? tenant, string? reason) : IDisposable
+    {
+        public void Dispose()
+        {
+            owner.Kind = kind;
+            owner.Current = tenant;
+            owner.PlatformReason = reason;
+        }
     }
 }

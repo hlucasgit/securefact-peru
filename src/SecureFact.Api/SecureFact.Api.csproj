@@ -1,6 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <ProjectReference Include="..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\Modules\Tenancy\SecureFact.Tenancy\SecureFact.Tenancy.csproj" />
+    <ProjectReference Include="..\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
+    <ProjectReference Include="..\Modules\Organizations\SecureFact.Organizations\SecureFact.Organizations.csproj" />
+    <ProjectReference Include="..\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />
   </ItemGroup>
 </Project>

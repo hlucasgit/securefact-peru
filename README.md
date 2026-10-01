@@ -18,13 +18,13 @@ Fase 1 (Foundation) en curso. Ver [STATUS.md](STATUS.md) y [ROADMAP.md](ROADMAP.
 
 ## Arranque local
 ```bash
-cp .env.example .env        # ajustar valores locales (nunca commitear .env)
-docker compose up -d        # postgres, redis, rabbitmq, minio
-dotnet build SecureFact.slnx
-dotnet test SecureFact.slnx
-dotnet run --project src/SecureFact.Api
+cp .env.example .env        # completar SF_JWT_SIGNING_KEY y SF_LOCAL_DEV_KEK (openssl rand -base64 48 / 32)
+docker compose up -d --build   # postgres, redis, rabbitmq, S3 local, migraciones, api, workers
+docker compose run --rm -e SF_BOOTSTRAP_ADMIN_EMAIL=admin@ejemplo.local -e SF_BOOTSTRAP_ADMIN_PASSWORD='<frase larga>' api bootstrap-platform-admin
+dotnet test SecureFact.slnx     # las pruebas de seguridad usan Testcontainers (requieren Docker)
 ```
-API local: `http://localhost:5180` (health: `/health/live`, `/health/ready`).
+API local: `http://localhost:5180` (health: `/health/live`, `/health/ready`; OpenAPI en desarrollo: `/openapi/v1.json`).
+Observabilidad opcional: `docker compose --profile observability up -d` y `SF_OTLP_ENDPOINT=http://otel:4317`.
 
 ## Licencia
 Propietario. Todos los derechos reservados.

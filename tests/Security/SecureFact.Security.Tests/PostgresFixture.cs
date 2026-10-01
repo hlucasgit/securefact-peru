@@ -5,6 +5,10 @@ using SecureFact.Platform;
 using SecureFact.Platform.Persistence;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel.Domain;
+using SecureFact.SharedKernel.Tenancy;
+using SecureFact.Audit;
+using SecureFact.Identity;
+using SecureFact.Organizations;
 using SecureFact.Tenancy;
 using Testcontainers.PostgreSql;
 
@@ -39,6 +43,9 @@ public sealed class PostgresFixture : IAsyncLifetime
         AppConnectionString = builder.ConnectionString;
 
         await TenancyModule.MigrateAsync(OwnerConnectionString);
+        await IdentityModule.MigrateAsync(OwnerConnectionString);
+        await AuditModule.MigrateAsync(OwnerConnectionString);
+        await OrganizationsModule.MigrateAsync(OwnerConnectionString);
 
         await ExecuteAsOwnerAsync($"""
             CREATE SCHEMA rlstest;
@@ -80,6 +87,9 @@ public sealed class PostgresFixture : IAsyncLifetime
     public ServiceProvider BuildServices() => new ServiceCollection()
         .AddLogging()
         .AddPlatformDataScope()
+        .AddScoped<ICurrentUser, AnonymousCurrentUser>()
+        .AddScoped<IRequestContext, NoRequestContext>()
+        .AddAuditModule(AppConnectionString)
         .AddTenancyModule(AppConnectionString)
         .BuildServiceProvider(validateScopes: true);
 
@@ -128,4 +138,35 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options, IDa
             ConfigureTenantOwned(builder);
         });
     }
+}
+
+/// <summary>Stand-ins for what the HTTP host provides, for tests that exercise modules without the API.</summary>
+public sealed class AnonymousCurrentUser : ICurrentUser
+{
+    public bool IsAuthenticated => false;
+
+    public Guid? UserId => null;
+
+    public Guid? SessionId => null;
+
+    public TenantId? TenantId => null;
+
+    public bool IsPlatform => false;
+
+    public IReadOnlySet<string> Roles { get; } = new HashSet<string>();
+
+    public IReadOnlySet<string> Permissions { get; } = new HashSet<string>();
+
+    public bool HasPermission(string permission) => false;
+}
+
+public sealed class NoRequestContext : IRequestContext
+{
+    public string? IpAddress => null;
+
+    public string? UserAgent => null;
+
+    public string? CorrelationId => null;
+
+    public string? RequestId => null;
 }

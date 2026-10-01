@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit" />
@@ -12,5 +13,9 @@
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\..\src\SecureFact.Platform\SecureFact.Platform.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Tenancy\SecureFact.Tenancy\SecureFact.Tenancy.csproj" />
+    <ProjectReference Include="..\..\..\src\SecureFact.Api\SecureFact.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Organizations\SecureFact.Organizations\SecureFact.Organizations.csproj" />
   </ItemGroup>
 </Project>

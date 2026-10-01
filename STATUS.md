@@ -1,48 +1,49 @@
-# STATUS — sesiones 1–2 (2026-09-30 / 2026-10-01)
-
-## Actualización sesión 2 — Tenancy + RLS
-- Docker volvió a responder. **Hecho**: `SecureFact.Platform` (ámbito de datos, interceptor RLS, DDL de políticas, `TenantDbContext`), módulo `Tenancy` (registro de tenants, `ITenantAdministration`, migración inicial con RLS forzado y grants al rol `securefact_app`), `tests/Security` con PostgreSQL real (Testcontainers).
-- **Pruebas: 53 pasan en Release con warnings-as-errors** (20 unitarias, 6 arquitectura, 6 integración, 21 seguridad). Mutación manual (interceptor sin tenant) hizo fallar las pruebas de seguridad.
-- Hallazgo: EF/Npgsql genera una columna `xmin` en la migración (no se puede crear en PostgreSQL); se quitó a mano. Documentado en la migración.
-- Pendiente de Tenancy: resolución del tenant desde credenciales (Identity) y `reseller_grant`. Aún sin endpoints HTTP de tenants (requieren Identity).
-- Siguiente: Identity/RBAC → Audit → Organizations. Las imágenes `api`/`workers` siguen sin verificar por build.
+# STATUS — 2026-10-01
 
 ## Estado general
-Fase 0 (Discovery) **completada**. Fase 1 (Foundation) **iniciada**: esqueleto compilable y probado, infraestructura local definida. Nada tributario implementado todavía (intencional). Código **sin commitear** (pendiente de tu orden).
+Fase 0 completada. **Fase 1 (Foundation) casi completa**: tenancy con RLS, identidad/RBAC, auditoría inmutable, empresas/establecimientos, observabilidad básica y stack `docker compose` verificado de punta a punta. No hay lógica tributaria todavía (intencional: depende de leer catálogos/XSD oficiales). Dos commits previos ya están en `origin/main`; el trabajo posterior está **sin commitear**.
 
 ## Arquitectura definida
-Monolito modular .NET 10 + PostgreSQL (RLS) + outbox/RabbitMQ + object storage S3 + canales `ICpeSubmissionChannel`. Ver `docs/architecture/` (análisis, C4, ERD, ADR-001…010).
+Monolito modular .NET 10 + PostgreSQL (RLS, un esquema por módulo) + canales `ICpeSubmissionChannel` + reglas con vigencia. ADR-001…012 en `docs/architecture/decisions/` (nuevos: ADR-011 identidad y sesiones, ADR-012 auditoría con cadena de hashes).
 
-## Normativa revisada (fuentes primarias SUNAT, leídas con navegador real; 403 a clientes automáticos)
-Detalle completo en `docs/regulatory/sources.md` y `current-baseline.md`. Resumen:
-- **Confirmado**: requisitos PSE del contexto (150 UIT = capital SUNARP o casillero 390, ≥5 trabajadores, ISO 27001, etc.); tasa de rechazo PSE ≤10 %→5 %; plazo de envío de factura 3 días calendario; CDR (aceptada / con observación / rechazada); SOAP `sendBill/sendSummary/sendPack/getStatus` con WS-Security (Clave SOL secundaria); receptor único `e-factura.sunat.gob.pe`; rangos de error 0100–999 / 1000–1999 / 2000–3999 / 4000+; GRE por REST/OAuth2 y **no** vía OSE; con PSE se firma con certificado del PSE.
-- **Hallazgos que corrigen supuestos**: Manual del Programador es de **mayo 2021**; reglas de validación vigentes 26.08.2026 (CPE) y 25.09.2026 (GRE); RS 049-2026 (PEI Web) no afecta al core; discrepancia sobre homologación PSE (RS 108-2022) sin resolver; UIT 2026 = S/5,500 sin verificar.
-- **Pendientes bloqueantes** (no se implementa hasta leerlos): catálogos + parámetro 742, reglas de validación xlsx y XSD, flujo vigente de boletas, contenido del QR, detracciones/retenciones/percepciones, Manual URL-GRE, SIRE, Ley 29733.
+## Módulos creados
+| Módulo | Qué contiene |
+|--------|--------------|
+| `SharedKernel` | `Result`, `Error`, `Ruc`, `Series`, `DocumentNumber`, `TenantId`, `ICurrentUser`, `IRequestContext`, métricas |
+| `Platform` | Ámbito de datos (`DataScope`, `Elevate`), RLS (interceptor + DDL), `TenantDbContext`, `ISecretProtector` (cifrado de envoltura AES-GCM) |
+| `Tenancy` | Registro de tenants (RLS), creación solo por plataforma |
+| `Identity` | Login, sesiones con rotación y detección de reutilización, MFA TOTP, bloqueo, recuperación de contraseña, usuarios, roles/permisos con anti-escalada |
+| `Audit` | Eventos append-only con cadena de hashes, verificación, consulta por tenant |
+| `Organizations` | Empresas (RUC validado) y establecimientos |
+| `Api` | JWT, autorización por permiso, Problem Details, rate limit en `/auth/*`, OpenTelemetry, logging por request sin datos sensibles, comandos `migrate` y `bootstrap-platform-admin` |
 
-## Módulos / código creado
-`SharedKernel` (Result/Error, `Ruc`, `Series`, `DocumentNumber`, `TenantId`, `ITenantContext`, `ErrorCodes`), `Api` (health live/ready, Problem Details RFC 9457 con `code/traceId/correlationId`, correlation ID seguro, security headers, OpenAPI en dev), `Workers` (host vacío). Aún **no** hay módulos de negocio (Tenancy, Identity, Audit, Organizations son el siguiente paso).
+## Pruebas (todas pasan en Release con warnings-as-errors)
+- **129 en total**: 58 unitarias (incluye vectores RFC 6238), 6 de arquitectura, 6 de integración, **59 de seguridad** contra PostgreSQL real (Testcontainers): aislamiento cross-tenant (con y sin filtro EF, SQL crudo, pool de conexiones), RLS en todas las tablas, autenticación/sesiones/MFA/reset por HTTP, RBAC y escalada de privilegios, auditoría (append-only, detección de manipulación y borrado, concurrencia), organizaciones, y que los logs no contengan contraseñas ni tokens.
+- Verificado por mutación: anular el interceptor RLS y la verificación de hash hace fallar las pruebas.
+- Bug real hallado por las pruebas y corregido: tras revocar una sesión el token seguía autorizado.
+- Cobertura de código **no medida**.
+- Smoke test manual del stack en contenedores: migración, bootstrap, login, creación de tenant y lectura de auditoría OK.
 
-## Pruebas
-31 pasando: 20 unitarias, 5 de arquitectura (límites de módulos, SharedKernel sin dependencias, sin `double/float` monetario), 6 de integración de la API. Cobertura **no medida**. Build limpio sin warnings; `restore --locked-mode` OK; sin paquetes vulnerables.
-
-## Entorno
-`docker-compose.yml` (postgres 17, redis 7, rabbitmq 4, SeaweedFS S3, `s3-init`, api, workers), `.env.example`, rol de BD de aplicación sin `BYPASSRLS` (verificado: `securefact_app` bypassrls=f). CI en `.github/workflows/ci.yml` (restore bloqueado, build, pruebas, vulnerabilidades, SBOM, gitleaks, Trivy) — **no ejecutado todavía**.
+## Normativa revisada
+`docs/regulatory/` (sources S01–S18, baseline, matriz). Novedades de esta sesión (hoja oficial de reglas de validación 26.08.2026): plazos y tasa de IGV son **parámetros con vigencia** (confirma ADR-008); las boletas pueden enviarse individualmente dentro del plazo y, fuera de él, por Resumen Diario; reglas de serie por tipo de documento; catálogos oficiales en el Anexo N.°8 (47). Hashes SHA-256 de xlsx y XSD registrados.
 
 ## Riesgos y desvíos
-- **MinIO no disponible**: imágenes comunitarias respondieron pull denied/401. Se usa SeaweedFS en dev (ADR-005, adenda).
-- **Docker Desktop dejó de responder (HTTP 500)** durante el build de las imágenes `api`/`workers`: los Dockerfiles **no están verificados**. Infra (postgres/redis/rabbitmq/s3) sí se levantó sana antes del fallo. Los puertos 5432/6379/8080 estaban ocupados por otro proyecto; se usan 55432/56379/58000/5180. Rango 59000–59114 está reservado por Windows.
-- Licencias: se evita FluentAssertions 8 (comercial) y se difiere la elección de framework de mensajería.
-- Fuentes SUNAT inaccesibles por herramientas automáticas: la revisión regulatoria requiere navegador.
+- MinIO ya no se puede descargar: se usa SeaweedFS en local (ADR-005).
+- `docker compose up` verificado; el build de imágenes requería copiar `.editorconfig` (corregido).
+- Auditoría escrita después del cambio de negocio, no en la misma transacción (ADR-012); se resolverá con el outbox.
+- La validación de sesión consulta la BD en cada request (sin caché).
+- Sin proveedor real de correo: la recuperación de contraseña queda inerte hasta el módulo Notifications.
+- `UnconfiguredPasswordResetNotifier` y `LocalEnvelopeSecretProtector` son solo de desarrollo; producción exige KMS/Vault (la API lo bloquea en `Production`).
+- Rutas inexistentes responden 401 antes que 404 (política por defecto segura).
 
 ## Deuda técnica
-Sin Testcontainers aún; `AllowedHosts: *` por restringir; CSP/HSTS básicos; CI sin probar; lock files de `bin/` ignorados por `.gitignore`.
+`AllowedHosts: *`; CSP/HSTS básicos; el CI no se ha ejecutado en GitHub; sin medición de cobertura; sin Redis/RabbitMQ/S3 consumidos por código aún; `dotnet-tools.json` en la raíz.
 
-## Pendientes inmediatos (siguiente sesión)
-1. Reiniciar Docker y verificar `docker compose up --build` completo.
-2. Módulos: **Tenancy + RLS + pruebas cross-tenant** → Identity/RBAC → Audit → Organizations (empresas/establecimientos).
-3. OpenTelemetry y logging estructurado con saneamiento; outbox + `IMessageBus` + `IObjectStorage`.
-4. Primer commit y ejecución de CI.
-5. Descargar y versionar (hash) reglas de validación y XSD antes de la Fase 3.
+## Pendientes inmediatos
+1. **Decisión del usuario**: autorizar la descarga a `docs/regulatory/assets/` del xlsx de reglas (855 KB), XSD (609 KB) y guías XML (≈5 MB) para versionarlos por hash.
+2. Commit y push del trabajo de esta sesión.
+3. Paso 9 de Fase 1: outbox + `IMessageBus` (RabbitMQ) + `IObjectStorage` (S3), y ejecutar el CI.
+4. Fase 2: módulo `Catalogs` (importando el Anexo N.°8), clientes, productos, series y numeración transaccional, TaxEngine.
 
 ## Siguiente fase
-Completar Fase 1; luego Fase 2 (Core Billing) cuando los catálogos oficiales estén leídos.
+Cerrar Fase 1 (outbox/bus/storage) y comenzar Fase 2 (Core Billing) tras leer la Guía XML de factura/boleta (QR, leyendas) y cargar los catálogos.

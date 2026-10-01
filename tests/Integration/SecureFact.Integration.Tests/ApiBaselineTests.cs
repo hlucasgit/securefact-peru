@@ -6,7 +6,16 @@ namespace SecureFact.Integration.Tests;
 
 public sealed class ApiBaselineTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = Configure(factory).CreateClient();
+
+    /// <summary>Baseline tests need no database: only the settings that make the host start.</summary>
+    private static WebApplicationFactory<Program> Configure(WebApplicationFactory<Program> factory) =>
+        factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:App", "Host=localhost;Database=unused");
+            builder.UseSetting("Security:LocalDevKek", Convert.ToBase64String(new byte[32]));
+            builder.UseSetting("Identity:SigningKey", Convert.ToBase64String(new byte[32]));
+        });
 
     [Theory]
     [InlineData("/health/live")]
@@ -53,15 +62,16 @@ public sealed class ApiBaselineTests(WebApplicationFactory<Program> factory) : I
     }
 
     [Fact]
-    public async Task Unknown_route_returns_problem_details_with_stable_code()
+    public async Task Unknown_route_is_unauthenticated_first_and_returns_problem_details_with_stable_code()
     {
         var response = await _client.GetAsync("/api/v1/does-not-exist");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        // Secure by default: the fallback policy demands authentication before the API reveals whether a route exists.
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
 
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("SF-VAL-005", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal("SF-AUTH-001", body.RootElement.GetProperty("code").GetString());
         Assert.True(body.RootElement.TryGetProperty("traceId", out _));
         Assert.True(body.RootElement.TryGetProperty("correlationId", out _));
     }

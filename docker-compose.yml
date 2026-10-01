@@ -64,7 +64,7 @@ services:
     volumes:
       - s3data:/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9333/cluster/status >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 8333 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -87,13 +87,29 @@ services:
         aws --endpoint-url http://s3:8333 s3api put-bucket-versioning --bucket "$${SF_STORAGE_BUCKET}" --versioning-configuration Status=Enabled
     restart: "no"
 
+  # One-shot schema migration using the owner role. The runtime role (securefact_app) never has DDL rights.
+  migrate:
+    build:
+      context: .
+      dockerfile: src/SecureFact.Api/Dockerfile
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Migrations: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__App: Host=postgres;Database=${POSTGRES_DB};Username=${SF_APP_DB_USER};Password=${SF_APP_DB_PASSWORD}
+      Identity__SigningKey: ${SF_JWT_SIGNING_KEY:?set in .env}
+      Security__LocalDevKek: ${SF_LOCAL_DEV_KEK:?set in .env}
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: src/SecureFact.Api/Dockerfile
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       rabbitmq:
@@ -101,9 +117,13 @@ services:
       s3-init:
         condition: service_completed_successfully
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${SF_ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://+:8080
       SF__Environment: ${SF_ENVIRONMENT:-Local}
+      ConnectionStrings__App: Host=postgres;Database=${POSTGRES_DB};Username=${SF_APP_DB_USER};Password=${SF_APP_DB_PASSWORD}
+      Identity__SigningKey: ${SF_JWT_SIGNING_KEY:?set in .env}
+      Security__LocalDevKek: ${SF_LOCAL_DEV_KEK:?set in .env}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${SF_OTLP_ENDPOINT:-}
     ports:
       - "127.0.0.1:${SF_API_PORT:-5180}:8080"
 
@@ -119,6 +139,16 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
       SF__Environment: ${SF_ENVIRONMENT:-Local}
+
+  # Optional local observability stack: docker compose --profile observability up -d
+  # Grafana http://localhost:3000 (Loki, Tempo, Prometheus); set SF_OTLP_ENDPOINT=http://otel:4317 for the API.
+  otel:
+    profiles: ["observability"]
+    image: grafana/otel-lgtm:latest
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
 
 volumes:
   pgdata:

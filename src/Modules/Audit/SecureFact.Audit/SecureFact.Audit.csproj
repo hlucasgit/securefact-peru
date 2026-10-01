@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="SecureFact.Security.Tests" />
+    <InternalsVisibleTo Include="SecureFact.Unit.Tests" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\SecureFact.Audit.Contracts\SecureFact.Audit.Contracts.csproj" />
+  </ItemGroup>
+</Project>

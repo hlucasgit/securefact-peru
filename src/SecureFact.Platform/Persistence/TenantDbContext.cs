@@ -10,6 +10,12 @@ public interface ITenantOwned
     Guid TenantId { get; }
 }
 
+/// <summary>Entities that belong to a tenant, or to the platform itself when <see cref="TenantId"/> is null (e.g. platform staff).</summary>
+public interface IOptionalTenantOwned
+{
+    Guid? TenantId { get; }
+}
+
 public sealed class TenantMismatchException(string message) : InvalidOperationException(message);
 
 /// <summary>
@@ -31,6 +37,15 @@ public abstract class TenantDbContext(DbContextOptions options, IDataScope scope
         builder.HasQueryFilter(e => IsPlatformScope || e.TenantId == CurrentTenantGuid);
     }
 
+    /// <summary>Call from <c>OnModelCreating</c> for entities that may belong to the platform (null tenant).</summary>
+    protected void ConfigureOptionalTenantOwned<TEntity>(EntityTypeBuilder<TEntity> builder)
+        where TEntity : class, IOptionalTenantOwned
+    {
+        builder.Property(e => e.TenantId).HasColumnName("tenant_id");
+        builder.HasIndex(e => e.TenantId);
+        builder.HasQueryFilter(e => IsPlatformScope || e.TenantId == CurrentTenantGuid);
+    }
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         EnforceTenantOwnership();
@@ -45,6 +60,21 @@ public abstract class TenantDbContext(DbContextOptions options, IDataScope scope
 
     private void EnforceTenantOwnership()
     {
+        foreach (var entry in ChangeTracker.Entries<IOptionalTenantOwned>())
+        {
+            var property = entry.Property(nameof(IOptionalTenantOwned.TenantId));
+            var owner = entry.Entity.TenantId;
+            switch (entry.State)
+            {
+                case EntityState.Added when !IsPlatformScope && owner != CurrentTenantGuid:
+                    throw new TenantMismatchException("Cannot create a row for another tenant or for the platform outside platform scope.");
+                case EntityState.Modified when property.IsModified:
+                    throw new TenantMismatchException("The owner tenant of a row cannot be changed.");
+                case EntityState.Modified or EntityState.Deleted when !IsPlatformScope && owner != CurrentTenantGuid:
+                    throw new TenantMismatchException("Cannot modify or delete a row owned by a different tenant.");
+            }
+        }
+
         foreach (var entry in ChangeTracker.Entries<ITenantOwned>())
         {
             var property = entry.Property(nameof(ITenantOwned.TenantId));

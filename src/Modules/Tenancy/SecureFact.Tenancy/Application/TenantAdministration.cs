@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SecureFact.Audit.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Domain;
@@ -9,7 +10,7 @@ using SecureFact.Tenancy.Infrastructure;
 
 namespace SecureFact.Tenancy.Application;
 
-internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope, TimeProvider clock) : ITenantAdministration
+internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit) : ITenantAdministration
 {
     private const int MinNameLength = 3;
     private const int MaxNameLength = 120;
@@ -33,6 +34,11 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
         var tenant = Tenant.Create(TenantId.New().Value, name, request.Environment, request.ResellerId, clock.GetUtcNow());
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
+        await audit.RecordAsync(
+            new AuditEvent(
+                AuditActions.TenantCreated, "tenant", tenant.Id.ToString("D"), tenant.Id,
+                NewValues: new Dictionary<string, object?> { ["name"] = tenant.Name, ["environment"] = tenant.Environment, ["resellerId"] = tenant.ResellerId }),
+            cancellationToken);
         return ToDto(tenant);
     }
 
