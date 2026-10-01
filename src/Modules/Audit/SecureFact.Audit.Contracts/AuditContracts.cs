@@ -21,6 +21,10 @@ public static class AuditActions
 
     public const string CertificateUploaded = "certificates.certificate.uploaded";
     public const string CertificateDeactivated = "certificates.certificate.deactivated";
+    public const string ElectronicDocumentPrepared = "cpe.electronic_document.prepared";
+    public const string ElectronicDocumentProcessed = "cpe.electronic_document.processed";
+    public const string ElectronicDocumentFailed = "cpe.electronic_document.failed";
+    public const string ElectronicDocumentRetried = "cpe.electronic_document.retried";
     public const string SolCredentialsSet = "certificates.sol_credentials.set";
     public const string SolCredentialsCleared = "certificates.sol_credentials.cleared";
 

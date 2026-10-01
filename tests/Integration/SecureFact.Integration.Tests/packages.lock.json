@@ -564,7 +564,13 @@
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Http": "[10.0.12, )",
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.Certificates.Contracts": "[1.0.0, )",
           "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
           "SecureFact.TaxEngine.Contracts": "[1.0.0, )",
           "System.Security.Cryptography.Xml": "[10.0.12, )"

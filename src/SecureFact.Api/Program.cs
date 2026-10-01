@@ -8,6 +8,7 @@ using SecureFact.Billing;
 using SecureFact.Catalogs;
 using SecureFact.CpeEngine;
 using SecureFact.Certificates;
+using SecureFact.CpeEngine.Contracts;
 using SecureFact.Customers;
 using SecureFact.Products;
 using SecureFact.Identity;
@@ -101,6 +102,22 @@ if (appConnection is not null)
     builder.Services.AddRulesModule(appConnection);
     builder.Services.AddCustomersModule(appConnection);
     builder.Services.AddCertificatesModule(appConnection);
+    builder.Services.AddCpePipeline(appConnection);
+
+    // SUNAT is never reached implicitly: the environment must be named. Without it, documents are prepared and signed but not sent.
+    switch (builder.Configuration["Sunat:Environment"])
+    {
+        case "Beta":
+            builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Beta);
+            break;
+        case "Production":
+            builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Production);
+            break;
+        case null or "":
+            break;
+        default:
+            throw new InvalidOperationException("Sunat:Environment must be 'Beta' or 'Production'.");
+    }
     builder.Services.AddProductsModule(appConnection);
     builder.Services.AddBillingModule(appConnection);
     builder.Services.AddIdentityModule(appConnection, options => builder.Configuration.GetSection("Identity").Bind(options));
@@ -122,6 +139,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await RulesModule.MigrateAsync(migrationsConnection);
     await CustomersModule.MigrateAsync(migrationsConnection);
     await CertificatesModule.MigrateAsync(migrationsConnection);
+    await SecureFact.CpeEngine.CpeEngineModule.MigrateAsync(migrationsConnection);
     await ProductsModule.MigrateAsync(migrationsConnection);
     return;
 }
@@ -169,6 +187,7 @@ app.MapCatalogEndpoints();
 app.MapRuleEndpoints();
 app.MapMasterDataEndpoints();
 app.MapCertificateEndpoints();
+app.MapCpeEndpoints();
 
 app.Run();
 

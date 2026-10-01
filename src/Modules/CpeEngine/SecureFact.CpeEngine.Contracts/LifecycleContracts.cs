@@ -68,3 +68,63 @@ public interface IEDocumentStateMachine
 
     Result<EDocumentSnapshot> Apply(EDocumentSnapshot current, EDocumentEvent @event);
 }
+
+/// <summary>Electronic side of a numbered billing document: its signed XML, its state with SUNAT and the CDR.</summary>
+/// <param name="CdrResponseCode">SUNAT response code from the CDR; null until a CDR arrives.</param>
+/// <param name="LastErrorCode">Last transport or SUNAT fault code (never a secret), for support.</param>
+public sealed record ElectronicDocumentDto(
+    Guid Id,
+    Guid TenantId,
+    Guid DocumentId,
+    Guid CompanyId,
+    string DocumentTypeCode,
+    string Series,
+    long Number,
+    string FileBaseName,
+    EDocumentState State,
+    int Attempts,
+    string DigestValue,
+    string? Ticket,
+    string? CdrProcessId,
+    int? CdrResponseCode,
+    string? CdrDescription,
+    IReadOnlyList<CdrObservation> CdrObservations,
+    string? LastErrorCode,
+    string? LastErrorMessage,
+    DateTimeOffset? NextAttemptAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? SentAt,
+    DateTimeOffset? ProcessedAt);
+
+public sealed record ElectronicDocumentEventDto(Guid Id, EDocumentState From, EDocumentState To, EDocumentEvent Event, int Attempt, string? Detail, DateTimeOffset OccurredAt);
+
+public interface IElectronicDocumentService
+{
+    /// <summary>
+    /// Builds the UBL XML of a numbered document, signs it with the company's active certificate and stores the result as the
+    /// electronic document (state <see cref="EDocumentState.ReadyToSend"/>). Idempotent: a document is prepared once.
+    /// </summary>
+    Task<Result<ElectronicDocumentDto>> PrepareAsync(Guid documentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends the signed invoice to SUNAT (<c>sendBill</c>) and records the CDR. Idempotent for documents with a final answer.
+    /// Receipts (03) are reported in daily summaries and are not sent by this method.
+    /// </summary>
+    Task<Result<ElectronicDocumentDto>> SendAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    /// <summary>An operator puts a failed document back in the queue (resets its send attempts).</summary>
+    Task<Result<ElectronicDocumentDto>> RetryAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    Task<Result<ElectronicDocumentDto>> GetAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    Task<Result<ElectronicDocumentDto>> GetByDocumentAsync(Guid documentId, CancellationToken cancellationToken);
+
+    Task<Result<IReadOnlyList<ElectronicDocumentEventDto>>> ListEventsAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    /// <summary>The signed XML exactly as it was sent. Never changes after preparation.</summary>
+    Task<Result<string>> GetSignedXmlAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    /// <summary>The CDR ZIP exactly as SUNAT returned it; not found until a CDR arrives.</summary>
+    Task<Result<byte[]>> GetCdrZipAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+}

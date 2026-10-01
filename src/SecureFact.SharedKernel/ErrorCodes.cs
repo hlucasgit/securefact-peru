@@ -31,6 +31,10 @@ public static class ErrorCodes
     public const string CpeUnsupported = "SF-CPE-002";
     public const string CpeInvalidDocument = "SF-CPE-003";
     public const string CpeInvalidTransition = "SF-CPE-004";
+    public const string CpeChannelNotConfigured = "SF-CPE-005";
+    public const string CpeCdrMismatch = "SF-CPE-006";
+    public const string CpeNotFound = "SF-CPE-007";
+    public const string CpeBusy = "SF-CPE-008";
 
     public const string InvalidCertificate = "SF-CRT-001";
     public const string CertificateNotFound = "SF-CRT-002";

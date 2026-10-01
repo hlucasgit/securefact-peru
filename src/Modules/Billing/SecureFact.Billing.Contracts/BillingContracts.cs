@@ -65,7 +65,7 @@ public enum DocumentStatus
     Validated,
 }
 
-public sealed record DocumentLineDto(int LineNumber, string Description, string UnitCode, string? ProductCode, decimal Quantity, decimal LineExtensionAmount, string TaxCode, decimal TotalTaxAmount, decimal? UnitPriceIncludingTaxes);
+public sealed record DocumentLineDto(int LineNumber, string Description, string UnitCode, string? ProductCode, decimal Quantity, decimal LineExtensionAmount, string TaxCode, decimal TotalTaxAmount, decimal? UnitPriceIncludingTaxes, decimal UnitValue = 0m, string IgvAffectationCode = "");
 
 public sealed record DocumentDto(
     Guid Id,

@@ -55,6 +55,8 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public LogSink Logs { get; } = new();
 
+    public FakeSunatChannel Sunat { get; } = new();
+
     public PostgresFixture Postgres => _postgres;
 
     public IServiceProvider Services => _factory!.Services;
@@ -75,6 +77,7 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IPasswordResetNotifier>(Notifier);
+                services.AddSingleton<SecureFact.CpeEngine.Contracts.ICpeSubmissionChannel>(Sunat);
                 services.AddLogging(logging => logging.AddProvider(Logs));
             }));
 

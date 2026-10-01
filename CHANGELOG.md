@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Tubería del documento electrónico: preparar (UBL + firma con el certificado de la empresa), enviar a SUNAT con credenciales SOL cifradas, registrar el CDR validado, historial de estados, reintentos con espera exponencial y disparadores de inmutabilidad (ADR-019).
 - Almacén de certificados digitales (`Certificates`): PKCS#12 cifrado en reposo, validación, un activo por empresa, alertas de vencimiento, permisos y auditoría (ADR-018).
 - Motor CPE: firma XMLDSig (`IXmlSigner`), empaquetado ZIP seguro, parser de CDR con clasificación de códigos SUNAT y canal SOAP `billService` (`sendBill`, `sendSummary`, `getStatus`) probado con un simulador sin red (ADR-017).
 - Rules (reglas con vigencia servidas por `IRuleProvider`; Billing deja de aceptar tasas del cliente), Customers y Products (datos maestros con catálogos oficiales), referencia de cliente en documentos, y generador UBL 2.1 sin firmar de factura/boleta validado contra el XSD oficial y las etiquetas obligatorias del libro de reglas.
