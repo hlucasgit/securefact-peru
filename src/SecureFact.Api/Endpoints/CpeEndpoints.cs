@@ -25,6 +25,9 @@ internal static class CpeEndpoints
         group.MapGet("/{id:guid}/xml", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.GetSignedXmlAsync(id, ct)).ToHttp(http, xml => Results.Text(xml, "application/xml"))).RequireAuthorization(Permissions.DocumentsRead);
 
+        group.MapGet("/{id:guid}/pdf", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
+            (await service.GetPdfAsync(id, ct)).ToHttp(http, pdf => Results.File(pdf, "application/pdf", $"{id:N}.pdf"))).RequireAuthorization(Permissions.DocumentsRead);
+
         group.MapGet("/{id:guid}/cdr", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.GetCdrZipAsync(id, ct)).ToHttp(http, zip => Results.File(zip, "application/zip", $"R-{id:N}.zip"))).RequireAuthorization(Permissions.DocumentsRead);
 

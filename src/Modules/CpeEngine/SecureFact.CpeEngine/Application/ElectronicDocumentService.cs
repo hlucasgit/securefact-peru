@@ -28,6 +28,8 @@ internal sealed class ElectronicDocumentService(
     IXmlSigner signer,
     ICpePackager packager,
     ICdrParser cdrParser,
+    IQrPayloadGenerator qr,
+    IPrintedRepresentationRenderer printer,
     IEDocumentStateMachine machine,
     IServiceProvider services,
     TimeProvider clock,
@@ -391,6 +393,61 @@ internal sealed class ElectronicDocumentService(
         var xml = await db.ElectronicDocuments.AsNoTracking().Where(e => e.Id == electronicDocumentId).Select(e => e.SignedXml).SingleOrDefaultAsync(cancellationToken);
         return xml is null ? Missing : xml;
     }
+
+    public async Task<Result<byte[]>> GetPdfAsync(Guid electronicDocumentId, CancellationToken cancellationToken)
+    {
+        var entity = await db.ElectronicDocuments.AsNoTracking().SingleOrDefaultAsync(e => e.Id == electronicDocumentId, cancellationToken);
+        if (entity is null)
+        {
+            return Missing;
+        }
+
+        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
+        {
+            return Error.Validation(ErrorCodes.CpeUnsupported, "Sin representación impresa", "Solo las facturas y boletas tienen representación impresa.");
+        }
+
+        var document = await billing.GetAsync(entity.DocumentId, cancellationToken);
+        if (!document.IsSuccess)
+        {
+            return document.Error;
+        }
+
+        var company = await companies.GetAsync(entity.CompanyId, cancellationToken);
+        if (!company.IsSuccess)
+        {
+            return company.Error;
+        }
+
+        var d = document.Value;
+        var identified = d.Buyer.DocumentTypeCode != IdentityDocuments.NoDocument;
+        var payload = qr.Build(new QrData(
+            company.Value.Ruc, d.DocumentTypeCode, d.Series, d.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), d.Totals.TotalIgv, d.Totals.PayableAmount,
+            d.IssueDate, identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null, entity.DigestValue));
+        if (!payload.IsSuccess)
+        {
+            return payload.Error;
+        }
+
+        var printed = new PrintedDocument(
+            d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, d.Currency, company.Value.LegalName, company.Value.TradeName, company.Value.Ruc, company.Value.FiscalAddress,
+            identified ? BuyerTypeName(d.Buyer.DocumentTypeCode) : null, identified ? d.Buyer.DocumentNumber : null, identified ? d.Buyer.Name : null, identified ? d.Buyer.Address : null,
+            d.Lines.Select(l => new PrintedLine(l.UnitCode, l.Quantity, l.Description, l.UnitValue, l.UnitPriceIncludingTaxes, l.LineExtensionAmount, l.TotalTaxAmount)).ToList(),
+            new PrintedTotals(d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount),
+            payload.Value, entity.DigestValue);
+        return printer.Render(printed);
+    }
+
+    /// <summary>The printed form replaces the catalogue 06 code by its denomination (annex rule for field "tipo y número de documento del adquirente").</summary>
+    internal static string BuyerTypeName(string code) => code switch
+    {
+        IdentityDocuments.Ruc => "RUC",
+        IdentityDocuments.Dni => "DNI",
+        IdentityDocuments.ForeignerCard => "Carné de extranjería",
+        IdentityDocuments.Passport => "Pasaporte",
+        IdentityDocuments.DiplomaticId => "Cédula diplomática",
+        _ => $"Documento {code}",
+    };
 
     public async Task<Result<byte[]>> GetCdrZipAsync(Guid electronicDocumentId, CancellationToken cancellationToken)
     {

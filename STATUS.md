@@ -36,6 +36,10 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Confirmado en el beta: base64 en línea, `SOAPAction` vacío, firma RSA-SHA256, certificado autofirmado, nombre del resumen con fecha de generación.
 - Pendiente de prueba: crédito con cuotas, notas, bajas, descuentos; la política de producción (cadena de certificados, boletas con `sendBill`).
 
+## Representación impresa
+- `GET /api/v1/electronic-documents/{id}/pdf` (permiso `documents.read`, aislado por tenant): PDF A4 determinista con los datos mínimos del Anexo II de la RS 114-2019 (fuente S21), QR según S19 y el `DigestValue` firmado. Pruebas: 455 pasan.
+- Sin confirmar: vigencia posterior a 2019 del anexo y la leyenda de la factura (R-044); el PDF no incluye código de establecimiento anexo ni datos adicionales (detracciones, anticipos…).
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción, crédito, notas, bajas y descuentos sin probar.

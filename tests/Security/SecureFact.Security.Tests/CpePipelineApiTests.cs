@@ -401,6 +401,87 @@ public sealed class CpePipelineApiTests(ApiFixture api)
         Assert.Equal(EDocumentState.Accepted, (await setup.Owner.GetFromJsonAsync<ElectronicDocumentDto>($"/api/v1/electronic-documents/{electronic.Id}", ApiFixture.JsonOptions))!.State);
     }
 
+    // ---------- printed representation ----------
+
+    private static string PdfText(byte[] pdf)
+    {
+        var text = System.Text.Encoding.Latin1.GetString(pdf);
+        var content = new System.Text.StringBuilder();
+        foreach (System.Text.RegularExpressions.Match stream in System.Text.RegularExpressions.Regex.Matches(text, @"stream
+(?<body>.*?)
+endstream", System.Text.RegularExpressions.RegexOptions.Singleline, TimeSpan.FromSeconds(5)))
+        {
+            using var zlib = new System.IO.Compression.ZLibStream(new MemoryStream(System.Text.Encoding.Latin1.GetBytes(stream.Groups["body"].Value)), System.IO.Compression.CompressionMode.Decompress);
+            using var reader = new StreamReader(zlib, System.Text.Encoding.Latin1);
+            content.Append(reader.ReadToEnd());
+        }
+
+        return content.ToString();
+    }
+
+    [Fact]
+    public async Task An_invoice_prints_with_the_numbers_billing_issued_and_the_digest_of_its_signed_xml()
+    {
+        var (setup, document, electronic) = await ReadyAsync("Cpe Pdf SAC");
+
+        var response = await setup.Owner.GetAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType!.MediaType);
+        var pdf = await response.Content.ReadAsByteArrayAsync();
+        Assert.StartsWith("%PDF-1.4", System.Text.Encoding.Latin1.GetString(pdf[..8]), StringComparison.Ordinal);
+        var content = PdfText(pdf);
+        foreach (var expected in new[]
+        {
+            "FACTURA ELECTRÓNICA", $"RUC {setup.Company.Ruc}", $"{document.Series}-{document.Number}", "(Emisora SAC)", "(Cliente SAC)", "RUC:", "20100066603",
+            "S/ 200.00", "S/ 36.00", "S/ 236.00", "SON: DOSCIENTOS TREINTA Y SEIS CON 00/100 SOLES", "Representación impresa de la factura electrónica", electronic.DigestValue,
+        })
+        {
+            Assert.Contains(expected, content, StringComparison.Ordinal);
+        }
+
+        // The PDF is a view: it is the same every time and it never moves the electronic document.
+        Assert.Equal(pdf, await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf"));
+        Assert.Equal(EDocumentState.ReadyToSend, (await setup.Owner.GetFromJsonAsync<ElectronicDocumentDto>($"/api/v1/electronic-documents/{electronic.Id}", ApiFixture.JsonOptions))!.State);
+    }
+
+    [Fact]
+    public async Task A_receipt_prints_with_its_own_denomination_and_the_buyer_type_by_name()
+    {
+        var setup = await NewTenantAsync("Cpe Pdf Receipt SAC");
+        var receipt = await PrepareAsync(setup.Owner, (await NewDocumentAsync(setup.Owner, setup.ReceiptSeries, receipt: true)).Id);
+
+        var content = PdfText(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{receipt.Id}/pdf"));
+
+        Assert.Contains("BOLETA DE VENTA ELECTRÓNICA", content, StringComparison.Ordinal);
+        Assert.Contains("Representación impresa de la boleta de venta electrónica", content, StringComparison.Ordinal);
+        Assert.Contains("DNI:", content, StringComparison.Ordinal);
+        Assert.Contains("12345678", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_pdf_is_isolated_guarded_and_not_offered_for_summaries()
+    {
+        var (a, _, electronic) = await ReadyAsync("Cpe Pdf Iso A SAC");
+        var b = await NewTenantAsync("Cpe Pdf Iso B SAC");
+        var sales = await ApiFixture.CreateUserAsync(a.Owner, Roles.Sales, a.TenantId);
+        using var salesClient = api.ClientFor(await api.LoginOkAsync(sales.Email, sales.Password));
+        using var anonymous = api.NewClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await b.Owner.GetAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await salesClient.GetAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")).StatusCode); // reading needs documents.read only
+
+        // A daily summary has no printed representation.
+        await NewDocumentAsync(a.Owner, a.ReceiptSeries, receipt: true);
+        var summary = await a.Owner.PostAsJsonAsync("/api/v1/summaries", new { companyId = a.Company.Id, referenceDate = TodayInLima().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) });
+        Assert.Equal(HttpStatusCode.Created, summary.StatusCode);
+        var created = (await summary.Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!;
+        var refused = await a.Owner.GetAsync($"/api/v1/electronic-documents/{created[0].Document.Id}/pdf");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Equal("SF-CPE-002", await ProblemCodeAsync(refused));
+    }
+
     // ---------- security ----------
 
     [Fact]

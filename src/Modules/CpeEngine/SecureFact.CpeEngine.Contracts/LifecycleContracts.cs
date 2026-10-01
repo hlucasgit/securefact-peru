@@ -150,6 +150,12 @@ public interface IElectronicDocumentService
     /// <summary>The signed XML exactly as it was sent. Never changes after preparation.</summary>
     Task<Result<string>> GetSignedXmlAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The printed representation (A4 PDF) of an invoice or receipt: issuer, buyer, items and totals as numbered by Billing, the amount in
+    /// words and a QR whose last field is the digest of the signed XML. Rendered on demand; it never changes the electronic document.
+    /// </summary>
+    Task<Result<byte[]>> GetPdfAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
     /// <summary>The CDR ZIP exactly as SUNAT returned it; not found until a CDR arrives.</summary>
     Task<Result<byte[]>> GetCdrZipAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
 }
