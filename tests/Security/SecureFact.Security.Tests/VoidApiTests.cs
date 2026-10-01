@@ -400,6 +400,44 @@ public sealed class VoidApiTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.NotFound, (await setup.Owner.GetAsync($"/api/v1/voids/{summary.Document.Id}")).StatusCode);
     }
 
+    // ---------- printed representation ----------
+
+    private static string PdfContent(byte[] pdf)
+    {
+        var text = System.Text.Encoding.Latin1.GetString(pdf);
+        var content = new System.Text.StringBuilder();
+        foreach (System.Text.RegularExpressions.Match stream in System.Text.RegularExpressions.Regex.Matches(text, "stream\r?\n(?<body>.*?)\r?\nendstream", System.Text.RegularExpressions.RegexOptions.Singleline, TimeSpan.FromSeconds(5)))
+        {
+            try
+            {
+                using var zlib = new System.IO.Compression.ZLibStream(new MemoryStream(System.Text.Encoding.Latin1.GetBytes(stream.Groups["body"].Value)), System.IO.Compression.CompressionMode.Decompress);
+                using var reader = new StreamReader(zlib, System.Text.Encoding.Latin1);
+                content.Append(reader.ReadToEnd());
+            }
+            catch (InvalidDataException)
+            {
+                // an image or another binary stream
+            }
+        }
+
+        return content.ToString();
+    }
+
+    [Fact]
+    public async Task The_pdf_of_a_voided_document_says_ANULADO_only_once_sunat_accepted_the_voiding()
+    {
+        var setup = await NewTenantAsync("Void Pdf SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+        var electronic = await AcceptedAsync(setup, invoice, $"{invoice.Series}-{invoice.Number}");
+        Assert.DoesNotContain("(ANULADO)", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+
+        var communication = Assert.Single((await (await VoidAsync(setup, (invoice.Id, "Error en la emisión"))).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        Assert.DoesNotContain("(ANULADO)", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal); // still pending
+
+        await FinishAsync(setup, communication, "T-1");
+        Assert.Contains("(ANULADO)", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+    }
+
     // ---------- notes on voided documents ----------
 
     [Fact]

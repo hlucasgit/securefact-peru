@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- El PDF de un documento anulado (baja aceptada por SUNAT) lleva «ANULADO» en cada página (ADR-024).
 - Billing rechaza notas sobre documentos anulados o con baja en curso (`SF-BIL-011`) mediante el puerto `IVoidStatusProvider` que implementa CpeEngine (ADR-024).
 - Baja de boletas y de notas de boletas por resumen diario con líneas de estado 3 (`POST /api/v1/voids` genera `RA` y/o `RC` según el tipo); `summary_item.line_status`; aceptado en el beta (ADR-024).
 - Comunicación de baja de facturas y notas de facturas: generador UBL 2.0 validado, creación por fecha de emisión con reglas de SUNAT, envío/seguimiento como el resumen, estado «anulado» derivado; aceptada en el beta (ADR-024).

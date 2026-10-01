@@ -137,6 +137,18 @@ internal sealed class PdfPage
     public void StrokeRectangle(double x, double y, double width, double height, double lineWidth = 0.5) =>
         Content.Append(CultureInfo.InvariantCulture, $"{PdfWriter.Number(lineWidth)} w {PdfWriter.Number(x)} {PdfWriter.Number(y)} {PdfWriter.Number(width)} {PdfWriter.Number(height)} re S\n");
 
+    /// <summary>Draws text in a gray level, rotated counter-clockwise by <paramref name="degrees"/> and centred on a point; the fill colour goes back to black afterwards.</summary>
+    public void CenteredRotatedText(PdfFont font, double size, double gray, double degrees, double centerX, double centerY, string text)
+    {
+        var radians = degrees * Math.PI / 180;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        var half = Helvetica.Width(font, text, size) / 2;
+        var x = centerX - (half * cos) + ((size * 0.35) * sin);
+        var y = centerY - (half * sin) - ((size * 0.35) * cos);
+        Content.Append(CultureInfo.InvariantCulture, $"{PdfWriter.Number(gray)} g BT /{(font == PdfFont.Bold ? "F2" : "F1")} {PdfWriter.Number(size)} Tf {cos:0.####} {sin:0.####} {-sin:0.####} {cos:0.####} {PdfWriter.Number(x)} {PdfWriter.Number(y)} Tm ({PdfWriter.Escape(text)}) Tj ET 0 g\n");
+    }
+
     /// <summary>Fills a rectangle in black (gray 0) or in the given gray level (0 black, 1 white).</summary>
     public void FillRectangle(double x, double y, double width, double height, double gray = 0)
     {

@@ -452,7 +452,8 @@ internal sealed class ElectronicDocumentService(
             d.Lines.Select(l => new PrintedLine(l.UnitCode, l.Quantity, l.Description, l.UnitValue, l.UnitPriceIncludingTaxes, l.LineExtensionAmount, l.TotalTaxAmount)).ToList(),
             new PrintedTotals(d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount),
             payload.Value, entity.DigestValue,
-            d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null);
+            d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
+            await IsVoidedAsync(entity.Id, cancellationToken));
         return printer.Render(printed);
     }
 

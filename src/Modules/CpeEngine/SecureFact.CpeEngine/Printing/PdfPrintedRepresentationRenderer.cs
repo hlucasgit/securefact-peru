@@ -89,6 +89,12 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
         var page = pdf.AddPage();
         var top = Top;
 
+        if (document.Voided)
+        {
+            // Drawn first and in light gray so the printed data stay readable underneath.
+            page.CenteredRotatedText(PdfFont.Bold, 110, 0.85, 45, PdfWriter.PageWidth / 2, PdfWriter.PageHeight / 2, "ANULADO");
+        }
+
         // Issuer block (left) and the document box (right).
         page.Text(PdfFont.Bold, 12, Left, top - 12, document.IssuerName);
         var cursor = top - 26;
@@ -113,6 +119,11 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
         page.Text(PdfFont.Bold, 11, boxLeft + ((boxWidth - Helvetica.Width(PdfFont.Bold, number, 11)) / 2), top - 54, number);
 
         y = top - boxHeight - 14;
+        if (document.Voided)
+        {
+            page.TextRight(PdfFont.Bold, 12, Right, y, "ANULADO");
+        }
+
         if (firstPage)
         {
             page.Text(PdfFont.Bold, 8, Left, y, "Fecha de emisión:");

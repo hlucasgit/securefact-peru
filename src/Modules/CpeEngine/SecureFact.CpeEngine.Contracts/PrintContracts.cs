@@ -26,6 +26,7 @@ public sealed record PrintedNote(string ReferencedDocument, string Reason);
 /// <param name="BuyerDocumentTypeName">Denomination of the catalogue 06 type (the printed form replaces the code by its name).</param>
 /// <param name="QrPayload">Text of the QR (see <see cref="IQrPayloadGenerator"/>).</param>
 /// <param name="DigestValue">Base64 <c>ds:DigestValue</c> of the signed XML, printed as the document's summary value.</param>
+/// <param name="Voided">True when SUNAT accepted the document's voiding: every page then carries the word ANULADO (the content and the QR are not altered).</param>
 public sealed record PrintedDocument(
     string DocumentTypeCode,
     string Series,
@@ -44,7 +45,8 @@ public sealed record PrintedDocument(
     PrintedTotals Totals,
     string QrPayload,
     string DigestValue,
-    PrintedNote? Note = null);
+    PrintedNote? Note = null,
+    bool Voided = false);
 
 /// <summary>Renders the printed representation (PDF, A4) of an invoice or receipt. Pure: the same input gives the same bytes.</summary>
 public interface IPrintedRepresentationRenderer

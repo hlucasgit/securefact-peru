@@ -182,6 +182,22 @@ public class PrintedRepresentationTests
     }
 
     [Fact]
+    public void A_voided_document_carries_the_word_ANULADO_on_every_page_and_the_rest_is_unchanged()
+    {
+        var plain = _renderer.Render(Document(lines: 120)).Value;
+        var voided = _renderer.Render(Document(lines: 120) with { Voided = true }).Value;
+
+        var plainPages = PageContents(plain);
+        var voidedPages = PageContents(voided);
+        Assert.DoesNotContain(plainPages, p => p.Contains("(ANULADO)", StringComparison.Ordinal));
+        Assert.True(voidedPages.Count >= 3);
+        Assert.Equal(plainPages.Count, voidedPages.Count);
+        Assert.All(voidedPages, p => Assert.Equal(2, Regex.Count(p, @"\(ANULADO\) Tj", RegexOptions.None, TimeSpan.FromSeconds(2)))); // watermark and header label
+        Assert.Contains("IMPORTE TOTAL", voidedPages[^1], StringComparison.Ordinal);
+        Assert.Contains(@"Resumen \(hash\):", voidedPages[^1], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Long_documents_paginate_and_the_totals_and_qr_appear_once_on_the_last_page()
     {
         var pdf = _renderer.Render(Document(lines: 120)).Value;
