@@ -14,11 +14,15 @@ public static class Permissions
     public const string SeriesManage = "series.manage";
     public const string DocumentsRead = "documents.read";
     public const string DocumentsCreate = "documents.create";
+    public const string CustomersRead = "customers.read";
+    public const string CustomersManage = "customers.manage";
+    public const string ProductsRead = "products.read";
+    public const string ProductsManage = "products.manage";
 
     public static IReadOnlyList<string> All { get; } =
     [
         TenantsCreate, TenantsRead, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
-        SeriesManage, DocumentsRead, DocumentsCreate,
+        SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
     ];
 }
 
@@ -55,16 +59,18 @@ public static class RoleCatalog
         [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.TenantsRead]),
         [Roles.TenantOwner] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
-             Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
+             Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
+             Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage]),
         [Roles.TenantAdmin] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.CompaniesRead, Permissions.CompaniesManage,
-             Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
-        [Roles.BillingAdmin] = (RoleLevel.Tenant, [Permissions.TenantsRead, Permissions.CompaniesRead, Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
-        [Roles.Accountant] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead]),
-        [Roles.Sales] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
+             Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
+             Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage]),
+        [Roles.BillingAdmin] = (RoleLevel.Tenant, [Permissions.TenantsRead, Permissions.CompaniesRead, Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate, Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage]),
+        [Roles.Accountant] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead]),
+        [Roles.Sales] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.DocumentsCreate, Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead]),
         [Roles.Developer] = (RoleLevel.Tenant, [Permissions.CompaniesRead]),
-        [Roles.Auditor] = (RoleLevel.Tenant, [Permissions.AuditRead, Permissions.UsersRead, Permissions.CompaniesRead, Permissions.DocumentsRead]),
-        [Roles.ReadOnly] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead]),
+        [Roles.Auditor] = (RoleLevel.Tenant, [Permissions.AuditRead, Permissions.UsersRead, Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead]),
+        [Roles.ReadOnly] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead]),
     };
 
     public static IReadOnlyCollection<string> AllRoles => Definitions.Keys;

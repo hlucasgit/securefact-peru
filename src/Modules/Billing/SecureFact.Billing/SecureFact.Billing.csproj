@@ -9,7 +9,9 @@
     <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
     <ProjectReference Include="..\..\Audit\SecureFact.Audit.Contracts\SecureFact.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Customers\SecureFact.Customers.Contracts\SecureFact.Customers.Contracts.csproj" />
     <ProjectReference Include="..\..\Organizations\SecureFact.Organizations.Contracts\SecureFact.Organizations.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\SecureFact.Rules.Contracts\SecureFact.Rules.Contracts.csproj" />
     <ProjectReference Include="..\..\TaxEngine\SecureFact.TaxEngine.Contracts\SecureFact.TaxEngine.Contracts.csproj" />
     <ProjectReference Include="..\SecureFact.Billing.Contracts\SecureFact.Billing.Contracts.csproj" />
   </ItemGroup>

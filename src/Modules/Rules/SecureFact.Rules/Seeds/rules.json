@@ -1,0 +1,46 @@
+{
+  "version": "2026-10-01",
+  "note": "Regulatory rules as versioned data (ADR-008). Verification is 'Verified' only when the value was read in an official primary source; otherwise 'Pending' and the Source says what must be checked. effectiveFrom 1900-01-01 means the source does not publish when the value started.",
+  "rules": [
+    {
+      "code": "tax.igv.rate",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S16 Factura2_0: 'tasa vigente del IGV (18.00 o 10.50)'",
+      "verification": "Verified",
+      "configuration": { "rate": 0.18 }
+    },
+    {
+      "code": "tax.igv.reduced_rate",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S16 Factura2_0 (error 4439): tasa 10.5 for issuers in the 'Padrón de Tasa especial del IGV - Restaurantes y hoteles'",
+      "verification": "Verified",
+      "configuration": { "rate": 0.105 }
+    },
+    {
+      "code": "tax.ivap.rate",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S16 Parámetro 024 'Tasa vigente del IVAP' defines the parameter but not its value; 4 % taken from general knowledge. PENDING: confirm in the official parameter table.",
+      "verification": "Pending",
+      "configuration": { "rate": 0.04 }
+    },
+    {
+      "code": "tax.icbper.unit_amount",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S16 rule 4318 (ICBPER = unit amount x quantity) defines the formula, not the amount; S/ 0.50 taken from general knowledge. PENDING: confirm in the official parameter table / law.",
+      "verification": "Pending",
+      "configuration": { "amount": 0.50 }
+    },
+    {
+      "code": "billing.issue_date_max_age_days",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S02 SEE-del Contribuyente: invoices and linked notes are sent within 3 calendar days (invoice verified). Receipts use the same value until Parámetro 004 for code 03 is read.",
+      "verification": "Pending",
+      "configuration": { "01": 3, "03": 3 }
+    }
+  ]
+}

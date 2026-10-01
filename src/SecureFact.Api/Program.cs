@@ -7,11 +7,14 @@ using SecureFact.Audit;
 using SecureFact.Billing;
 using SecureFact.Catalogs;
 using SecureFact.CpeEngine;
+using SecureFact.Customers;
+using SecureFact.Products;
 using SecureFact.Identity;
 using SecureFact.Organizations;
 using SecureFact.Identity.Contracts;
 using SecureFact.Platform;
 using SecureFact.Platform.Security;
+using SecureFact.Rules;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -94,6 +97,9 @@ if (appConnection is not null)
     builder.Services.AddTaxEngineModule();
     builder.Services.AddCpeEngineModule();
     builder.Services.AddCatalogsModule(appConnection);
+    builder.Services.AddRulesModule(appConnection);
+    builder.Services.AddCustomersModule(appConnection);
+    builder.Services.AddProductsModule(appConnection);
     builder.Services.AddBillingModule(appConnection);
     builder.Services.AddIdentityModule(appConnection, options => builder.Configuration.GetSection("Identity").Bind(options));
 }
@@ -111,6 +117,9 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await OrganizationsModule.MigrateAsync(migrationsConnection);
     await BillingModule.MigrateAsync(migrationsConnection);
     await CatalogsModule.MigrateAsync(migrationsConnection);
+    await RulesModule.MigrateAsync(migrationsConnection);
+    await CustomersModule.MigrateAsync(migrationsConnection);
+    await ProductsModule.MigrateAsync(migrationsConnection);
     return;
 }
 
@@ -154,6 +163,8 @@ app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
 app.MapBillingEndpoints();
 app.MapCatalogEndpoints();
+app.MapRuleEndpoints();
+app.MapMasterDataEndpoints();
 
 app.Run();
 

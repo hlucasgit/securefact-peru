@@ -22,6 +22,10 @@
     <Project Path="src/Modules/CpeEngine/SecureFact.CpeEngine.Contracts/SecureFact.CpeEngine.Contracts.csproj" />
     <Project Path="src/Modules/CpeEngine/SecureFact.CpeEngine/SecureFact.CpeEngine.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Customers/">
+    <Project Path="src/Modules/Customers/SecureFact.Customers.Contracts/SecureFact.Customers.Contracts.csproj" />
+    <Project Path="src/Modules/Customers/SecureFact.Customers/SecureFact.Customers.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/SecureFact.Identity.Contracts/SecureFact.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/SecureFact.Identity/SecureFact.Identity.csproj" />
@@ -29,6 +33,14 @@
   <Folder Name="/src/Modules/Organizations/">
     <Project Path="src/Modules/Organizations/SecureFact.Organizations.Contracts/SecureFact.Organizations.Contracts.csproj" />
     <Project Path="src/Modules/Organizations/SecureFact.Organizations/SecureFact.Organizations.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Products/">
+    <Project Path="src/Modules/Products/SecureFact.Products.Contracts/SecureFact.Products.Contracts.csproj" />
+    <Project Path="src/Modules/Products/SecureFact.Products/SecureFact.Products.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Rules/">
+    <Project Path="src/Modules/Rules/SecureFact.Rules.Contracts/SecureFact.Rules.Contracts.csproj" />
+    <Project Path="src/Modules/Rules/SecureFact.Rules/SecureFact.Rules.csproj" />
   </Folder>
   <Folder Name="/src/Modules/TaxEngine/">
     <Project Path="src/Modules/TaxEngine/SecureFact.TaxEngine.Contracts/SecureFact.TaxEngine.Contracts.csproj" />

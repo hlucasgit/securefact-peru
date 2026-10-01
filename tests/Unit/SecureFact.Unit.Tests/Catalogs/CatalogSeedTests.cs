@@ -1,5 +1,5 @@
 using System.Text.Json;
-using SecureFact.Billing.Application;
+using SecureFact.SharedKernel.Domain;
 using SecureFact.CatalogImporter;
 using SecureFact.TaxEngine;
 
@@ -85,7 +85,7 @@ public class CatalogSeedTests
     {
         var official = Catalog("06").Entries.Select(e => e.Code).ToHashSet(StringComparer.Ordinal);
 
-        Assert.All(BillingRules.SupportedBuyerDocumentTypes, code => Assert.Contains(code, official));
+        Assert.All(IdentityDocuments.SupportedTypes, code => Assert.Contains(code, official));
     }
 
     [Fact]

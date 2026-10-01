@@ -234,8 +234,10 @@
         "dependencies": {
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.Customers.Contracts": "[1.0.0, )",
           "SecureFact.Organizations.Contracts": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
           "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
         }
@@ -272,10 +274,18 @@
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
-          "SecureFact.SharedKernel": "[1.0.0, )"
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
         }
       },
       "securefact.cpeengine.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.customers.contracts": {
         "type": "Project",
         "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )"
@@ -310,6 +320,20 @@
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.rules": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.rules.contracts": {
+        "type": "Project",
+        "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },

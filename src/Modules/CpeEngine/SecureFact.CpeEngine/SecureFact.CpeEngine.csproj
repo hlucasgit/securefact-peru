@@ -3,6 +3,7 @@
     <InternalsVisibleTo Include="SecureFact.Unit.Tests" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\TaxEngine\SecureFact.TaxEngine.Contracts\SecureFact.TaxEngine.Contracts.csproj" />
     <ProjectReference Include="..\SecureFact.CpeEngine.Contracts\SecureFact.CpeEngine.Contracts.csproj" />
   </ItemGroup>
 </Project>

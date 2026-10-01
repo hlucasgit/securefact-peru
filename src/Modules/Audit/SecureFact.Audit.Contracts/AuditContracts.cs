@@ -12,6 +12,13 @@ public static class AuditActions
     public const string EstablishmentUpdated = "organizations.establishment.updated";
     public const string EstablishmentDeactivated = "organizations.establishment.deactivated";
 
+    public const string CustomerCreated = "customers.customer.created";
+    public const string CustomerUpdated = "customers.customer.updated";
+    public const string CustomerDeactivated = "customers.customer.deactivated";
+    public const string ProductCreated = "products.product.created";
+    public const string ProductUpdated = "products.product.updated";
+    public const string ProductDeactivated = "products.product.deactivated";
+
     public const string SeriesCreated = "billing.series.created";
     public const string SeriesDeactivated = "billing.series.deactivated";
     public const string DocumentCreated = "billing.document.created";

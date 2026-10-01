@@ -70,7 +70,6 @@ public sealed class BillingApiTests(ApiFixture api)
         {
             new { description = "Servicio de consultoría", unitCode = "ZZ", tax = new { quantity, unitValue, igvAffectationCode = "10" } },
         },
-        rates = new { igvRate = 0.18m, ivapRate = 0.04m, icbperUnitAmount = 0.5m },
     };
 
     private static async Task<HttpResponseMessage> PostDocumentAsync(HttpClient client, object body, string? key = null)
@@ -140,6 +139,26 @@ public sealed class BillingApiTests(ApiFixture api)
         Assert.Equal(document.Totals.PayableAmount, fetched.Totals.PayableAmount);
         var list = (await setup.Owner.GetFromJsonAsync<List<DocumentDto>>($"/api/v1/documents?companyId={setup.CompanyId}", ApiFixture.JsonOptions))!;
         Assert.Equal(2, list.Count);
+    }
+
+    [Fact]
+    public async Task Tax_rates_come_from_the_platform_and_a_client_supplied_rate_is_ignored()
+    {
+        var setup = await NewTenantWithSeriesAsync("Doc Rates SAC");
+        var forged = new
+        {
+            seriesId = setup.InvoiceSeries.Id,
+            issueDate = TodayInLima().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            currency = "PEN",
+            buyer = new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" },
+            lines = new[] { new { description = "Servicio", unitCode = "ZZ", tax = new { quantity = 1m, unitValue = 100m, igvAffectationCode = "10" } } },
+            rates = new { igvRate = 0m, ivapRate = 0m, icbperUnitAmount = 0m },
+        };
+
+        var document = await ReadDocumentAsync(await PostDocumentAsync(setup.Owner, forged));
+
+        Assert.Equal(18.00m, document.Totals.TotalIgv);
+        Assert.Equal(118.00m, document.Totals.PayableAmount);
     }
 
     [Fact]
@@ -288,7 +307,6 @@ public sealed class BillingApiTests(ApiFixture api)
             currency = "PEN",
             buyer = new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" },
             lines = Array.Empty<object>(),
-            rates = new { igvRate = 0.18m },
         };
         Assert.Equal("SF-BIL-006", await ProblemCodeAsync(await PostDocumentAsync(setup.Owner, noLines)));
     }

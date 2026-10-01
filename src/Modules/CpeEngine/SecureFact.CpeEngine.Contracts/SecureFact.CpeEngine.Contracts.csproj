@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\TaxEngine\SecureFact.TaxEngine.Contracts\SecureFact.TaxEngine.Contracts.csproj" />
   </ItemGroup>
 </Project>

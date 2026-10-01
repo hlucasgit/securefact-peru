@@ -10,7 +10,10 @@ using SecureFact.Audit;
 using SecureFact.Billing;
 using SecureFact.Catalogs;
 using SecureFact.Identity;
+using SecureFact.Customers;
 using SecureFact.Organizations;
+using SecureFact.Products;
+using SecureFact.Rules;
 using SecureFact.Tenancy;
 using Testcontainers.PostgreSql;
 
@@ -50,6 +53,9 @@ public sealed class PostgresFixture : IAsyncLifetime
         await OrganizationsModule.MigrateAsync(OwnerConnectionString);
         await BillingModule.MigrateAsync(OwnerConnectionString);
         await CatalogsModule.MigrateAsync(OwnerConnectionString);
+        await RulesModule.MigrateAsync(OwnerConnectionString);
+        await CustomersModule.MigrateAsync(OwnerConnectionString);
+        await ProductsModule.MigrateAsync(OwnerConnectionString);
 
         await ExecuteAsOwnerAsync($"""
             CREATE SCHEMA rlstest;

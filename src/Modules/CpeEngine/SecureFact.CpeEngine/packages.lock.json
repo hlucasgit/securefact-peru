@@ -11,11 +11,18 @@
       "securefact.cpeengine.contracts": {
         "type": "Project",
         "dependencies": {
-          "SecureFact.SharedKernel": "[1.0.0, )"
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
         }
       },
       "securefact.sharedkernel": {
         "type": "Project"
+      },
+      "securefact.taxengine.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
       }
     }
   }

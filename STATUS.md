@@ -1,38 +1,25 @@
-# STATUS — 2026-10-01 (segunda hora autónoma)
+# STATUS — 2026-10-01 (dos horas autónomas)
 
 ## Estado general
 Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almacenamiento S3 de código; el CI no se ha ejecutado). **Fase 2 en curso**: ya existen el motor tributario, las series, la numeración atómica y la emisión idempotente de facturas/boletas. Último commit en `origin/main`: `3bfc54b`. El trabajo de esta hora está **sin commitear**.
 
-## Novedades de la segunda hora
-- **Catalogs**: 42 catálogos oficiales (794 códigos) importados del libro de reglas del 26.08.2026 con `tools/SecureFact.CatalogImporter`; esquema `catalog` con vigencias y versiones, lectura por API (`/api/v1/catalogs`), carga solo del lado del dueño del esquema. Pruebas de que semilla = libro almacenado = hash registrado, y de que TaxEngine/Billing no se desvían de los catálogos oficiales (**ADR-015**).
-- **CpeEngine** (inicio): contenido del QR según el Anexo N.° 6 §6.4.3, leído de la fuente primaria (S19). Hallazgo: la guía XML de factura **no** trata el QR; las leyendas del catálogo 52 sí están en la guía (S20).
-- XSD de SUNAT: el propietario descargó el zip; UBL 2.1 y UBLPE 2.0 extraídos y verificados.
-- **Pruebas: 213 pasan en Release con warnings-as-errors** (112 unitarias, 6 de arquitectura, 6 de integración, 89 de seguridad/API). Cobertura no medida.
+## Novedades de las dos últimas horas
+- **Rules** (`IRuleProvider`): plazos y tasas como reglas versionadas con estado `Verified`/`Pending`; versiones publicadas inmutables; `GET /api/v1/rules`. **Billing ya no acepta tasas del cliente** (las resuelve por fecha de emisión); prueba con tasas falsas.
+- **Customers** y **Products**: datos maestros por tenant con validación contra los catálogos 06 y 07, identidad inmutable, sin borrado, búsqueda con comodines escapados. Los documentos pueden referenciar `customerId` (instantánea del adquirente).
+- **UBL**: generador de XML 2.1 sin firmar para factura y boleta (líneas gravadas, exoneradas, inafectas, gratuitas). **Valida contra el XSD oficial UBL 2.1** y contiene **todas las etiquetas obligatorias de las hojas `Factura2_0` y `Boleta2_0`** del libro oficial (la prueba lee el libro versionado). Todo lo demás falla con `SF-CPE-002` en lugar de emitir XML engañoso. **ADR-016**.
+- Hallazgos: el libro de reglas es la fuente más fiable (la guía PDF de 2017 usa una estructura anterior); el ejemplo de la guía firma con RSA-SHA1 (algoritmo vigente por confirmar, R-032); `EF.Functions.ILike` sin carácter de escape no escapa comodines.
+- **Pruebas: 251 pasan en Release con warnings-as-errors** (123 unitarias, 6 de arquitectura, 6 de integración, 116 de seguridad/API). Cobertura no medida.
 
-## Módulos
-`SharedKernel`, `Platform` (RLS, ámbito de datos, cifrado de envoltura), `Tenancy`, `Identity`, `Audit`, `Organizations`, **`TaxEngine`** (nuevo), **`Billing`** (nuevo), `Api`. Ver ADR-001…014.
-
-## Novedades de esta sesión
-- **TaxEngine** (`ITaxCalculator`, puro, solo `decimal`): valor de venta, IGV por línea y global, ISC (al valor y monto fijo), ICBPER, gratuitas (11–16, 21, 31–37), exoneradas, inafectas, exportación, IVAP, descuentos y cargos de línea y globales (afectan o no la base), redondeo del total, precio unitario con tributos. Las fórmulas salen de las reglas oficiales de validación de factura (libro del 26.08.2026) y los catálogos 05, 07, 08 y 53 transcritos de él. **ADR-013**.
-- **Billing**: series validadas por tipo (F/B), numeración atómica en la misma transacción que el documento (sin huecos ni duplicados bajo concurrencia), `Idempotency-Key` con reintentos concurrentes, adquirente como instantánea, JSON original y cálculo completo guardados, `document`/`document_line` **insert-only** a nivel de base de datos. **ADR-014**.
-- Permisos nuevos: `series.manage`, `documents.read`, `documents.create`.
-
-## Pruebas: 193 pasan en Release con warnings-as-errors
-98 unitarias (40 de TaxEngine con casos a mano y 3 000 documentos aleatorios), 6 de arquitectura, 6 de integración, 83 de seguridad/API contra PostgreSQL real. Hallazgo: la regla de arquitectura "Contracts solo referencia SharedKernel" era demasiado estricta; ahora permite referenciar otros Contracts. Cobertura de código no medida.
-
-## Normativa
-Nuevo: fórmulas de totales y tolerancias de la hoja de reglas (S16). Supuestos explícitos: **R-024** modo de redondeo (AwayFromZero), **R-025** unidad de la "tolerancia ± 1", **R-029** plazo de antigüedad de boletas. No soportado aún (error explícito `SF-TAX-002`): mezcla IGV+IVAP, ISC sistema 03, anticipos, percepciones/retenciones, detracciones.
-
-## Riesgos y deuda
-- Auditoría escrita después del cambio de negocio (ADR-012) hasta tener outbox.
-- Catálogos con lista externa (moneda, unidad, país, ubigeo, producto SUNAT) sin cargar completos; la tasa del IGV y los plazos (Parámetros 004/012/024) siguen siendo entradas, no reglas servidas por un `IRuleProvider`.
-- `docs/regulatory/sources.md` S18 (guías XML) sin leer: QR, leyendas y estructura UBL dependen de ellas.
-- Sin clientes/productos como entidades propias (el adquirente va en cada documento).
-- Notas de crédito/débito esperan el flujo de CDR (Fase 4).
+## Riesgos y deuda (resumen actual)
+- Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
+- Aceptación de SUNAT del XML no probada (solo XSD y etiquetas obligatorias); firma, ZIP, envío y CDR sin hacer; algoritmo de firma por confirmar.
+- Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; CI sin ejecutar en GitHub; cobertura sin medir.
+- Descuentos y cargos (línea y globales con base mixta), ISC, ICBPER, IVAP, exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún. El caso oficial de la guía (descuentos porcentuales por línea y descuento global sobre base mixta) requiere factor de descuento en el motor.
+- Notas de crédito/débito esperan el CDR (Fase 4).
 
 ## Pendientes
-1. ✔ Descargas autorizadas y hechas: xlsx, guías XML y 19 XSD UBL 2.1 en `docs/regulatory/assets/` (con hashes). El zip de XSD lo descargó el propietario; UBL 2.1 y UBLPE 2.0 están extraídos y verificados por hash.
-2. Commit y push.
-3. `Customers`, `Products`, reglas con vigencia como servicio (`IRuleProvider`: plazos Parámetro 004, tasas Parámetros 012/024).
-4. Cerrar Fase 1: outbox + `IMessageBus` (RabbitMQ) + `IObjectStorage` (S3) y ejecutar el CI.
-5. Fase 3: leer guías XML, generador UBL, XSD, firma, CDR, QR, PDF.
+1. Commit y push.
+2. Factor de descuento porcentual y descuentos globales por categoría (casos oficiales de la guía) en TaxEngine y UBL.
+3. Firma XMLDSig (leer la hoja `Firma`), ZIP, `ICpeSubmissionChannel` + simulador SUNAT, parser de CDR.
+4. Outbox + bus + S3 de código; ejecutar el CI; medir cobertura.
+5. PDF y renderizado del QR.

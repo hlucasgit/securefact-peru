@@ -24,20 +24,6 @@ internal static partial class BillingRules
     [GeneratedRegex("^[A-Z]{3}$")]
     private static partial Regex CurrencyCode();
 
-    [GeneratedRegex("^[0-9A-Z]{1,15}$")]
-    private static partial Regex AlphanumericIdentity();
-
-    [GeneratedRegex(@"^\d{8}$")]
-    private static partial Regex Dni();
-
-    internal static readonly string[] SupportedBuyerDocumentTypes = ["0", "1", "4", "6", "7", "A"];
-
-    /// <summary>
-    /// Maximum age of the issue date when the document is created (SEE-del Contribuyente: 3 calendar days, S02; the same value is applied
-    /// to receipts until the receipt guide is read, R-017). Source: docs/regulatory/sources.md S02, S16.
-    /// </summary>
-    public const int MaxIssueDateAgeDays = 3;
-
     /// <summary>Series format per document type (S16 "General", rule 0151). Numeric contingency series are not supported yet.</summary>
     public static Error? ValidateSeriesCode(string documentTypeCode, string code)
     {
@@ -82,29 +68,14 @@ internal static partial class BillingRules
             return Bad("El nombre o razón social del adquirente es obligatorio (máximo 250 caracteres).");
         }
 
-        var type = buyer.DocumentTypeCode?.Trim() ?? string.Empty;
-        var number = buyer.DocumentNumber?.Trim() ?? string.Empty;
-
-        if (documentTypeCode == DocumentTypes.Invoice && type != "6")
+        if (documentTypeCode == DocumentTypes.Invoice && buyer.DocumentTypeCode?.Trim() != IdentityDocuments.Ruc)
         {
             return Bad("Las facturas solo se emiten a adquirentes con RUC.");
         }
 
-        if (!SupportedBuyerDocumentTypes.Contains(type, StringComparer.Ordinal))
+        if (IdentityDocuments.Validate(buyer.DocumentTypeCode, buyer.DocumentNumber) is { } problem)
         {
-            return Bad($"El tipo de documento de identidad '{type}' no es válido (catálogo 06).");
-        }
-
-        switch (type)
-        {
-            case "6" when !Ruc.Create(number).IsSuccess:
-                return Bad("El RUC del adquirente no es válido.");
-            case "1" when !Dni().IsMatch(number):
-                return Bad("El DNI debe tener 8 dígitos.");
-            case "4" or "7" or "A" when !AlphanumericIdentity().IsMatch(number.ToUpperInvariant()):
-                return Bad("El número de documento debe ser alfanumérico de hasta 15 caracteres.");
-            case "0" when number.Length is 0 or > 15:
-                return Bad("Indique el número de documento (o un guion) para adquirentes sin documento.");
+            return Bad(problem);
         }
 
         if (buyer.Address is { Length: > 250 } || buyer.Email is { Length: > 254 })

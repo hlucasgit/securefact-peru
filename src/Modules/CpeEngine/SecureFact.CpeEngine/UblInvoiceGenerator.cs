@@ -1,0 +1,289 @@
+using System.Globalization;
+using System.Text;
+using System.Xml;
+using System.Xml.Linq;
+using SecureFact.CpeEngine.Contracts;
+using SecureFact.SharedKernel;
+using SecureFact.SharedKernel.Results;
+using SecureFact.TaxEngine.Contracts;
+
+namespace SecureFact.CpeEngine;
+
+/// <summary>
+/// UBL 2.1 Invoice for factura (01) and boleta (03). Structure follows the mandatory/conditional tags of the 2026-08-26 validation
+/// rules workbook (sheets Factura2_0/Boleta2_0, S16) and the XML guides (S18). Scope today: taxed (10), exempt (20), unaffected (30) and
+/// free (11–16, 21, 31–37) lines without line or global discounts/charges; everything else returns <c>SF-CPE-002</c> instead of
+/// producing XML that would not match the calculated amounts. The output is unsigned: the signer fills <c>ext:ExtensionContent</c>.
+/// </summary>
+internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
+{
+    private static readonly XNamespace Inv = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2";
+    private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
+    private static readonly XNamespace Cbc = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
+    private static readonly XNamespace Ext = "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2";
+    private static readonly XNamespace Ds = "http://www.w3.org/2000/09/xmldsig#";
+
+    /// <summary>Tax category letter (UN/ECE 5305, guide S18), scheme name and international code (catalogue 05) per tax code.</summary>
+    private static readonly Dictionary<string, (string Letter, string Name, string TypeCode)> Schemes = new(StringComparer.Ordinal)
+    {
+        [TaxCodes.Igv] = ("S", "IGV", "VAT"),
+        [TaxCodes.Exempt] = ("E", "EXO", "VAT"),
+        [TaxCodes.Unaffected] = ("O", "INA", "FRE"),
+        [TaxCodes.Free] = ("Z", "GRA", "FRE"),
+    };
+
+    internal static IReadOnlyDictionary<string, (string Letter, string Name, string TypeCode)> SupportedSchemes => Schemes;
+
+    public Result<UblDocument> GenerateInvoice(UblInvoiceData data)
+    {
+        if (Validate(data) is { } invalid)
+        {
+            return invalid;
+        }
+
+        var currency = data.Currency;
+        var totals = data.Totals;
+        var root = new XElement(
+            Inv + "Invoice",
+            new XAttribute(XNamespace.Xmlns + "cac", Cac),
+            new XAttribute(XNamespace.Xmlns + "cbc", Cbc),
+            new XAttribute(XNamespace.Xmlns + "ext", Ext),
+            new XAttribute(XNamespace.Xmlns + "ds", Ds),
+            new XElement(Ext + "UBLExtensions", new XElement(Ext + "UBLExtension", new XElement(Ext + "ExtensionContent"))),
+            new XElement(Cbc + "UBLVersionID", "2.1"),
+            new XElement(Cbc + "CustomizationID", "2.0"),
+            new XElement(Cbc + "ID", $"{data.Series}-{data.Number.ToString(CultureInfo.InvariantCulture)}"),
+            new XElement(Cbc + "IssueDate", data.IssueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+
+        if (data.IssueTime is { } time)
+        {
+            root.Add(new XElement(Cbc + "IssueTime", time.ToString("HH:mm:ss", CultureInfo.InvariantCulture)));
+        }
+
+        root.Add(
+            new XElement(
+                Cbc + "InvoiceTypeCode",
+                new XAttribute("listID", data.OperationTypeCode),
+                new XAttribute("listAgencyName", "PE:SUNAT"),
+                new XAttribute("listName", "SUNAT:Identificador de Tipo de Documento"),
+                new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01"),
+                data.DocumentTypeCode),
+            new XElement(Cbc + "DocumentCurrencyCode", currency),
+            new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
+            SignatureInfo(data.Issuer),
+            Supplier(data.Issuer),
+            Customer(data.Buyer),
+            TaxTotal(totals, data.IgvRate, currency),
+            MonetaryTotal(totals, currency));
+
+        for (var i = 0; i < data.Lines.Count; i++)
+        {
+            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, currency));
+        }
+
+        var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
+        using var buffer = new StringWriterUtf8();
+        using (var writer = XmlWriter.Create(buffer, new XmlWriterSettings { Indent = true, Encoding = new UTF8Encoding(false), OmitXmlDeclaration = false }))
+        {
+            document.Save(writer);
+        }
+
+        var fileBase = $"{data.Issuer.DocumentNumber}-{data.DocumentTypeCode}-{data.Series}-{data.Number.ToString(CultureInfo.InvariantCulture)}";
+        return new UblDocument(buffer.ToString(), fileBase);
+    }
+
+    private static Error? Validate(UblInvoiceData data)
+    {
+        static Error Unsupported(string detail) => Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", detail);
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
+
+        if (data is null || data.Lines is not { Count: > 0 } || data.Totals is null || data.Totals.Lines.Count != data.Lines.Count)
+        {
+            return Invalid("El documento requiere líneas y totales calculados que coincidan línea a línea.");
+        }
+
+        if (data.DocumentTypeCode is not ("01" or "03"))
+        {
+            return Unsupported($"El tipo de documento '{data.DocumentTypeCode}' no está soportado (solo 01 y 03).");
+        }
+
+        if (data.Totals.TotalIvap != 0 || data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
+        {
+            return Unsupported("IVAP, ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+        }
+
+        if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0)
+        {
+            return Unsupported("Cargos, descuentos y redondeo aún no están soportados por el generador UBL.");
+        }
+
+        for (var i = 0; i < data.Lines.Count; i++)
+        {
+            if (!Schemes.ContainsKey(data.Totals.Lines[i].TaxCode))
+            {
+                return Unsupported($"La línea {i + 1} usa el tributo {data.Totals.Lines[i].TaxCode}, no soportado todavía.");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(data.Series) || data.Number < 1 || string.IsNullOrWhiteSpace(data.OperationTypeCode))
+        {
+            return Invalid("Serie, número y tipo de operación son obligatorios.");
+        }
+
+        return null;
+    }
+
+    private static XElement SignatureInfo(UblParty issuer) =>
+        new(
+            Cac + "Signature",
+            new XElement(Cbc + "ID", "IDSignSP"),
+            new XElement(
+                Cac + "SignatoryParty",
+                new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", issuer.DocumentNumber)),
+                new XElement(Cac + "PartyName", new XElement(Cbc + "Name", issuer.LegalName))),
+            new XElement(
+                Cac + "DigitalSignatureAttachment",
+                new XElement(Cac + "ExternalReference", new XElement(Cbc + "URI", "#SignatureSP"))));
+
+    private static XElement Supplier(UblParty issuer)
+    {
+        var party = new XElement(
+            Cac + "Party",
+            new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", new XAttribute("schemeID", issuer.DocumentTypeCode), issuer.DocumentNumber)));
+        if (!string.IsNullOrWhiteSpace(issuer.TradeName))
+        {
+            party.Add(new XElement(Cac + "PartyName", new XElement(Cbc + "Name", issuer.TradeName)));
+        }
+
+        party.Add(new XElement(
+            Cac + "PartyLegalEntity",
+            new XElement(Cbc + "RegistrationName", issuer.LegalName),
+            new XElement(Cac + "RegistrationAddress", new XElement(Cbc + "AddressTypeCode", issuer.EstablishmentCode ?? "0000"))));
+        return new XElement(Cac + "AccountingSupplierParty", party);
+    }
+
+    private static XElement Customer(UblParty buyer) =>
+        new(
+            Cac + "AccountingCustomerParty",
+            new XElement(
+                Cac + "Party",
+                new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", new XAttribute("schemeID", buyer.DocumentTypeCode), buyer.DocumentNumber)),
+                new XElement(Cac + "PartyLegalEntity", new XElement(Cbc + "RegistrationName", buyer.LegalName))));
+
+    private static XElement TaxTotal(TaxCalculationResult totals, decimal igvRate, string currency)
+    {
+        var element = new XElement(Cac + "TaxTotal", Amount("TaxAmount", totals.TotalTaxAmount, currency));
+        foreach (var subtotal in totals.TaxSubtotals)
+        {
+            element.Add(new XElement(
+                Cac + "TaxSubtotal",
+                Amount("TaxableAmount", subtotal.TaxableAmount, currency),
+                Amount("TaxAmount", subtotal.TaxAmount, currency),
+                Category(subtotal.TaxCode, igvRate, null)));
+        }
+
+        return element;
+    }
+
+    private static XElement Category(string taxCode, decimal igvRate, string? exemptionReasonCode)
+    {
+        var (letter, name, typeCode) = Schemes[taxCode];
+        var category = new XElement(
+            Cac + "TaxCategory",
+            new XElement(
+                Cbc + "ID",
+                new XAttribute("schemeID", "UN/ECE 5305"),
+                new XAttribute("schemeName", "Tax Category Identifier"),
+                new XAttribute("schemeAgencyName", "United Nations Economic Commission for Europe"),
+                letter));
+
+        if (exemptionReasonCode is not null)
+        {
+            if (taxCode == TaxCodes.Igv)
+            {
+                category.Add(new XElement(Cbc + "Percent", (igvRate * 100m).ToString("0.00", CultureInfo.InvariantCulture)));
+            }
+
+            category.Add(new XElement(
+                Cbc + "TaxExemptionReasonCode",
+                new XAttribute("listAgencyName", "PE:SUNAT"),
+                new XAttribute("listName", "SUNAT:Codigo de Tipo de Afectación del IGV"),
+                new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07"),
+                exemptionReasonCode));
+        }
+
+        category.Add(new XElement(
+            Cac + "TaxScheme",
+            new XElement(
+                Cbc + "ID",
+                new XAttribute("schemeID", "UN/ECE 5153"),
+                new XAttribute("schemeName", "Tax Scheme Identifier"),
+                new XAttribute("schemeAgencyName", "United Nations Economic Commission for Europe"),
+                taxCode),
+            new XElement(Cbc + "Name", name),
+            new XElement(Cbc + "TaxTypeCode", typeCode)));
+        return category;
+    }
+
+    private static XElement MonetaryTotal(TaxCalculationResult totals, string currency) =>
+        new(
+            Cac + "LegalMonetaryTotal",
+            Amount("LineExtensionAmount", totals.TotalLineExtensionAmount, currency),
+            Amount("TaxInclusiveAmount", totals.TotalTaxInclusiveAmount, currency),
+            Amount("PayableAmount", totals.PayableAmount, currency));
+
+    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, string currency)
+    {
+        var isFree = result.TaxCode == TaxCodes.Free;
+        var element = new XElement(
+            Cac + "InvoiceLine",
+            new XElement(Cbc + "ID", line.LineNumber.ToString(CultureInfo.InvariantCulture)),
+            new XElement(
+                Cbc + "InvoicedQuantity",
+                new XAttribute("unitCode", line.UnitCode),
+                new XAttribute("unitCodeListID", "UN/ECE rec 20"),
+                new XAttribute("unitCodeListAgencyName", "United Nations Economic Commission for Europe"),
+                Decimal(line.Quantity)),
+            Amount("LineExtensionAmount", result.LineExtensionAmount, currency));
+
+        var referencePrice = isFree ? line.ReferenceUnitValue ?? 0m : result.UnitPriceIncludingTaxes ?? 0m;
+        element.Add(new XElement(
+            Cac + "PricingReference",
+            new XElement(
+                Cac + "AlternativeConditionPrice",
+                new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", currency), Decimal(referencePrice)),
+                new XElement(Cbc + "PriceTypeCode", isFree ? "02" : "01"))));
+
+        // Free operations report the informational IGV (11–16) under tax 9996 but the line total tax stays 0 (S16, rule 3302).
+        var lineTax = isFree ? result.IgvOrIvapAmount : result.TotalTaxAmount;
+        element.Add(new XElement(
+            Cac + "TaxTotal",
+            Amount("TaxAmount", lineTax, currency),
+            new XElement(
+                Cac + "TaxSubtotal",
+                Amount("TaxableAmount", result.LineExtensionAmount, currency),
+                Amount("TaxAmount", lineTax, currency),
+                Category(result.TaxCode, igvRate, line.IgvAffectationCode))));
+
+        var item = new XElement(Cac + "Item", new XElement(Cbc + "Description", line.Description));
+        if (!string.IsNullOrWhiteSpace(line.ProductCode))
+        {
+            item.Add(new XElement(Cac + "SellersItemIdentification", new XElement(Cbc + "ID", line.ProductCode)));
+        }
+
+        element.Add(item);
+        element.Add(new XElement(Cac + "Price", new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", currency), Decimal(isFree ? 0m : line.UnitValue))));
+        return element;
+    }
+
+    private static XElement Amount(string name, decimal value, string currency) =>
+        new(Cbc + name, new XAttribute("currencyID", currency), value.ToString("0.00", CultureInfo.InvariantCulture));
+
+    /// <summary>Quantities and unit values keep up to 10 decimals, at least two (n(12,10)).</summary>
+    private static string Decimal(decimal value) => value.ToString("0.00##########", CultureInfo.InvariantCulture);
+
+    private sealed class StringWriterUtf8 : StringWriter
+    {
+        public override Encoding Encoding => new UTF8Encoding(false);
+    }
+}

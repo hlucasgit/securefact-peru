@@ -45,14 +45,19 @@ public sealed record DocumentLineRequest(
     TaxableLine Tax,
     string? ProductCode = null);
 
+/// <summary>
+/// Tax rates are never accepted from the client: the platform resolves them from versioned rules at the issue date.
+/// The buyer is given either inline (<paramref name="Buyer"/>) or by reference (<paramref name="CustomerId"/>), never both; a referenced
+/// customer is copied into the document as a snapshot.
+/// </summary>
 public sealed record CreateDocumentRequest(
     Guid SeriesId,
     DateOnly IssueDate,
     string Currency,
-    BuyerSnapshot Buyer,
+    BuyerSnapshot? Buyer,
     IReadOnlyList<DocumentLineRequest> Lines,
-    TaxRates Rates,
-    GlobalAdjustments? Adjustments = null);
+    GlobalAdjustments? Adjustments = null,
+    Guid? CustomerId = null);
 
 public enum DocumentStatus
 {

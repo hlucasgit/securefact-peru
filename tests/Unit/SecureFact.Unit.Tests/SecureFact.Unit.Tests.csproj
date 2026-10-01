@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\..\src\Modules\Catalogs\SecureFact.Catalogs\SecureFact.Catalogs.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Billing\SecureFact.Billing\SecureFact.Billing.csproj" />
     <ProjectReference Include="..\..\..\tools\SecureFact.CatalogImporter\SecureFact.CatalogImporter.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Rules\SecureFact.Rules\SecureFact.Rules.csproj" />
   </ItemGroup>
 </Project>

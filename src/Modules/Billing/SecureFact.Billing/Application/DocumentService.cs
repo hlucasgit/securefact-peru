@@ -6,9 +6,11 @@ using Microsoft.EntityFrameworkCore;
 using SecureFact.Audit.Contracts;
 using SecureFact.Billing.Contracts;
 using SecureFact.Billing.Domain;
+using SecureFact.Customers.Contracts;
 using SecureFact.Billing.Infrastructure;
 using SecureFact.Organizations.Contracts;
 using SecureFact.Platform.Tenancy;
+using SecureFact.Rules.Contracts;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Results;
 using SecureFact.TaxEngine.Contracts;
@@ -19,6 +21,8 @@ internal sealed partial class DocumentService(
     BillingDbContext db,
     IDataScope scope,
     ICompanyAdministration companies,
+    IRuleProvider rules,
+    ICustomerAdministration customers,
     ITaxCalculator calculator,
     TimeProvider clock,
     IAuditTrail audit) : IDocumentService
@@ -45,9 +49,14 @@ internal sealed partial class DocumentService(
             return Error.Validation(ErrorCodes.InvalidRequest, "Idempotency-Key inválida", "Envíe el encabezado Idempotency-Key con 8 a 100 caracteres alfanuméricos, '.', '_', ':' o '-'.");
         }
 
-        if (request is null || request.Lines is not { Count: > 0 and <= MaxLines } || request.Buyer is null)
+        if (request is null || request.Lines is not { Count: > 0 and <= MaxLines })
         {
-            return Error.Validation(ErrorCodes.InvalidDocument, "Documento inválido", $"El documento requiere adquirente y entre 1 y {MaxLines} líneas.");
+            return Error.Validation(ErrorCodes.InvalidDocument, "Documento inválido", $"El documento requiere entre 1 y {MaxLines} líneas.");
+        }
+
+        if ((request.Buyer is null) == (request.CustomerId is null))
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Adquirente inválido", "Indique el adquirente en 'buyer' o por 'customerId', pero no ambos.");
         }
 
         var requestJson = JsonSerializer.Serialize(request, Json);
@@ -66,13 +75,36 @@ internal sealed partial class DocumentService(
             return replay.Value;
         }
 
-        var validation = await ValidateAsync(series, request, cancellationToken);
+        var buyer = request.Buyer;
+        if (request.CustomerId is { } customerId)
+        {
+            var customer = await customers.GetAsync(customerId, cancellationToken);
+            if (!customer.IsSuccess)
+            {
+                return customer.Error;
+            }
+
+            if (!customer.Value.IsActive)
+            {
+                return Error.Validation(ErrorCodes.InvalidDocument, "Cliente inactivo", "El cliente referenciado está inactivo.");
+            }
+
+            buyer = new BuyerSnapshot(customer.Value.DocumentTypeCode, customer.Value.DocumentNumber, customer.Value.Name, customer.Value.Address, customer.Value.Email);
+        }
+
+        var validation = await ValidateAsync(series, request, buyer, cancellationToken);
         if (validation is not null)
         {
             return validation;
         }
 
-        var calculated = calculator.Calculate(new TaxCalculationRequest(request.Lines.Select(l => l.Tax).ToList(), request.Rates, request.Adjustments));
+        var rates = await ResolveRatesAsync(request.IssueDate, cancellationToken);
+        if (!rates.IsSuccess)
+        {
+            return rates.Error;
+        }
+
+        var calculated = calculator.Calculate(new TaxCalculationRequest(request.Lines.Select(l => l.Tax).ToList(), rates.Value, request.Adjustments));
         if (!calculated.IsSuccess)
         {
             return calculated.Error;
@@ -112,7 +144,7 @@ internal sealed partial class DocumentService(
 
         var document = Document.Create(
             documentId, tenant.Value, series.CompanyId, series.Id, series.DocumentTypeCode, series.Code, numbers[0], request.IssueDate,
-            request.Currency, request.Buyer with { DocumentTypeCode = request.Buyer.DocumentTypeCode.Trim(), DocumentNumber = request.Buyer.DocumentNumber.Trim(), Name = request.Buyer.Name.Trim() },
+            request.Currency, buyer! with { DocumentTypeCode = buyer!.DocumentTypeCode.Trim(), DocumentNumber = buyer.DocumentNumber.Trim().ToUpperInvariant(), Name = buyer.Name.Trim() },
             totals.PayableAmount, JsonSerializer.Serialize(totals, Json), requestJson, requestHash, now);
 
         for (var i = 0; i < request.Lines.Count; i++)
@@ -179,7 +211,26 @@ internal sealed partial class DocumentService(
         return await GetAsync(existing.DocumentId, cancellationToken);
     }
 
-    private async Task<Error?> ValidateAsync(Series series, CreateDocumentRequest request, CancellationToken cancellationToken)
+    /// <summary>IGV, IVAP and ICBPER values in force on the issue date. The reduced IGV rate (10.5 %) needs the issuer's registry status and is not offered yet.</summary>
+    private async Task<Result<TaxRates>> ResolveRatesAsync(DateOnly issueDate, CancellationToken cancellationToken)
+    {
+        var igv = await rules.ResolveDecimalAsync(RuleCodes.IgvRate, "rate", issueDate, cancellationToken);
+        var ivap = await rules.ResolveDecimalAsync(RuleCodes.IvapRate, "rate", issueDate, cancellationToken);
+        var icbper = await rules.ResolveDecimalAsync(RuleCodes.IcbperUnitAmount, "amount", issueDate, cancellationToken);
+        if (!igv.IsSuccess)
+        {
+            return igv.Error;
+        }
+
+        if (!ivap.IsSuccess)
+        {
+            return ivap.Error;
+        }
+
+        return icbper.IsSuccess ? new TaxRates(igv.Value, ivap.Value, icbper.Value) : icbper.Error;
+    }
+
+    private async Task<Error?> ValidateAsync(Series series, CreateDocumentRequest request, BuyerSnapshot? buyerToValidate, CancellationToken cancellationToken)
     {
         if (series.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
         {
@@ -196,9 +247,9 @@ internal sealed partial class DocumentService(
             return currency;
         }
 
-        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, request.Buyer) is { } buyer)
+        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate) is { } buyerError)
         {
-            return buyer;
+            return buyerError;
         }
 
         var company = await companies.GetAsync(series.CompanyId, cancellationToken);
@@ -220,9 +271,15 @@ internal sealed partial class DocumentService(
             return Error.Validation(ErrorCodes.InvalidDocument, "Fecha de emisión inválida", "La fecha de emisión no puede ser futura.");
         }
 
-        if (request.IssueDate < today.AddDays(-BillingRules.MaxIssueDateAgeDays))
+        var maxAge = await rules.ResolveDecimalAsync(RuleCodes.IssueDateMaxAgeDays, series.DocumentTypeCode, request.IssueDate, cancellationToken);
+        if (!maxAge.IsSuccess)
         {
-            return Error.Validation(ErrorCodes.InvalidDocument, "Fecha de emisión fuera de plazo", $"La fecha de emisión no puede tener más de {BillingRules.MaxIssueDateAgeDays} días de antigüedad.");
+            return maxAge.Error;
+        }
+
+        if (request.IssueDate < today.AddDays(-(int)maxAge.Value))
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Fecha de emisión fuera de plazo", $"La fecha de emisión no puede tener más de {(int)maxAge.Value} días de antigüedad.");
         }
 
         foreach (var (line, index) in request.Lines.Select((l, i) => (l, i)))

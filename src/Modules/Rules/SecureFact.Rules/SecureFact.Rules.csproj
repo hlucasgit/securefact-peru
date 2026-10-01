@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="SecureFact.Security.Tests" />
+    <InternalsVisibleTo Include="SecureFact.Unit.Tests" />
+    <EmbeddedResource Include="Seeds\rules.json" LogicalName="SecureFact.Rules.Seeds.rules.json" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\SecureFact.Rules.Contracts\SecureFact.Rules.Contracts.csproj" />
+  </ItemGroup>
+</Project>

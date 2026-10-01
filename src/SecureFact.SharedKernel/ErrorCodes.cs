@@ -28,8 +28,20 @@ public static class ErrorCodes
     public const string TaxAmountOverflow = "SF-TAX-004";
 
     public const string CpeInvalidQrField = "SF-CPE-001";
+    public const string CpeUnsupported = "SF-CPE-002";
+    public const string CpeInvalidDocument = "SF-CPE-003";
 
     public const string CatalogNotFound = "SF-CAT-001";
+
+    public const string InvalidCustomer = "SF-CUS-001";
+    public const string CustomerNotFound = "SF-CUS-002";
+    public const string CustomerAlreadyExists = "SF-CUS-003";
+    public const string InvalidProduct = "SF-PRD-001";
+    public const string ProductNotFound = "SF-PRD-002";
+    public const string ProductAlreadyExists = "SF-PRD-003";
+
+    public const string RuleNotFound = "SF-RUL-001";
+    public const string RuleInvalid = "SF-RUL-002";
 
     public const string InvalidCompany = "SF-ORG-001";
     public const string CompanyNotFound = "SF-ORG-002";
