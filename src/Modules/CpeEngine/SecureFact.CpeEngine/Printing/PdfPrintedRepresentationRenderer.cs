@@ -30,13 +30,20 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
     public Result<byte[]> Render(PrintedDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        if (document.DocumentTypeCode is not ("01" or "03") || document.Lines.Count is 0 or > MaxLines || string.IsNullOrWhiteSpace(document.QrPayload))
+        var isNote = document.DocumentTypeCode is "07" or "08";
+        if (document.DocumentTypeCode is not ("01" or "03" or "07" or "08") || document.Lines.Count is 0 or > MaxLines || string.IsNullOrWhiteSpace(document.QrPayload)
+            || (isNote && document.Note is null))
         {
-            return Error.Validation(ErrorCodes.CpeInvalidDocument, "Documento no imprimible", "Se requiere una factura o boleta con líneas y datos del QR.");
+            return Error.Validation(ErrorCodes.CpeInvalidDocument, "Documento no imprimible", "Se requiere una factura, boleta o nota (con el documento que modifica) con líneas y datos del QR.");
         }
 
-        var denomination = document.DocumentTypeCode == "01" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA";
-        var legend = document.DocumentTypeCode == "01" ? "Representación impresa de la factura electrónica" : "Representación impresa de la boleta de venta electrónica";
+        var (denomination, legend) = document.DocumentTypeCode switch
+        {
+            "01" => ("FACTURA ELECTRÓNICA", "Representación impresa de la factura electrónica"),
+            "03" => ("BOLETA DE VENTA ELECTRÓNICA", "Representación impresa de la boleta de venta electrónica"),
+            "07" => ("NOTA DE CRÉDITO ELECTRÓNICA", "Representación impresa de la nota de crédito electrónica"),
+            _ => ("NOTA DE DÉBITO ELECTRÓNICA", "Representación impresa de la nota de débito electrónica"),
+        };
         var number = $"{document.Series}-{document.Number.ToString(CultureInfo.InvariantCulture)}";
         var symbol = Symbol(document.Currency);
 
@@ -129,6 +136,21 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
                     page.Text(PdfFont.Regular, 8, Left + 80, y, Wrap(document.BuyerAddress, 420, 8).First());
                     y -= 12;
                 }
+            }
+
+            if (document.Note is { } note)
+            {
+                page.Text(PdfFont.Bold, 8, Left, y, "Documento que modifica:");
+                page.Text(PdfFont.Regular, 8, Left + 110, y, note.ReferencedDocument);
+                y -= 12;
+                page.Text(PdfFont.Bold, 8, Left, y, "Motivo:");
+                foreach (var reasonLine in Wrap(note.Reason, Right - Left - 110, 8).Take(4))
+                {
+                    page.Text(PdfFont.Regular, 8, Left + 110, y, reasonLine);
+                    y -= 10;
+                }
+
+                y -= 2;
             }
 
             y -= 6;

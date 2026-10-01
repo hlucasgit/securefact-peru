@@ -31,6 +31,14 @@ internal static class BillingEndpoints
             return result.ToHttp(http, dto => Results.Created($"/api/v1/documents/{dto.Id}", dto));
         }).RequireAuthorization(Permissions.DocumentsCreate);
 
+        // Credit and debit notes: the series (07 or 08) decides which; same idempotency and numbering guarantees as documents.
+        app.MapPost("/api/v1/notes", async (CreateNoteRequest body, IDocumentService service, HttpContext http, CancellationToken ct) =>
+        {
+            var key = http.Request.Headers[IdempotencyHeader].ToString();
+            var result = await service.CreateNoteAsync(key, body, ct);
+            return result.ToHttp(http, dto => Results.Created($"/api/v1/documents/{dto.Id}", dto));
+        }).WithTags("Documents").RequireAuthorization(Permissions.DocumentsCreate);
+
         documents.MapGet("/{id:guid}", async (Guid id, IDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
 

@@ -41,6 +41,14 @@
       "source": "S02 SEE-del Contribuyente: invoices and linked notes are sent within 3 calendar days (invoice verified). Receipts use the same value until Parámetro 004 for code 03 is read.",
       "verification": "Pending",
       "configuration": { "01": 3, "03": 3 }
+    },
+    {
+      "code": "billing.note_issue_date_max_age_days",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S02 SEE-del Contribuyente: invoices and linked notes are sent within 3 calendar days. Same value for credit and debit notes until Parametro 004 for codes 07 and 08 is read.",
+      "verification": "Pending",
+      "configuration": { "07": 3, "08": 3 }
     }
   ]
 }

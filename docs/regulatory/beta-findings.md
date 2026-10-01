@@ -10,6 +10,9 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 - **Boleta con `sendBill`** (R-039): el beta aceptó una boleta (03, serie B001, DNI) enviada directamente («La Boleta numero B001-N, ha sido aceptada»). Que producción lo permita para el emisor **no está confirmado**; el pipeline sigue enviando boletas por resumen.
 - **Resumen diario** (R-040, R-041): `sendSummary` devolvió ticket, `getStatus` devolvió el CDR en el primer intento (código `0`, «El Resumen diario RC-…, ha sido aceptado») y su `ReferenceID` es el identificador `RC-AAAAMMDD-n`. Aceptó un resumen cuyo nombre lleva la **fecha de generación** (hoy) con las boletas del día anterior (`ReferenceDate` = ayer): resuelto el supuesto de R-040.
 
+- **Notas** (R-045): nota de crédito (motivo 01) y de débito (motivo 02) de una factura, y nota de crédito (motivo 07) de una boleta, enviadas con `sendBill` después de aceptarse el original, aceptadas sin observaciones. Series `FC01`, `FD01` y `BC01`.
+- **HTTP 401 intermitente**: una de las llamadas (un `sendBill` justo después de otro con las mismas credenciales) devolvió 401 y la siguiente, con las mismas credenciales, fue aceptada. El canal sigue tratando el 401 como no reintentable: reintentar con una clave SOL incorrecta podría bloquear la cuenta.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

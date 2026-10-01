@@ -1,0 +1,24 @@
+# ADR-023: Notas de crédito y de débito
+
+- Estado: Aceptada · Fecha: 2026-10-01
+
+## Fuentes
+Hojas `NotaCredito2_0` y `NotaDebito2_0` de las reglas de validación del 26.08.2026 (S16), catálogos 09 y 10 (versionados), XSD UBL 2.1 `CreditNote` y `DebitNote` (S17) y la prueba funcional contra el beta de SUNAT del 2026-10-01 (`docs/regulatory/beta-findings.md`).
+
+## Decisión
+- **Emisión** (`POST /api/v1/notes`, permiso `documents.create`): la serie (07 o 08) decide el tipo. La nota modifica **una** factura o boleta emitida por la misma empresa; toma su moneda y su adquirente (instantánea) y no puede fecharse antes que ella (regla 2885) ni en el futuro. Mismas garantías que un documento: `Idempotency-Key`, numeración sin huecos, tasas de las reglas por fecha, solo inserción. La referencia y el motivo se guardan en columnas propias del documento y el evento `billing.document.issued` también se publica para las notas.
+- **Series**: las notas de facturas usan serie `F***` y las de boletas `B***` (la hoja solo fija el formato; la regla de la inicial se confirmó en el beta con `FC01` y `BC01`).
+- **Motivos soportados**: crédito 01–10 (catálogo 09) y débito 01–03 (catálogo 10). Los motivos 11 (exportación), 12 (IVAP) y 13 (cuotas) se rechazan: su estructura exige datos que aún no se modelan. El sustento es obligatorio (1–500 caracteres, sin saltos de línea ni tabulaciones).
+- **Tope de la nota de crédito** (reglas 3286 y 4028): el importe total, cada valor de venta (gravado, exonerado, inafecto, gratuito) y el IGV no pueden superar los del documento que modifica (`SF-BIL-010`). La nota de débito no tiene tope. Pendiente: acumular varias notas de crédito sobre un mismo documento (SUNAT valida cada nota contra el original).
+- **Plazo**: regla nueva `billing.note_issue_date_max_age_days` (07 y 08: 3 días, **Pending**, como las facturas), para no alterar una regla ya publicada.
+- **UBL**: `IUblDocumentGenerator.GenerateNote` produce `CreditNote` o `DebitNote` 2.1 (orden de elementos del XSD): `DiscrepancyResponse` (referencia, motivo y sustento), `BillingReference` al documento, líneas `CreditNoteLine`/`DebitNoteLine` (`CreditedQuantity`/`DebitedQuantity`) y `LegalMonetaryTotal`/`RequestedMonetaryTotal`. Valida contra el XSD y contiene todas las etiquetas obligatorias de las hojas.
+- **Documento electrónico**: igual que una factura (ADR-019), más la referencia firmada (`reference_document_id`, `reference_type_code`, inmutables por disparador). **Una nota espera a que el documento que modifica esté aceptado** (SUNAT rechaza con 2119 si no está registrado): hasta entonces el envío devuelve `SF-CPE-010`, el documento conserva estado e intentos y se aplaza 5 minutos (el worker lo reintenta solo). Si el original fue rechazado, la nota queda esperando con ese motivo.
+- **Envío**: las notas de **facturas** van por `sendBill`. Las notas de **boletas** se preparan, pero no se envían hasta extender el resumen diario con líneas 07/08 (`SF-CPE-002`).
+- **Representación impresa**: el PDF de una nota muestra su denominación, el documento que modifica y el motivo; la leyenda «Representación impresa de la nota de crédito/débito electrónica» se infiere por analogía (R-044).
+
+## Verificado en el beta (2026-10-01)
+Nota de crédito (motivo 01) y nota de débito (motivo 02) de una factura, y nota de crédito (motivo 07) de una boleta, enviadas con `sendBill` tras aceptarse el original: las tres aceptadas con código 0 y sin observaciones.
+
+## Límites
+- Sin notas de boletas por resumen, sin motivos 11–13, sin descuentos globales ni cargos (como el resto del generador), sin acumulado de notas de crédito.
+- Las bajas (comunicación de baja) y la anulación por nota de crédito de un documento en contingencia no existen aún.

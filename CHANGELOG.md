@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Notas de crédito y de débito (ADR-023): emisión en Billing (`POST /api/v1/notes`), UBL 2.1 validado, documento electrónico que espera a que el original sea aceptado, PDF y envío por `sendBill` para notas de facturas; aceptadas en el beta de SUNAT.
 - `GET /api/v1/electronic-documents/{id}/pdf`: representación impresa A4 (emisor, adquirente, ítems, totales, importe en letras, QR y resumen de la firma), generada bajo demanda con los importes de Billing y sin tocar el documento electrónico.
 - Primera aceptación real: factura enviada al **beta de SUNAT** y aceptada (CDR código 0, sin observaciones). Herramienta `tools/SecureFact.BetaSmoke`; correcciones de forma de pago (3244), atributos del UBL y lectura del CDR real (`docs/regulatory/beta-findings.md`).
 - Representación impresa: importe en letras y renderizador PDF A4 con QR vectorial (sin integrar en la API todavía).

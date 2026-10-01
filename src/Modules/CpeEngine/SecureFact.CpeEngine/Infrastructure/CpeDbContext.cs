@@ -27,6 +27,8 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.DocumentId).HasColumnName("document_id");
             b.Property(e => e.CompanyId).HasColumnName("company_id");
             b.Property(e => e.IssueDate).HasColumnName("issue_date");
+            b.Property(e => e.ReferenceDocumentId).HasColumnName("reference_document_id");
+            b.Property(e => e.ReferenceTypeCode).HasColumnName("reference_type_code").HasMaxLength(2);
             b.Property(e => e.DocumentTypeCode).HasColumnName("document_type_code").HasMaxLength(2).IsRequired();
             b.Property(e => e.Series).HasColumnName("series").HasMaxLength(4).IsRequired();
             b.Property(e => e.Number).HasColumnName("number");

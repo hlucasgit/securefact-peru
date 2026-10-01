@@ -103,6 +103,19 @@ internal sealed class Document : ITenantOwned
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>Notes only: the document the note modifies, and why (catalogue 09 or 10 code plus the explanation).</summary>
+    public Guid? ReferencedDocumentId { get; private set; }
+
+    public string? ReferencedDocumentTypeCode { get; private set; }
+
+    public string? ReferencedSeries { get; private set; }
+
+    public long? ReferencedNumber { get; private set; }
+
+    public string? ReasonCode { get; private set; }
+
+    public string? Reason { get; private set; }
+
     public IReadOnlyCollection<DocumentLine> Lines => _lines;
 
     public static Document Create(
@@ -132,6 +145,16 @@ internal sealed class Document : ITenantOwned
     };
 
     public void AddLine(DocumentLine line) => _lines.Add(line);
+
+    public void MarkAsNote(Guid referencedId, string referencedType, string referencedSeries, long referencedNumber, string reasonCode, string reason)
+    {
+        ReferencedDocumentId = referencedId;
+        ReferencedDocumentTypeCode = referencedType;
+        ReferencedSeries = referencedSeries;
+        ReferencedNumber = referencedNumber;
+        ReasonCode = reasonCode;
+        Reason = reason;
+    }
 }
 
 internal sealed class DocumentLine : ITenantOwned

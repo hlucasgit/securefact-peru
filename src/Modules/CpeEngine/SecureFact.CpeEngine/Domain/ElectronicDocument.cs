@@ -20,6 +20,11 @@ internal sealed class ElectronicDocument : ITenantOwned
     /// <summary>Issue date of the document; for a daily summary, the date of the receipts it reports.</summary>
     public DateOnly IssueDate { get; private set; }
 
+    /// <summary>Notes only: the billing document the note modifies and its type (01 invoice or 03 receipt).</summary>
+    public Guid? ReferenceDocumentId { get; private set; }
+
+    public string? ReferenceTypeCode { get; private set; }
+
     public string DocumentTypeCode { get; private set; } = string.Empty;
 
     public string Series { get; private set; } = string.Empty;
@@ -69,13 +74,16 @@ internal sealed class ElectronicDocument : ITenantOwned
 
     public static ElectronicDocument Create(
         Guid id, Guid tenantId, Guid documentId, Guid companyId, string documentTypeCode, string series, long number,
-        string fileBaseName, string signedXml, string digestValue, DateTimeOffset now, DateOnly issueDate) => new()
+        string fileBaseName, string signedXml, string digestValue, DateTimeOffset now, DateOnly issueDate,
+        Guid? referenceDocumentId = null, string? referenceTypeCode = null) => new()
     {
         Id = id,
         TenantId = tenantId,
         DocumentId = documentId,
         CompanyId = companyId,
         IssueDate = issueDate,
+        ReferenceDocumentId = referenceDocumentId,
+        ReferenceTypeCode = referenceTypeCode,
         DocumentTypeCode = documentTypeCode,
         Series = series,
         Number = number,

@@ -110,7 +110,24 @@ internal sealed partial class DocumentService(
             return calculated.Error;
         }
 
-        var totals = calculated.Value;
+        return await IssueAsync(
+            tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, request.Currency, buyer!, request.Lines, calculated.Value, null, cancellationToken);
+    }
+
+    private async Task<Result<DocumentDto>> IssueAsync(
+        Guid tenantId,
+        string idempotencyKey,
+        string requestJson,
+        byte[] requestHash,
+        Series series,
+        DateOnly issueDate,
+        string currency,
+        BuyerSnapshot buyer,
+        IReadOnlyList<DocumentLineRequest> lines,
+        TaxCalculationResult totals,
+        NoteInfo? note,
+        CancellationToken cancellationToken)
+    {
         var documentId = Guid.CreateVersion7();
         var now = clock.GetUtcNow();
 
@@ -120,13 +137,13 @@ internal sealed partial class DocumentService(
         // transaction ends, then either replays our result (commit) or takes over (rollback).
         var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO billing.idempotency_key (id, tenant_id, key, request_hash, document_id, created_at)
-            VALUES ({Guid.CreateVersion7()}, {tenant.Value}, {idempotencyKey}, {requestHash}, {documentId}, {now})
+            VALUES ({Guid.CreateVersion7()}, {tenantId}, {idempotencyKey}, {requestHash}, {documentId}, {now})
             ON CONFLICT (tenant_id, key) DO NOTHING
             """, cancellationToken);
         if (inserted == 0)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return (await TryReplayAsync(tenant.Value, idempotencyKey, requestHash, cancellationToken))
+            return (await TryReplayAsync(tenantId, idempotencyKey, requestHash, cancellationToken))
                 ?? Error.Conflict(ErrorCodes.IdempotencyConflict, "Solicitud en conflicto", "No se pudo resolver la clave de idempotencia; reintente.");
         }
 
@@ -143,31 +160,36 @@ internal sealed partial class DocumentService(
         }
 
         var document = Document.Create(
-            documentId, tenant.Value, series.CompanyId, series.Id, series.DocumentTypeCode, series.Code, numbers[0], request.IssueDate,
-            request.Currency, buyer! with { DocumentTypeCode = buyer!.DocumentTypeCode.Trim(), DocumentNumber = buyer.DocumentNumber.Trim().ToUpperInvariant(), Name = buyer.Name.Trim() },
+            documentId, tenantId, series.CompanyId, series.Id, series.DocumentTypeCode, series.Code, numbers[0], issueDate,
+            currency, buyer with { DocumentTypeCode = buyer!.DocumentTypeCode.Trim(), DocumentNumber = buyer.DocumentNumber.Trim().ToUpperInvariant(), Name = buyer.Name.Trim() },
             totals.PayableAmount, JsonSerializer.Serialize(totals, Json), requestJson, requestHash, now);
 
-        for (var i = 0; i < request.Lines.Count; i++)
+        for (var i = 0; i < lines.Count; i++)
         {
-            var input = request.Lines[i];
+            var input = lines[i];
             var line = totals.Lines[i];
             document.AddLine(DocumentLine.Create(
-                tenant.Value, documentId, line.LineNumber, input.Description.Trim(), input.UnitCode.Trim(), input.ProductCode?.Trim(),
+                tenantId, documentId, line.LineNumber, input.Description.Trim(), input.UnitCode.Trim(), input.ProductCode?.Trim(),
                 input.Tax.Quantity, input.Tax.UnitValue, input.Tax.IgvAffectationCode, line.LineExtensionAmount, line.TaxCode,
                 line.TotalTaxAmount, line.UnitPriceIncludingTaxes));
+        }
+
+        if (note is not null)
+        {
+            document.MarkAsNote(note.ReferencedDocumentId, note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, note.ReasonCode, note.Reason);
         }
 
         db.Documents.Add(document);
 
         // The integration event commits (or rolls back) with the document: it can neither be lost nor announce a document that does not exist.
         db.OutboxMessages.Add(OutboxMessageEntity.Create(
-            tenant.Value, BillingEvents.DocumentIssued,
-            JsonSerializer.Serialize(new DocumentIssuedEvent(tenant.Value, documentId, document.CompanyId, document.DocumentTypeCode, document.SeriesCode, document.Number), Json), now));
+            tenantId, BillingEvents.DocumentIssued,
+            JsonSerializer.Serialize(new DocumentIssuedEvent(tenantId, documentId, document.CompanyId, document.DocumentTypeCode, document.SeriesCode, document.Number), Json), now));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         await audit.RecordAsync(new AuditEvent(
-            AuditActions.DocumentCreated, "document", documentId.ToString("D"), tenant.Value,
+            AuditActions.DocumentCreated, "document", documentId.ToString("D"), tenantId,
             NewValues: new Dictionary<string, object?>
             {
                 ["number"] = $"{document.SeriesCode}-{document.Number}",
@@ -177,6 +199,182 @@ internal sealed partial class DocumentService(
             }), cancellationToken);
 
         return ToDto(document);
+    }
+
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"];
+
+    private static readonly HashSet<string> DebitReasons = ["01", "02", "03"];
+
+    public async Task<Result<DocumentDto>> CreateNoteAsync(string idempotencyKey, CreateNoteRequest request, CancellationToken cancellationToken)
+    {
+        if (scope.Kind != DataScopeKind.Tenant || scope.Current is not { } tenant)
+        {
+            return Error.Forbidden(ErrorCodes.TenantNotResolved, "Tenant requerido", "Esta operación requiere un contexto de tenant.");
+        }
+
+        if (idempotencyKey is null || !SafeKey().IsMatch(idempotencyKey))
+        {
+            return Error.Validation(ErrorCodes.InvalidRequest, "Idempotency-Key inválida", "Envíe el encabezado Idempotency-Key con 8 a 100 caracteres alfanuméricos, '.', '_', ':' o '-'.");
+        }
+
+        if (request is null || request.Lines is not { Count: > 0 and <= MaxLines })
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Nota inválida", $"La nota requiere entre 1 y {MaxLines} líneas.");
+        }
+
+        var requestJson = JsonSerializer.Serialize(request, Json);
+        var requestHash = SHA256.HashData(Encoding.UTF8.GetBytes(requestJson));
+
+        var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == request.SeriesId, cancellationToken);
+        if (series is null)
+        {
+            return Error.NotFound(ErrorCodes.SeriesNotFound, "Serie no encontrada", "La serie no existe o no es visible para este contexto.");
+        }
+
+        var replay = await TryReplayAsync(tenant.Value, idempotencyKey, requestHash, cancellationToken);
+        if (replay is not null)
+        {
+            return replay.Value;
+        }
+
+        var referenced = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == request.ReferencedDocumentId, cancellationToken);
+        if (referenced is null)
+        {
+            return DocumentMissing;
+        }
+
+        var validation = await ValidateNoteAsync(series, referenced, request, cancellationToken);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        var rates = await ResolveRatesAsync(request.IssueDate, cancellationToken);
+        if (!rates.IsSuccess)
+        {
+            return rates.Error;
+        }
+
+        var calculated = calculator.Calculate(new TaxCalculationRequest(request.Lines.Select(l => l.Tax).ToList(), rates.Value, request.Adjustments));
+        if (!calculated.IsSuccess)
+        {
+            return calculated.Error;
+        }
+
+        var original = JsonSerializer.Deserialize<TaxCalculationResult>(referenced.TotalsJson, Json)!;
+        if (series.DocumentTypeCode == DocumentTypes.CreditNote && ExceedsOriginal(calculated.Value, original))
+        {
+            return Error.Validation(ErrorCodes.NoteExceedsOriginal, "Nota por encima del original", "Una nota de crédito no puede superar el importe total ni los valores de venta del documento que modifica.");
+        }
+
+        var buyer = new BuyerSnapshot(referenced.BuyerDocumentTypeCode, referenced.BuyerDocumentNumber, referenced.BuyerName, referenced.BuyerAddress, referenced.BuyerEmail);
+        var note = new NoteInfo(request.ReasonCode.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
+        return await IssueAsync(
+            tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines, calculated.Value, note, cancellationToken);
+    }
+
+    /// <summary>Rules 3286 / 4028 (S16 NotaCredito2_0): the note total and each sale-value category may not exceed the original.</summary>
+    private static bool ExceedsOriginal(TaxCalculationResult note, TaxCalculationResult original) =>
+        note.PayableAmount > original.PayableAmount
+        || note.TotalTaxableGravado > original.TotalTaxableGravado
+        || note.TotalExempt > original.TotalExempt
+        || note.TotalUnaffected > original.TotalUnaffected
+        || note.TotalFree > original.TotalFree
+        || note.TotalIgv > original.TotalIgv;
+
+    private async Task<Error?> ValidateNoteAsync(Series series, Document referenced, CreateNoteRequest request, CancellationToken cancellationToken)
+    {
+        static Error Invalid(string title, string detail) => Error.Validation(ErrorCodes.InvalidDocument, title, detail);
+
+        if (series.DocumentTypeCode is not (DocumentTypes.CreditNote or DocumentTypes.DebitNote))
+        {
+            return Error.Validation(ErrorCodes.DocumentTypeNotSupported, "Serie no válida para notas", "La serie debe ser de notas de crédito (07) o de débito (08).");
+        }
+
+        if (!series.IsActive)
+        {
+            return Error.Validation(ErrorCodes.SeriesInactive, "Serie inactiva", "La serie está desactivada.");
+        }
+
+        if (referenced.CompanyId != series.CompanyId)
+        {
+            return Invalid("Documento de otra empresa", "La nota y el documento que modifica deben ser de la misma empresa.");
+        }
+
+        if (referenced.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
+        {
+            return Invalid("Documento no modificable", "Una nota solo modifica una factura o una boleta.");
+        }
+
+        // The note series starts with F for notes of invoices and with B for notes of receipts (S16 rule 0151; confirmed against the SUNAT beta).
+        var expectedPrefix = referenced.DocumentTypeCode == DocumentTypes.Invoice ? 'F' : 'B';
+        if (series.Code[0] != expectedPrefix)
+        {
+            return Invalid("Serie incompatible", $"Las notas de {(referenced.DocumentTypeCode == DocumentTypes.Invoice ? "facturas" : "boletas")} usan una serie que empieza con {expectedPrefix}.");
+        }
+
+        var credit = series.DocumentTypeCode == DocumentTypes.CreditNote;
+        if (!(credit ? CreditReasons : DebitReasons).Contains(request.ReasonCode?.Trim() ?? string.Empty))
+        {
+            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 10 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
+        }
+
+        var reason = request.Reason?.Trim() ?? string.Empty;
+        if (reason.Length is 0 or > 500 || reason.Any(c => c is '\n' or '\r' or '\t'))
+        {
+            return Invalid("Sustento inválido", "El sustento es obligatorio (1 a 500 caracteres, sin saltos de línea ni tabulaciones).");
+        }
+
+        var company = await companies.GetAsync(series.CompanyId, cancellationToken);
+        if (!company.IsSuccess)
+        {
+            return company.Error;
+        }
+
+        if (company.Value.Status != CompanyStatus.Active)
+        {
+            return Invalid("Empresa inactiva", "La empresa emisora está inactiva.");
+        }
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(company.Value.TimeZone);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
+        if (request.IssueDate > today)
+        {
+            return Invalid("Fecha de emisión inválida", "La fecha de emisión no puede ser futura.");
+        }
+
+        if (request.IssueDate < referenced.IssueDate)
+        {
+            return Invalid("Fecha de emisión inválida", "La nota no puede tener una fecha anterior a la del documento que modifica (regla 2885).");
+        }
+
+        var maxAge = await rules.ResolveDecimalAsync(RuleCodes.NoteIssueDateMaxAgeDays, series.DocumentTypeCode, request.IssueDate, cancellationToken);
+        if (!maxAge.IsSuccess)
+        {
+            return maxAge.Error;
+        }
+
+        if (request.IssueDate < today.AddDays(-(int)maxAge.Value))
+        {
+            return Invalid("Fecha de emisión fuera de plazo", $"La fecha de emisión no puede tener más de {(int)maxAge.Value} días de antigüedad.");
+        }
+
+        return ValidateLines(request.Lines);
+    }
+
+    private static Error? ValidateLines(IReadOnlyList<DocumentLineRequest> lines)
+    {
+        foreach (var (line, index) in lines.Select((l, i) => (l, i)))
+        {
+            if (line is null || string.IsNullOrWhiteSpace(line.Description) || line.Description.Trim().Length > 500
+                || string.IsNullOrWhiteSpace(line.UnitCode) || line.UnitCode.Trim().Length > 3 || line.Tax is null
+                || line.ProductCode is { Length: > 50 })
+            {
+                return Error.Validation(ErrorCodes.InvalidDocument, $"Línea {index + 1} inválida", "Cada línea requiere descripción (máx. 500), unidad (máx. 3) y datos de impuestos.");
+            }
+        }
+
+        return null;
     }
 
     public async Task<Result<DocumentDto>> GetAsync(Guid documentId, CancellationToken cancellationToken)
@@ -249,7 +447,7 @@ internal sealed partial class DocumentService(
     {
         if (series.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
         {
-            return Error.Validation(ErrorCodes.DocumentTypeNotSupported, "Tipo de documento no soportado", "Por ahora solo se emiten facturas y boletas; las notas requieren el flujo de CDR (Fase 4).");
+            return Error.Validation(ErrorCodes.DocumentTypeNotSupported, "Tipo de documento no soportado", "Este endpoint emite facturas y boletas; las notas de crédito y débito se emiten en /api/v1/notes.");
         }
 
         if (!series.IsActive)
@@ -316,6 +514,9 @@ internal sealed partial class DocumentService(
         var lines = d.Lines.OrderBy(l => l.LineNumber).Select(l => new DocumentLineDto(
             l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.LineExtensionAmount, l.TaxCode, l.TotalTaxAmount, l.UnitPriceIncludingTaxes, l.UnitValue, l.AffectationCode)).ToList();
         var buyer = new BuyerSnapshot(d.BuyerDocumentTypeCode, d.BuyerDocumentNumber, d.BuyerName, d.BuyerAddress, d.BuyerEmail);
-        return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt);
+        var note = d.ReferencedDocumentId is { } referencedId
+            ? new NoteInfo(d.ReasonCode!, d.Reason!, referencedId, d.ReferencedDocumentTypeCode!, d.ReferencedSeries!, d.ReferencedNumber!.Value)
+            : null;
+        return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note);
     }
 }

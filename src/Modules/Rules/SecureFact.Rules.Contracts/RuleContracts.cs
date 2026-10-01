@@ -10,6 +10,7 @@ public static class RuleCodes
     public const string IvapRate = "tax.ivap.rate";
     public const string IcbperUnitAmount = "tax.icbper.unit_amount";
     public const string IssueDateMaxAgeDays = "billing.issue_date_max_age_days";
+    public const string NoteIssueDateMaxAgeDays = "billing.note_issue_date_max_age_days";
 }
 
 public enum RuleVerification

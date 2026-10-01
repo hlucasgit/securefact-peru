@@ -64,9 +64,9 @@ internal sealed class ElectronicDocumentService(
         }
 
         var d = document.Value;
-        if (d.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
+        if (d.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt or DocumentTypes.CreditNote or DocumentTypes.DebitNote))
         {
-            return Error.Validation(ErrorCodes.CpeUnsupported, "Tipo de documento no soportado", "Solo facturas y boletas generan XML por ahora.");
+            return Error.Validation(ErrorCodes.CpeUnsupported, "Tipo de documento no soportado", "Solo facturas, boletas y notas de crédito o débito generan XML.");
         }
 
         var company = await companies.GetAsync(d.CompanyId, cancellationToken);
@@ -81,14 +81,16 @@ internal sealed class ElectronicDocumentService(
             return igv.Error;
         }
 
-        var data = new UblInvoiceData(
-            d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale,
-            new UblParty(IdentityDocuments.Ruc, company.Value.Ruc, company.Value.LegalName, company.Value.TradeName),
-            new UblParty(d.Buyer.DocumentTypeCode, d.Buyer.DocumentNumber, d.Buyer.Name),
-            d.Lines.Select(l => new UblLine(l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.UnitValue, null, l.IgvAffectationCode)).ToList(),
-            d.Totals, igv.Value);
+        var issuer = new UblParty(IdentityDocuments.Ruc, company.Value.Ruc, company.Value.LegalName, company.Value.TradeName);
+        var buyer = new UblParty(d.Buyer.DocumentTypeCode, d.Buyer.DocumentNumber, d.Buyer.Name);
+        var ublLines = d.Lines.Select(l => new UblLine(l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.UnitValue, null, l.IgvAffectationCode)).ToList();
 
-        var generated = ubl.GenerateInvoice(data);
+        var generated = d.Note is { } note
+            ? ubl.GenerateNote(new UblNoteData(
+                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, note.ReasonCode, note.Reason,
+                note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value))
+            : ubl.GenerateInvoice(new UblInvoiceData(
+                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -120,7 +122,7 @@ internal sealed class ElectronicDocumentService(
         var now = clock.GetUtcNow();
         var entity = ElectronicDocument.Create(
             Guid.CreateVersion7(), tenant.Value, d.Id, d.CompanyId, d.DocumentTypeCode, d.Series, d.Number,
-            generated.Value.FileBaseName, signed.Value.Xml, signed.Value.DigestValue, now, d.IssueDate);
+            generated.Value.FileBaseName, signed.Value.Xml, signed.Value.DigestValue, now, d.IssueDate, d.Note?.ReferencedDocumentId, d.Note?.ReferencedDocumentTypeCode);
         var moved = Lifecycle.Transition(db, machine, entity, EDocumentEvent.DocumentSigned, "XML generado y firmado.", now);
         if (!moved.IsSuccess)
         {
@@ -154,9 +156,10 @@ internal sealed class ElectronicDocumentService(
             return Missing;
         }
 
-        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or ElectronicDocument.SummaryType))
+        var isNote = entity.DocumentTypeCode is DocumentTypes.CreditNote or DocumentTypes.DebitNote;
+        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or ElectronicDocument.SummaryType) && !(isNote && entity.ReferenceTypeCode == DocumentTypes.Invoice))
         {
-            return Error.Validation(ErrorCodes.CpeUnsupported, "Envío no soportado", "Las boletas se informan en el resumen diario: cree el resumen y envíelo.");
+            return Error.Validation(ErrorCodes.CpeUnsupported, "Envío no soportado", "Las boletas y sus notas se informan en el resumen diario (las notas de boletas aún no están soportadas): cree el resumen y envíelo.");
         }
 
         if (entity.Snapshot.IsTerminal)
@@ -172,6 +175,11 @@ internal sealed class ElectronicDocumentService(
         if (entity.State != EDocumentState.ReadyToSend)
         {
             return Error.Conflict(ErrorCodes.CpeInvalidTransition, "Transición de estado inválida", $"El documento está en estado {entity.State} y no se puede enviar. Si falló, reintente primero.");
+        }
+
+        if (isNote && await CheckReferencedAcceptedAsync(entity, cancellationToken) is { } notAccepted)
+        {
+            return await DeferAsync(entity, notAccepted, cancellationToken);
         }
 
         var prepared = await PrepareRemoteCallAsync(entity, cancellationToken);
@@ -402,9 +410,9 @@ internal sealed class ElectronicDocumentService(
             return Missing;
         }
 
-        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
+        if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt or DocumentTypes.CreditNote or DocumentTypes.DebitNote))
         {
-            return Error.Validation(ErrorCodes.CpeUnsupported, "Sin representación impresa", "Solo las facturas y boletas tienen representación impresa.");
+            return Error.Validation(ErrorCodes.CpeUnsupported, "Sin representación impresa", "Solo las facturas, boletas y notas tienen representación impresa.");
         }
 
         var document = await billing.GetAsync(entity.DocumentId, cancellationToken);
@@ -434,9 +442,12 @@ internal sealed class ElectronicDocumentService(
             identified ? BuyerTypeName(d.Buyer.DocumentTypeCode) : null, identified ? d.Buyer.DocumentNumber : null, identified ? d.Buyer.Name : null, identified ? d.Buyer.Address : null,
             d.Lines.Select(l => new PrintedLine(l.UnitCode, l.Quantity, l.Description, l.UnitValue, l.UnitPriceIncludingTaxes, l.LineExtensionAmount, l.TotalTaxAmount)).ToList(),
             new PrintedTotals(d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount),
-            payload.Value, entity.DigestValue);
+            payload.Value, entity.DigestValue,
+            d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null);
         return printer.Render(printed);
     }
+
+    private static string DocumentName(string typeCode) => typeCode == DocumentTypes.Invoice ? "Factura electrónica" : "Boleta de venta electrónica";
 
     /// <summary>The printed form replaces the catalogue 06 code by its denomination (annex rule for field "tipo y número de documento del adquirente").</summary>
     internal static string BuyerTypeName(string code) => code switch
@@ -456,6 +467,21 @@ internal sealed class ElectronicDocumentService(
     }
 
     // ---------- remote call preparation ----------
+
+    /// <summary>SUNAT rejects a note whose document is not registered (error 2119), so a note waits until the document it modifies is accepted.</summary>
+    private async Task<Error?> CheckReferencedAcceptedAsync(ElectronicDocument note, CancellationToken cancellationToken)
+    {
+        var state = await db.ElectronicDocuments.AsNoTracking()
+            .Where(e => e.DocumentId == note.ReferenceDocumentId)
+            .Select(e => (EDocumentState?)e.State)
+            .SingleOrDefaultAsync(cancellationToken);
+        return state switch
+        {
+            EDocumentState.Accepted or EDocumentState.AcceptedWithObservations => null,
+            null => Error.Conflict(ErrorCodes.CpeReferenceNotAccepted, "Documento referenciado sin preparar", "El documento que modifica la nota aún no tiene documento electrónico."),
+            _ => Error.Conflict(ErrorCodes.CpeReferenceNotAccepted, "Documento referenciado no aceptado", $"El documento que modifica la nota está en estado {state} y debe estar aceptado por SUNAT antes de enviar la nota."),
+        };
+    }
 
     /// <summary>
     /// A precondition (SOL credentials, channel, company) is missing. The document keeps its state and attempts, but its next attempt moves

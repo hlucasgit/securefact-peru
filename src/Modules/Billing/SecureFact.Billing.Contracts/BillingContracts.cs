@@ -59,6 +59,22 @@ public sealed record CreateDocumentRequest(
     GlobalAdjustments? Adjustments = null,
     Guid? CustomerId = null);
 
+/// <summary>
+/// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
+/// cannot be dated before it. <see cref="ReasonCode"/> is catalogue 09 (credit: 01-10) or 10 (debit: 01-03); <see cref="Reason"/> explains it.
+/// </summary>
+public sealed record CreateNoteRequest(
+    Guid SeriesId,
+    Guid ReferencedDocumentId,
+    DateOnly IssueDate,
+    string ReasonCode,
+    string Reason,
+    IReadOnlyList<DocumentLineRequest> Lines,
+    GlobalAdjustments? Adjustments = null);
+
+/// <summary>What a note modifies and why.</summary>
+public sealed record NoteInfo(string ReasonCode, string Reason, Guid ReferencedDocumentId, string ReferencedDocumentTypeCode, string ReferencedSeries, long ReferencedNumber);
+
 public enum DocumentStatus
 {
     /// <summary>Numbered and fully calculated; no electronic artefact exists yet (Phase 3 generates the XML).</summary>
@@ -80,7 +96,8 @@ public sealed record DocumentDto(
     DocumentStatus Status,
     IReadOnlyList<DocumentLineDto> Lines,
     TaxCalculationResult Totals,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    NoteInfo? Note = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }
@@ -92,6 +109,12 @@ public interface IDocumentService
     /// original document; the same key with different content is a conflict.
     /// </summary>
     Task<Result<DocumentDto>> CreateAsync(string idempotencyKey, CreateDocumentRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates and numbers a credit or debit note with the same guarantees as <see cref="CreateAsync"/> (idempotent, gap-free, rates from rules,
+    /// insert-only). A credit note cannot exceed the document it modifies.
+    /// </summary>
+    Task<Result<DocumentDto>> CreateNoteAsync(string idempotencyKey, CreateNoteRequest request, CancellationToken cancellationToken);
 
     Task<Result<DocumentDto>> GetAsync(Guid documentId, CancellationToken cancellationToken);
 

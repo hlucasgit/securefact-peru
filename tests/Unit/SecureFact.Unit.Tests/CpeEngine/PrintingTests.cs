@@ -125,6 +125,27 @@ public class PrintedRepresentationTests
         Assert.Contains(type == "01" ? "Registro Unico de Contributentes:" : "Documento Nacional de Identidad:", content, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("07", "NOTA DE CRÉDITO ELECTRÓNICA", "Representación impresa de la nota de crédito electrónica")]
+    [InlineData("08", "NOTA DE DÉBITO ELECTRÓNICA", "Representación impresa de la nota de débito electrónica")]
+    public void Notes_print_what_they_modify_and_why(string type, string denomination, string legend)
+    {
+        var note = Document("01") with { DocumentTypeCode = type, Series = "FC01", Note = new PrintedNote("Factura electrónica F001-123", "Anulación de la operación") };
+
+        var content = string.Concat(PageContents(_renderer.Render(note).Value));
+
+        foreach (var expected in new[] { denomination, legend, "(FC01-123)", "Documento que modifica:", "Factura electrónica F001-123", "Motivo:", "Anulación de la operación" })
+        {
+            Assert.Contains(expected, content, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_note_without_the_document_it_modifies_is_not_printable()
+    {
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _renderer.Render(Document("01") with { DocumentTypeCode = "07" }).Error.Code);
+    }
+
     [Fact]
     public void Unit_codes_niu_and_zz_are_not_printed_but_others_are()
     {
@@ -205,7 +226,7 @@ public class PrintedRepresentationTests
     [Fact]
     public void Unprintable_documents_are_refused()
     {
-        Assert.Equal(ErrorCodes.CpeInvalidDocument, _renderer.Render(Document("07")).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _renderer.Render(Document("05")).Error.Code);
         Assert.False(_renderer.Render(Document() with { Lines = [] }).IsSuccess);
         Assert.False(_renderer.Render(Document() with { QrPayload = " " }).IsSuccess);
     }

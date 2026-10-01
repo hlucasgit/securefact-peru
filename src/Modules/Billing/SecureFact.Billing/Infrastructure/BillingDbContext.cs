@@ -65,6 +65,13 @@ internal sealed class BillingDbContext(DbContextOptions<BillingDbContext> option
             b.Property(d => d.OriginalRequestJson).HasColumnName("original_request").HasColumnType("jsonb").IsRequired();
             b.Property(d => d.RequestHash).HasColumnName("request_hash").IsRequired();
             b.Property(d => d.CreatedAt).HasColumnName("created_at");
+            b.Property(d => d.ReferencedDocumentId).HasColumnName("referenced_document_id");
+            b.Property(d => d.ReferencedDocumentTypeCode).HasColumnName("referenced_document_type").HasMaxLength(2);
+            b.Property(d => d.ReferencedSeries).HasColumnName("referenced_series").HasMaxLength(4);
+            b.Property(d => d.ReferencedNumber).HasColumnName("referenced_number");
+            b.Property(d => d.ReasonCode).HasColumnName("reason_code").HasMaxLength(2);
+            b.Property(d => d.Reason).HasColumnName("reason").HasMaxLength(500);
+            b.HasIndex(d => d.ReferencedDocumentId);
             b.HasIndex(d => new { d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number }).IsUnique();
             b.HasIndex(d => new { d.TenantId, d.CompanyId, d.IssueDate });
             b.HasMany(d => d.Lines).WithOne().HasForeignKey(l => l.DocumentId).OnDelete(DeleteBehavior.Restrict);

@@ -25,9 +25,9 @@ internal sealed class DocumentIssuedHandler(IElectronicDocumentService electroni
             throw new InvalidOperationException("The event does not belong to the tenant of its outbox message.");
         }
 
-        if (issued.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
+        if (issued.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt or DocumentTypes.CreditNote or DocumentTypes.DebitNote))
         {
-            return; // nothing to prepare for other document types (yet)
+            return; // no other document type exists in Billing today
         }
 
         var prepared = await electronicDocuments.PrepareAsync(issued.DocumentId, cancellationToken);

@@ -7,7 +7,7 @@ Cada fase tiene **entrada** (qué debe estar listo) y **salida** (criterio de ac
 | 0 | Discovery | **Completada (2026-09-30)** — ver `STATUS.md` |
 | 1 | Foundation | **En curso** — entorno + esqueleto |
 | 2 | Core Billing | **Casi completa** — TaxEngine, series, numeración, idempotencia, catálogos, reglas, clientes y productos; faltan notas (esperan el CDR) |
-| 3 | Motor CPE | **En curso** — QR, UBL, firma XMLDSig, ZIP, parser de CDR y canal SOAP (con simulador) hechos; almacén de certificados, credenciales SOL, máquina de estados, tubería, worker, resumen diario y outbox hechos; faltan prueba en beta, PDF y notas |
+| 3 | Motor CPE | **En curso** — QR, UBL, firma XMLDSig, ZIP, parser de CDR y canal SOAP (con simulador) hechos; almacén de certificados, credenciales SOL, máquina de estados, tubería, worker, resumen diario, outbox, PDF y notas de facturas hechos y aceptados en el beta; faltan notas de boletas por resumen, bajas, descuentos y crédito con cuotas |
 | 4 | Integración | Pendiente |
 | 5 | MVP comercial | Pendiente |
 | 6 | White label / Resellers | Pendiente |
