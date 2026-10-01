@@ -12,7 +12,8 @@ namespace SecureFact.CpeEngine;
 /// <summary>
 /// UBL 2.1 Invoice for factura (01) and boleta (03). Structure follows the mandatory/conditional tags of the 2026-08-26 validation
 /// rules workbook (sheets Factura2_0/Boleta2_0, S16) and the XML guides (S18). Scope today: taxed (10), exempt (20), unaffected (30) and
-/// free (11–16, 21, 31–37) lines without line or global discounts/charges; everything else returns <c>SF-CPE-002</c> instead of
+/// free (11–16, 21, 31–37) lines with line discounts/charges (catalogue 53: 00, 01, 47, 48) and global ones (02, 03, 49, 50) in invoices and receipts, but not in notes;
+/// everything else returns <c>SF-CPE-002</c> instead of
 /// producing XML that would not match the calculated amounts. The output is unsigned: the signer fills <c>ext:ExtensionContent</c>.
 /// </summary>
 internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
@@ -80,6 +81,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         if (data.DocumentTypeCode == "01")
         {
             root.Add(new XElement(Cac + "PaymentTerms", new XElement(Cbc + "ID", "FormaPago"), new XElement(Cbc + "PaymentMeansID", data.PaymentForm)));
+        }
+
+        foreach (var allowance in GlobalAllowances(data))
+        {
+            root.Add(AllowanceElement(allowance, currency));
         }
 
         root.Add(
@@ -221,9 +227,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return Unsupported("IVAP, ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
         }
 
-        if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0)
+        if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0 || data.Lines.Any(HasLineAdjustments))
         {
-            return Unsupported("Cargos, descuentos y redondeo aún no están soportados por el generador UBL.");
+            return Unsupported("Cargos, descuentos y redondeo aún no están soportados por el generador UBL para notas.");
         }
 
         for (var i = 0; i < data.Lines.Count; i++)
@@ -257,9 +263,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return Unsupported("IVAP, ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
         }
 
-        if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0)
+        if (data.Totals.PayableRoundingAmount != 0)
         {
-            return Unsupported("Cargos, descuentos y redondeo aún no están soportados por el generador UBL.");
+            return Unsupported("El redondeo del importe total aún no está soportado por el generador UBL.");
+        }
+
+        if (CheckAdjustments(data) is { } inconsistent)
+        {
+            return inconsistent;
         }
 
         for (var i = 0; i < data.Lines.Count; i++)
@@ -281,6 +292,125 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         }
 
         return null;
+    }
+
+    /// <summary>One cac:AllowanceCharge: a discount (<c>ChargeIndicator</c> false) or a charge (true) of catalogue 53, with the base it applies to when the structure asks for it.</summary>
+    private readonly record struct Allowance(string Code, bool IsCharge, decimal Amount, decimal? BaseAmount);
+
+    private static bool HasLineAdjustments(UblLine line) =>
+        line.DiscountAffectingBase != 0 || line.ChargeAffectingBase != 0 || line.DiscountNotAffectingBase != 0 || line.ChargeNotAffectingBase != 0;
+
+    /// <summary>
+    /// Line discounts/charges (sheet Factura2_0, rows "Cargo/descuento por ítem"). Codes 00 and 47 apply to the value of the line before them; 01 and 48 do not change
+    /// the base and are stated over the line value. The sheet mandates amount, base and factor at line level, the factor being checked as amount = base × factor (rule 3290).
+    /// </summary>
+    private static List<Allowance> LineAllowances(UblLine line, LineTaxResult result)
+    {
+        var gross = result.LineExtensionAmount + line.DiscountAffectingBase - line.ChargeAffectingBase;
+        var list = new List<Allowance>();
+        AddIfAny(list, "00", false, line.DiscountAffectingBase, gross);
+        AddIfAny(list, "47", true, line.ChargeAffectingBase, gross);
+        AddIfAny(list, "01", false, line.DiscountNotAffectingBase, result.LineExtensionAmount);
+        AddIfAny(list, "48", true, line.ChargeNotAffectingBase, result.LineExtensionAmount);
+        return list;
+    }
+
+    /// <summary>
+    /// Global discounts/charges: 02 and 49 change the taxable base of the IGV (rules 3277, 3278, 3291) and are stated over the taxed base before them;
+    /// 03 and 50 do not and enter the allowance/charge totals (rules 3300, 3301). The base and the factor are optional at this level, so only the first pair carries them.
+    /// </summary>
+    private static List<Allowance> GlobalAllowances(UblInvoiceData data)
+    {
+        var adjustments = data.Adjustments ?? new GlobalAdjustments();
+        var taxedBefore = data.Totals.TotalTaxableGravado + adjustments.DiscountAffectingBase - adjustments.ChargeAffectingBase;
+        var list = new List<Allowance>();
+        AddIfAny(list, "02", false, adjustments.DiscountAffectingBase, taxedBefore);
+        AddIfAny(list, "49", true, adjustments.ChargeAffectingBase, taxedBefore);
+        AddIfAny(list, "03", false, adjustments.DiscountNotAffectingBase, null);
+        AddIfAny(list, "50", true, adjustments.ChargeNotAffectingBase, null);
+        return list;
+    }
+
+    private static void AddIfAny(List<Allowance> list, string code, bool isCharge, decimal amount, decimal? baseAmount)
+    {
+        if (amount != 0)
+        {
+            list.Add(new Allowance(code, isCharge, amount, baseAmount));
+        }
+    }
+
+    /// <summary>Factor n(3,5): amount ÷ base to 5 decimals; null when the base is not positive or the factor does not fit the format (positive, below 1000).</summary>
+    private static decimal? Factor(Allowance allowance)
+    {
+        if (allowance.BaseAmount is not { } baseAmount)
+        {
+            return null;
+        }
+
+        if (baseAmount <= 0)
+        {
+            return -1m;
+        }
+
+        var factor = Math.Round(allowance.Amount / baseAmount, 5, MidpointRounding.AwayFromZero);
+        return factor is > 0m and < 1000m ? factor : -1m;
+    }
+
+    private static Error? CheckAdjustments(UblInvoiceData data)
+    {
+        var adjustments = data.Adjustments ?? new GlobalAdjustments();
+        var allowances = data.Lines.Sum(l => l.DiscountNotAffectingBase) + adjustments.DiscountNotAffectingBase;
+        var charges = data.Lines.Sum(l => l.ChargeNotAffectingBase) + adjustments.ChargeNotAffectingBase;
+        if (data.Totals.TotalAllowances != allowances || data.Totals.TotalCharges != charges)
+        {
+            return Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Los descuentos y cargos informados no coinciden con los totales calculados.");
+        }
+
+        for (var i = 0; i < data.Lines.Count; i++)
+        {
+            foreach (var allowance in LineAllowances(data.Lines[i], data.Totals.Lines[i]))
+            {
+                if (Factor(allowance) == -1m)
+                {
+                    return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"La línea {i + 1} tiene un descuento o cargo de código {allowance.Code} cuya base y factor no son válidos (la base debe ser mayor que cero).");
+                }
+            }
+        }
+
+        foreach (var allowance in GlobalAllowances(data))
+        {
+            if (Factor(allowance) == -1m)
+            {
+                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El descuento o cargo global de código {allowance.Code} no tiene una base y un factor válidos (la base gravada debe ser mayor que cero).");
+            }
+        }
+
+        return null;
+    }
+
+    private static XElement AllowanceElement(Allowance allowance, string currency)
+    {
+        var element = new XElement(
+            Cac + "AllowanceCharge",
+            new XElement(Cbc + "ChargeIndicator", allowance.IsCharge ? "true" : "false"),
+            new XElement(
+                Cbc + "AllowanceChargeReasonCode",
+                new XAttribute("listAgencyName", "PE:SUNAT"),
+                new XAttribute("listName", "Cargo/descuento"),
+                new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo53"),
+                allowance.Code));
+        if (Factor(allowance) is { } factor)
+        {
+            element.Add(new XElement(Cbc + "MultiplierFactorNumeric", factor.ToString("0.00###", CultureInfo.InvariantCulture)));
+        }
+
+        element.Add(Amount("Amount", allowance.Amount, currency));
+        if (allowance.BaseAmount is { } baseAmount)
+        {
+            element.Add(Amount("BaseAmount", baseAmount, currency));
+        }
+
+        return element;
     }
 
     private static XElement SignatureInfo(UblParty issuer) =>
@@ -349,10 +479,10 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         if (exemptionReasonCode is not null)
         {
-            if (taxCode == TaxCodes.Igv)
-            {
-                category.Add(new XElement(Cbc + "Percent", (igvRate * 100m).ToString("0.00", CultureInfo.InvariantCulture)));
-            }
+            // Every line category states its rate (rule 2992, found against the SUNAT beta on an exempt line): the IGV rate for taxed lines and for free ones that
+            // report an informational IGV (11-16; rule 2993 forbids 0 there), and 0.00 for the rest.
+            var carriesIgv = taxCode == TaxCodes.Igv || (taxCode == TaxCodes.Free && exemptionReasonCode is "11" or "12" or "13" or "14" or "15" or "16");
+            category.Add(new XElement(Cbc + "Percent", (carriesIgv ? igvRate * 100m : 0m).ToString("0.00", CultureInfo.InvariantCulture)));
 
             category.Add(new XElement(
                 Cbc + "TaxExemptionReasonCode",
@@ -381,6 +511,8 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             Cac + "LegalMonetaryTotal",
             Amount("LineExtensionAmount", totals.TotalLineExtensionAmount, currency),
             Amount("TaxInclusiveAmount", totals.TotalTaxInclusiveAmount, currency),
+            totals.TotalAllowances > 0 ? Amount("AllowanceTotalAmount", totals.TotalAllowances, currency) : null,
+            totals.TotalCharges > 0 ? Amount("ChargeTotalAmount", totals.TotalCharges, currency) : null,
             Amount("PayableAmount", totals.PayableAmount, currency));
 
     private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, string currency, string lineName = "InvoiceLine", string quantityName = "InvoicedQuantity")
@@ -404,6 +536,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 Cac + "AlternativeConditionPrice",
                 new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", currency), Decimal(referencePrice)),
                 new XElement(Cbc + "PriceTypeCode", isFree ? "02" : "01"))));
+
+        foreach (var allowance in LineAllowances(line, result))
+        {
+            element.Add(AllowanceElement(allowance, currency));
+        }
 
         // Free operations report the informational IGV (11–16) under tax 9996 but the line total tax stays 0 (S16, rule 3302).
         var lineTax = isFree ? result.IgvOrIvapAmount : result.TotalTaxAmount;

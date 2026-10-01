@@ -297,6 +297,13 @@ internal sealed partial class DocumentService(
             return Error.Validation(ErrorCodes.SeriesInactive, "Serie inactiva", "La serie está desactivada.");
         }
 
+        // The validation-rules sheets of the notes define no line or global discounts/charges (only the invoice and receipt sheets do): a note states net values.
+        if ((request.Adjustments is { } adjustments && adjustments != new GlobalAdjustments())
+            || request.Lines.Any(l => l?.Tax is { } t && (t.DiscountAffectingBase != 0 || t.ChargeAffectingBase != 0 || t.DiscountNotAffectingBase != 0 || t.ChargeNotAffectingBase != 0)))
+        {
+            return Invalid("Notas sin descuentos ni cargos", "Una nota no lleva descuentos ni cargos (ni de línea ni globales): indique los valores netos.");
+        }
+
         if (referenced.CompanyId != series.CompanyId)
         {
             return Invalid("Documento de otra empresa", "La nota y el documento que modifica deben ser de la misma empresa.");
@@ -517,12 +524,36 @@ internal sealed partial class DocumentService(
     private static DocumentDto ToDto(Document d)
     {
         var totals = JsonSerializer.Deserialize<TaxCalculationResult>(d.TotalsJson, Json)!;
-        var lines = d.Lines.OrderBy(l => l.LineNumber).Select(l => new DocumentLineDto(
-            l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.LineExtensionAmount, l.TaxCode, l.TotalTaxAmount, l.UnitPriceIncludingTaxes, l.UnitValue, l.AffectationCode)).ToList();
+
+        // Line and global discounts/charges are not columns: they are part of the request exactly as received, which is kept with the document.
+        var stored = ReadStoredRequest(d.OriginalRequestJson);
+        var lines = d.Lines.OrderBy(l => l.LineNumber).Select(l =>
+        {
+            var tax = stored?.Lines is { } storedLines && l.LineNumber >= 1 && l.LineNumber <= storedLines.Count ? storedLines[l.LineNumber - 1]?.Tax : null;
+            return new DocumentLineDto(
+                l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.LineExtensionAmount, l.TaxCode, l.TotalTaxAmount, l.UnitPriceIncludingTaxes, l.UnitValue, l.AffectationCode,
+                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m);
+        }).ToList();
         var buyer = new BuyerSnapshot(d.BuyerDocumentTypeCode, d.BuyerDocumentNumber, d.BuyerName, d.BuyerAddress, d.BuyerEmail);
         var note = d.ReferencedDocumentId is { } referencedId
             ? new NoteInfo(d.ReasonCode!, d.Reason!, referencedId, d.ReferencedDocumentTypeCode!, d.ReferencedSeries!, d.ReferencedNumber!.Value)
             : null;
-        return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note);
+        return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments);
+    }
+
+    private sealed record StoredLine(TaxableLine? Tax);
+
+    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments);
+
+    private static StoredRequest? ReadStoredRequest(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<StoredRequest>(json, Json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }

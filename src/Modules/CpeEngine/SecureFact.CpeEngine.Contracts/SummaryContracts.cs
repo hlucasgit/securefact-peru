@@ -5,6 +5,8 @@ namespace SecureFact.CpeEngine.Contracts;
 /// <summary>
 /// One line of a daily summary: a receipt (03) or a credit/debit note (07/08) that modifies a receipt. Amounts are the ones calculated and numbered by Billing, never recomputed here.
 /// <see cref="BuyerDocumentTypeCode"/> and <see cref="BuyerDocumentNumber"/> are both null when the receipt has no buyer identification.
+/// <see cref="OtherCharges"/> and <see cref="OtherDiscounts"/> are the charges and discounts that do not affect the taxable base (catalogue 53 codes 48/50 and 01/03):
+/// the summary informs the charges in an <c>AllowanceCharge</c> node, and both enter the total.
 /// </summary>
 public sealed record SummaryLineData(
     int LineNumber,
@@ -23,7 +25,9 @@ public sealed record SummaryLineData(
     string? ReferencedDocumentTypeCode = null,
     string? ReferencedSeries = null,
     long? ReferencedNumber = null,
-    string Status = "1");
+    string Status = "1",
+    decimal OtherCharges = 0m,
+    decimal OtherDiscounts = 0m);
 
 /// <param name="ReferenceDate">Issue date of every receipt in the summary (they must all share it).</param>
 /// <param name="IssueDate">Date the summary is generated; it names the file and is never before <paramref name="ReferenceDate"/>.</param>

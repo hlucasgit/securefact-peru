@@ -20,5 +20,5 @@
 ## Límites conocidos
 - **Boletas**: se preparan pero no se envían; se informan en el resumen diario (`sendSummary`), pendiente.
 - **Resultado desconocido**: un proceso que muera en `Sending` deja el documento en ese estado; falta el detector de documentos atascados y la consulta `getStatusCdr` (Fase 4).
-- El UBL no incluye hora de emisión, valor de referencia de operaciones gratuitas ni descuentos/cargos (ADR-016). El XML y el CDR se guardan en la base de datos hasta que exista `IObjectStorage` (S3).
+- El UBL no incluye hora de emisión ni valor de referencia de operaciones gratuitas (ADR-016); los descuentos y cargos de facturas y boletas sí (ADR-025). El XML y el CDR se guardan en la base de datos hasta que exista `IObjectStorage` (S3).
 - Falta el worker que reintente por `next_attempt_at` y consulte tickets.

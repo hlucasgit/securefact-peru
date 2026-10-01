@@ -157,7 +157,7 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Invalid($"{label}: moneda inválida.");
             }
 
-            if (new[] { line.TotalAmount, line.TaxedAmount, line.ExemptAmount, line.UnaffectedAmount, line.IgvAmount }.Any(a => a < 0))
+            if (new[] { line.TotalAmount, line.TaxedAmount, line.ExemptAmount, line.UnaffectedAmount, line.IgvAmount, line.OtherCharges, line.OtherDiscounts }.Any(a => a < 0))
             {
                 return Invalid($"{label}: los importes no pueden ser negativos.");
             }
@@ -167,9 +167,9 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Unsupported($"{label}: solo se informan operaciones gravadas, exoneradas o inafectas con valor de venta; las gratuitas y exportaciones aún no están soportadas.");
             }
 
-            if (Math.Abs(line.TotalAmount - (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.IgvAmount)) > TotalTolerance)
+            if (Math.Abs(line.TotalAmount - (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.IgvAmount + line.OtherCharges - line.OtherDiscounts)) > TotalTolerance)
             {
-                return Unsupported($"{label}: el importe total no coincide con la suma de valores de venta e IGV (ISC, ICBPER, cargos u otros tributos aún no están soportados).");
+                return Unsupported($"{label}: el importe total no coincide con la suma de valores de venta, IGV y otros cargos menos otros descuentos (ISC, ICBPER u otros tributos aún no están soportados).");
             }
 
             if (line.IgvRate <= 0 || line.IgvRate >= 1)
@@ -243,6 +243,15 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                     new XElement(Cbc + "PaidAmount", new XAttribute("currencyID", line.Currency), Money(amount)),
                     new XElement(Cbc + "InstructionID", code)));
             }
+        }
+
+        // Charges that do not affect the base are informed in one node per line (sheet "Sumatoria otros cargos del item"); the discounts only enter the total.
+        if (line.OtherCharges > 0)
+        {
+            element.Add(new XElement(
+                Cac + "AllowanceCharge",
+                new XElement(Cbc + "ChargeIndicator", "true"),
+                new XElement(Cbc + "Amount", new XAttribute("currencyID", line.Currency), Money(line.OtherCharges))));
         }
 
         // IGV is mandatory in every line (rule 2278), also when it is zero; the rate is mandatory for code 1000 (rule 2992).

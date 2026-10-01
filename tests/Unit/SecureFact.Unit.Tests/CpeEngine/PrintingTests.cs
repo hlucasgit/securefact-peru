@@ -182,6 +182,20 @@ public class PrintedRepresentationTests
     }
 
     [Fact]
+    public void Other_charges_and_discounts_are_printed_only_when_they_exist()
+    {
+        var plain = string.Concat(PageContents(_renderer.Render(Document()).Value));
+        var adjusted = string.Concat(PageContents(_renderer.Render(Document() with { Totals = new PrintedTotals(200m, 0m, 0m, 0m, 36m, 249m, 7m, 20m) }).Value));
+
+        Assert.DoesNotContain("Otros cargos", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Otros descuentos", plain, StringComparison.Ordinal);
+        Assert.Contains("(Otros cargos)", adjusted, StringComparison.Ordinal);
+        Assert.Contains("(S/ 20.00)", adjusted, StringComparison.Ordinal);
+        Assert.Contains("(Otros descuentos)", adjusted, StringComparison.Ordinal);
+        Assert.Contains("(S/ -7.00)", adjusted, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_voided_document_carries_the_word_ANULADO_on_every_page_and_the_rest_is_unchanged()
     {
         var plain = _renderer.Render(Document(lines: 120)).Value;

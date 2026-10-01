@@ -186,10 +186,165 @@ public class UblInvoiceGeneratorTests
 
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { DocumentTypeCode = "07" }).Error.Code);
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { Totals = export }).Error.Code);
+        var rounded = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10")], Rates, new GlobalAdjustments(PayableRoundingAmount: 0.5m))).Value;
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { Totals = rounded }).Error.Code);
+
+        // Totals that say there are discounts or charges the document does not state are never turned into XML.
         var charged = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10", ChargeNotAffectingBase: 5m)], Rates)).Value;
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { Totals = charged }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(baseData with { Totals = charged }).Error.Code);
         Assert.NotNull(withDiscount);
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(baseData with { Lines = [] }).Error.Code);
+    }
+
+    // Found against the SUNAT beta service: an exempt line without the rate tag is rejected with 2992 ("el XML no contiene el tag de la tasa del tributo de la línea").
+    [Fact]
+    public void Every_line_category_states_its_rate_zero_unless_the_line_carries_igv()
+    {
+        var xml = Parse(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m), ("20", 1m, 50m), ("30", 1m, 10m), ("11", 1m, 30m), ("21", 1m, 5m))).Value);
+
+        var percents = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine", Namespaces)
+            .Select(l => l.XPathSelectElement("cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent", Namespaces)!.Value)
+            .ToArray();
+        Assert.Equal(["18.00", "0.00", "0.00", "18.00", "0.00"], percents);
+        Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent", Namespaces)); // the document totals do not carry it
+    }
+
+    // ---------- discounts and charges ----------
+
+    private static readonly UblLine DiscountedLine = new(1, "Producto con ajustes", "NIU", "P001", 2m, 100m, null, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m);
+
+    /// <summary>A taxed line with the four line adjustments, an exempt line and the four global adjustments.</summary>
+    private static UblInvoiceData Discounted(string type = "01")
+    {
+        var lines = new[]
+        {
+            new TaxableLine(2m, 100m, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m),
+            new TaxableLine(1m, 50m, "20"),
+        };
+        var adjustments = new GlobalAdjustments(DiscountAffectingBase: 12m, ChargeAffectingBase: 4m, DiscountNotAffectingBase: 7m, ChargeNotAffectingBase: 2m);
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest(lines, Rates, adjustments)).Value;
+        var ubl = new[] { DiscountedLine, new UblLine(2, "Servicio exonerado", "ZZ", null, 1m, 50m, null, "20") };
+        return new UblInvoiceData(
+            type, type == "01" ? "F001" : "B001", 123, new DateOnly(2026, 9, 30), null, "PEN", "0101",
+            new UblParty("6", "20100066603", "EMISORA DEMO SAC"),
+            type == "01" ? new UblParty("6", "20100070970", "CLIENTE DEMO SAC") : new UblParty("1", "12345678", "JUAN PEREZ"),
+            ubl, totals, 0.18m, Adjustments: adjustments);
+    }
+
+    private static decimal Value(XContainer node, string path) =>
+        decimal.Parse(node.XPathSelectElement(path, Namespaces)!.Value, System.Globalization.CultureInfo.InvariantCulture);
+
+    [Theory]
+    [InlineData("01")]
+    [InlineData("03")]
+    public void Line_and_global_discounts_and_charges_validate_against_the_schema(string type)
+    {
+        var result = _generator.GenerateInvoice(Discounted(type));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        Assert.Empty(SchemaErrors(Parse(result.Value)));
+    }
+
+    [Fact]
+    public void Line_allowances_carry_code_indicator_amount_base_and_factor()
+    {
+        var xml = Parse(_generator.GenerateInvoice(Discounted()).Value);
+        var line = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine", Namespaces).First();
+
+        var nodes = line.XPathSelectElements("cac:AllowanceCharge", Namespaces).ToList();
+        Assert.Equal(["00", "47", "01", "48"], nodes.Select(n => n.XPathSelectElement("cbc:AllowanceChargeReasonCode", Namespaces)!.Value).ToArray());
+        Assert.Equal(["false", "true", "false", "true"], nodes.Select(n => n.XPathSelectElement("cbc:ChargeIndicator", Namespaces)!.Value).ToArray());
+
+        // 00 and 47 are stated over the value before them (2 x 100 = 200); 01 and 48 over the line value (200 - 20 + 5 = 185).
+        Assert.Equal("200.00", nodes[0].XPathSelectElement("cbc:BaseAmount", Namespaces)!.Value);
+        Assert.Equal("0.10", nodes[0].XPathSelectElement("cbc:MultiplierFactorNumeric", Namespaces)!.Value);
+        Assert.Equal("0.025", nodes[1].XPathSelectElement("cbc:MultiplierFactorNumeric", Namespaces)!.Value);
+        Assert.Equal("185.00", nodes[2].XPathSelectElement("cbc:BaseAmount", Namespaces)!.Value);
+        Assert.Equal("0.05405", nodes[2].XPathSelectElement("cbc:MultiplierFactorNumeric", Namespaces)!.Value);
+        Assert.Equal("185.00", nodes[3].XPathSelectElement("cbc:BaseAmount", Namespaces)!.Value);
+        Assert.Equal("185.00", line.XPathSelectElement("cbc:LineExtensionAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void Global_allowances_state_the_taxed_base_only_for_the_ones_that_affect_it()
+    {
+        var xml = Parse(_generator.GenerateInvoice(Discounted()).Value);
+
+        var nodes = xml.XPathSelectElements("/inv:Invoice/cac:AllowanceCharge", Namespaces).ToList();
+        Assert.Equal(["02", "49", "03", "50"], nodes.Select(n => n.XPathSelectElement("cbc:AllowanceChargeReasonCode", Namespaces)!.Value).ToArray());
+        Assert.Equal(["false", "true", "false", "true"], nodes.Select(n => n.XPathSelectElement("cbc:ChargeIndicator", Namespaces)!.Value).ToArray());
+        Assert.Equal(["12.00", "4.00", "7.00", "2.00"], nodes.Select(n => n.XPathSelectElement("cbc:Amount", Namespaces)!.Value).ToArray());
+
+        // Taxed base before the global discount and charge: the taxed line, 185.
+        Assert.Equal("185.00", nodes[0].XPathSelectElement("cbc:BaseAmount", Namespaces)!.Value);
+        Assert.Equal("185.00", nodes[1].XPathSelectElement("cbc:BaseAmount", Namespaces)!.Value);
+        Assert.Null(nodes[2].XPathSelectElement("cbc:BaseAmount", Namespaces));
+        Assert.Null(nodes[3].XPathSelectElement("cbc:MultiplierFactorNumeric", Namespaces));
+    }
+
+    /// <summary>The arithmetic of the sheet rules 3270, 3277, 3278, 3279/3291, 3280, 3290, 3300 and 3301, checked on the generated XML itself with their tolerance of 1.</summary>
+    [Fact]
+    public void The_xml_satisfies_the_sheet_arithmetic_for_discounts_and_charges()
+    {
+        var xml = Parse(_generator.GenerateInvoice(Discounted()).Value);
+        var lines = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine", Namespaces).ToList();
+        var global = xml.XPathSelectElements("/inv:Invoice/cac:AllowanceCharge", Namespaces).ToDictionary(n => n.XPathSelectElement("cbc:AllowanceChargeReasonCode", Namespaces)!.Value, n => Value(n, "cbc:Amount"));
+        var taxedLines = Value(lines[0], "cbc:LineExtensionAmount");
+        var lineSum = lines.Sum(l => Value(l, "cbc:LineExtensionAmount"));
+
+        // 3277: taxed total = taxed lines - 02 + 49. 3278: total value = all lines - 02 + 49.
+        var taxedTotal = Value(xml, "/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal[cac:TaxCategory/cac:TaxScheme/cbc:ID='1000']/cbc:TaxableAmount");
+        Assert.InRange(Math.Abs(taxedTotal - (taxedLines - global["02"] + global["49"])), 0m, 1m);
+        var monetary = "/inv:Invoice/cac:LegalMonetaryTotal/";
+        Assert.InRange(Math.Abs(Value(xml, monetary + "cbc:LineExtensionAmount") - (lineSum - global["02"] + global["49"])), 0m, 1m);
+
+        // 3291: IGV = taxed base x rate. 3279: price total = value + IGV. 3300/3301: the other allowances and charges. 3280: payable.
+        var igv = Value(xml, "/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal[cac:TaxCategory/cac:TaxScheme/cbc:ID='1000']/cbc:TaxAmount");
+        Assert.InRange(Math.Abs(igv - (taxedTotal * 0.18m)), 0m, 1m);
+        Assert.InRange(Math.Abs(Value(xml, monetary + "cbc:TaxInclusiveAmount") - (Value(xml, monetary + "cbc:LineExtensionAmount") + igv)), 0m, 1m);
+        Assert.Equal(10m + global["03"], Value(xml, monetary + "cbc:AllowanceTotalAmount"));
+        Assert.Equal(3m + global["50"], Value(xml, monetary + "cbc:ChargeTotalAmount"));
+        var payable = Value(xml, monetary + "cbc:PayableAmount");
+        Assert.InRange(Math.Abs(payable - (Value(xml, monetary + "cbc:TaxInclusiveAmount") + Value(xml, monetary + "cbc:ChargeTotalAmount") - Value(xml, monetary + "cbc:AllowanceTotalAmount"))), 0m, 1m);
+
+        // 3270: unit price with taxes x quantity = line value + line taxes - discount 01 + charge 48. 3290: amount = base x factor.
+        var first = lines[0];
+        var priced = Value(first, "cac:PricingReference/cac:AlternativeConditionPrice/cbc:PriceAmount") * 2m;
+        Assert.InRange(Math.Abs(priced - (Value(first, "cbc:LineExtensionAmount") + Value(first, "cac:TaxTotal/cbc:TaxAmount") - 10m + 3m)), 0m, 1m);
+        foreach (var node in lines[0].XPathSelectElements("cac:AllowanceCharge", Namespaces).Concat(xml.XPathSelectElements("/inv:Invoice/cac:AllowanceCharge[cbc:MultiplierFactorNumeric]", Namespaces)))
+        {
+            Assert.InRange(Math.Abs(Value(node, "cbc:Amount") - (Value(node, "cbc:BaseAmount") * Value(node, "cbc:MultiplierFactorNumeric"))), 0m, 1m);
+        }
+    }
+
+    [Fact]
+    public void Without_discounts_the_xml_has_no_allowance_nodes_or_allowance_totals()
+    {
+        var xml = Parse(_generator.GenerateInvoice(Data("01", ("10", 2m, 100m))).Value);
+
+        Assert.Empty(xml.XPathSelectElements("//cac:AllowanceCharge", Namespaces));
+        Assert.Empty(xml.XPathSelectElements("//cbc:AllowanceTotalAmount | //cbc:ChargeTotalAmount", Namespaces));
+    }
+
+    [Fact]
+    public void Allowances_that_do_not_agree_with_the_totals_or_have_no_valid_base_are_refused()
+    {
+        var data = Discounted();
+
+        // The totals were calculated with different line adjustments than the ones given to the generator.
+        var tampered = data with { Lines = [DiscountedLine with { DiscountNotAffectingBase = 0m }, data.Lines[1]] };
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(tampered).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data with { Adjustments = null }).Error.Code);
+
+        // A charge that does not touch the base over a line whose value is zero has no base to be stated on.
+        var line = new TaxableLine(1m, 100m, "10", DiscountAffectingBase: 100m, ChargeNotAffectingBase: 5m);
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([line], Rates)).Value;
+        var emptyBase = Data("01", ("10", 1m, 100m)) with
+        {
+            Totals = totals,
+            Lines = [new UblLine(1, "Producto", "NIU", null, 1m, 100m, null, "10", DiscountAffectingBase: 100m, ChargeNotAffectingBase: 5m)],
+        };
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(emptyBase).Error.Code);
     }
 
     // Found against the SUNAT beta service: invoices need their payment form (error 3244) and attribute values must match the catalogue

@@ -5,6 +5,10 @@ namespace SecureFact.CpeEngine.Contracts;
 
 public sealed record UblParty(string DocumentTypeCode, string DocumentNumber, string LegalName, string? TradeName = null, string? EstablishmentCode = null);
 
+/// <param name="DiscountAffectingBase">Line discount, code 00 of catalogue 53 (the taxable base is reduced).</param>
+/// <param name="ChargeAffectingBase">Line charge, code 47.</param>
+/// <param name="DiscountNotAffectingBase">Line discount, code 01 (the base is untouched; the unit price with taxes reflects it).</param>
+/// <param name="ChargeNotAffectingBase">Line charge, code 48.</param>
 public sealed record UblLine(
     int LineNumber,
     string Description,
@@ -13,7 +17,11 @@ public sealed record UblLine(
     decimal Quantity,
     decimal UnitValue,
     decimal? ReferenceUnitValue,
-    string IgvAffectationCode);
+    string IgvAffectationCode,
+    decimal DiscountAffectingBase = 0m,
+    decimal ChargeAffectingBase = 0m,
+    decimal DiscountNotAffectingBase = 0m,
+    decimal ChargeNotAffectingBase = 0m);
 
 /// <summary>
 /// Canonical input of the UBL generator. Amounts come from the TaxEngine result, never recomputed here: the XML must say exactly
@@ -21,6 +29,7 @@ public sealed record UblLine(
 /// </summary>
 /// <param name="OperationTypeCode">Catalogue 51 code, e.g. <c>0101</c> internal sale.</param>
 /// <param name="PaymentForm">Forma de pago of an invoice: only <c>Contado</c> is supported; credit needs installments and is refused (SUNAT errors 3245–3267).</param>
+/// <param name="Adjustments">Global discounts and charges (catalogue 53 codes 02, 03, 49, 50) exactly as given to the TaxEngine; the generator states them and checks that they agree with <paramref name="Totals"/>.</param>
 public sealed record UblInvoiceData(
     string DocumentTypeCode,
     string Series,
@@ -34,7 +43,8 @@ public sealed record UblInvoiceData(
     IReadOnlyList<UblLine> Lines,
     TaxCalculationResult Totals,
     decimal IgvRate,
-    string PaymentForm = "Contado");
+    string PaymentForm = "Contado",
+    GlobalAdjustments? Adjustments = null);
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)

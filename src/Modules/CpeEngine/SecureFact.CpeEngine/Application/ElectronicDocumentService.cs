@@ -83,14 +83,16 @@ internal sealed class ElectronicDocumentService(
 
         var issuer = new UblParty(IdentityDocuments.Ruc, company.Value.Ruc, company.Value.LegalName, company.Value.TradeName);
         var buyer = new UblParty(d.Buyer.DocumentTypeCode, d.Buyer.DocumentNumber, d.Buyer.Name);
-        var ublLines = d.Lines.Select(l => new UblLine(l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.UnitValue, null, l.IgvAffectationCode)).ToList();
+        var ublLines = d.Lines.Select(l => new UblLine(
+            l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.UnitValue, null, l.IgvAffectationCode,
+            l.DiscountAffectingBase, l.ChargeAffectingBase, l.DiscountNotAffectingBase, l.ChargeNotAffectingBase)).ToList();
 
         var generated = d.Note is { } note
             ? ubl.GenerateNote(new UblNoteData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, note.ReasonCode, note.Reason,
                 note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value))
             : ubl.GenerateInvoice(new UblInvoiceData(
-                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value));
+                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value, Adjustments: d.Adjustments));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -450,7 +452,7 @@ internal sealed class ElectronicDocumentService(
             d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, d.Currency, company.Value.LegalName, company.Value.TradeName, company.Value.Ruc, company.Value.FiscalAddress,
             identified ? BuyerTypeName(d.Buyer.DocumentTypeCode) : null, identified ? d.Buyer.DocumentNumber : null, identified ? d.Buyer.Name : null, identified ? d.Buyer.Address : null,
             d.Lines.Select(l => new PrintedLine(l.UnitCode, l.Quantity, l.Description, l.UnitValue, l.UnitPriceIncludingTaxes, l.LineExtensionAmount, l.TotalTaxAmount)).ToList(),
-            new PrintedTotals(d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount),
+            new PrintedTotals(d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount, d.Totals.TotalAllowances, d.Totals.TotalCharges),
             payload.Value, entity.DigestValue,
             d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
             await IsVoidedAsync(entity.Id, cancellationToken));

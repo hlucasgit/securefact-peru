@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Descuentos y cargos de línea y globales en facturas y boletas: UBL con `AllowanceCharge`, base y factor, totales, resumen diario, PDF y Billing; aceptados en el beta (ADR-025). Las líneas exoneradas, inafectas y gratuitas llevan ahora su tasa (rechazo 2992 del beta).
 - El PDF de un documento anulado (baja aceptada por SUNAT) lleva «ANULADO» en cada página (ADR-024).
 - Billing rechaza notas sobre documentos anulados o con baja en curso (`SF-BIL-011`) mediante el puerto `IVoidStatusProvider` que implementa CpeEngine (ADR-024).
 - Baja de boletas y de notas de boletas por resumen diario con líneas de estado 3 (`POST /api/v1/voids` genera `RA` y/o `RC` según el tipo); `summary_item.line_status`; aceptado en el beta (ADR-024).

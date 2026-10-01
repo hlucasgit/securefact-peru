@@ -17,10 +17,13 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 - **Baja de boleta con resumen de estado 3** (R-041): una boleta aceptada con `sendBill` y un `RC` posterior con esa boleta en estado 3 (importes originales repetidos) fue aceptado con código 0. El beta no comprueba que la boleta haya sido informada en un resumen antes (producción sí, regla 2989 para las notas).
 - **HTTP 401 tras una llamada reciente**: dos veces, una segunda llamada hecha a los pocos segundos de la primera con las mismas credenciales recibió 401; con unos segundos de espera fue aceptada. Parece un límite de ritmo del beta, no un error de credenciales.
 
+- **Descuentos y cargos** (R-047): una factura con descuentos y cargos de línea (00, 47, 01, 48) y globales (02, 49, 03, 50), más una línea exonerada, aceptada con código 0 y sin observaciones; igual como boleta con `sendBill`; un resumen diario con cargo y descuento que no afectan la base, aceptado.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|
 | **3244** (rechazo) | Falta la forma de pago de la factura (error desde el 01.01.2022; la hoja `Factura2_0` la marca «C» pero es obligatoria en la práctica) | `cac:PaymentTerms` con `cbc:ID` = `FormaPago` y `cbc:PaymentMeansID` = `Contado`, solo en facturas. El crédito (cuotas) queda rechazado por el generador (R-042) |
+| **2992** (rechazo) | La línea exonerada (tributo 9997) no llevaba `cbc:Percent`; el defecto estaba oculto porque solo se había probado con líneas gravadas | Toda línea lleva su tasa: la del IGV en gravadas y gratuitas 11–16, `0.00` en el resto |
 | 4252 / 4255 / 4256 (observaciones) | Valores de atributos distintos de los de la hoja de reglas | `listName` «Tipo de Documento» y «Afectacion del IGV»; en `cac:TaxScheme/cbc:ID`: `schemeName` «Codigo de tributos», `schemeAgencyName` «PE:SUNAT»; los números de identidad llevan `schemeName` «Documento de Identidad», `schemeAgencyName` y `schemeURI` del catálogo 06 |
 
 ## Particularidades del CDR del beta (R-043)

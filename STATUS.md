@@ -34,7 +34,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Novedades de la séptima tanda — primera aceptación real
 - **Factura, boleta (`sendBill`) y resumen diario (`sendSummary` + `getStatus`) aceptados por el beta de SUNAT** (CDR código 0) con `tools/SecureFact.BetaSmoke`. Hallazgos en `docs/regulatory/beta-findings.md`: faltaba la forma de pago (3244), valores de atributos del UBL, carpeta `dummy/` y marca de tiempo en el CDR real; todo corregido.
 - Confirmado en el beta: base64 en línea, `SOAPAction` vacío, firma RSA-SHA256, certificado autofirmado, nombre del resumen con fecha de generación.
-- Pendiente de prueba: crédito con cuotas, notas, bajas, descuentos; la política de producción (cadena de certificados, boletas con `sendBill`).
+- Pendiente de prueba: crédito con cuotas; la política de producción (cadena de certificados, boletas con `sendBill`).
 
 ## Representación impresa
 - `GET /api/v1/electronic-documents/{id}/pdf` (permiso `documents.read`, aislado por tenant): PDF A4 determinista con los datos mínimos del Anexo II de la RS 114-2019 (fuente S21), QR según S19 y el `DigestValue` firmado. Pruebas: 455 pasan.
@@ -50,16 +50,21 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Una nota sobre un documento anulado o con baja en curso se rechaza (`SF-BIL-011`, puerto `IVoidStatusProvider`).
 - El PDF de un documento anulado lleva «ANULADO» (marca de agua y rótulo).
 
+## Descuentos y cargos
+- Facturas y boletas con descuentos y cargos de línea (00, 01, 47, 48) y globales (02, 03, 49, 50): el generador los emite (`cac:AllowanceCharge`, base, factor, totales), el resumen diario informa los cargos, el PDF imprime «Otros cargos» y «Otros descuentos». Aceptados en el beta (ADR-025). Las notas no llevan descuentos ni cargos (`SF-BIL-006`).
+- El beta destapó que las líneas exoneradas, inafectas y gratuitas necesitaban `cbc:Percent` (2992); corregido. Pruebas: 560 pasan (330 unitarias, 6 arquitectura, 6 integración, 218 seguridad/API).
+- Pendiente: factor porcentual como entrada, desglose de descuentos en el PDF, anticipos.
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
-- Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción, crédito, notas, bajas y descuentos sin probar.
+- Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción y crédito sin probar.
 - Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; CI sin ejecutar en GitHub; cobertura sin medir.
-- Descuentos y cargos (línea y globales con base mixta), ISC, ICBPER, IVAP, exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún. El caso oficial de la guía (descuentos porcentuales por línea y descuento global sobre base mixta) requiere factor de descuento en el motor.
+- ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.
 - Notas de crédito/débito esperan el CDR (Fase 4).
 
 ## Pendientes
 1. Commit y push.
-2. Factor de descuento porcentual y descuentos globales por categoría (casos oficiales de la guía) en TaxEngine y UBL.
+2. ISC, ICBPER, IVAP, exportación y operaciones gratuitas con valor referencial en el UBL.
 3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF, retención del outbox.
 4. Outbox + bus + S3 de código; ejecutar el CI; medir cobertura.
 5. PDF y renderizado del QR.

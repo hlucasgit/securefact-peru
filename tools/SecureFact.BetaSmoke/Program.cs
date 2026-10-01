@@ -35,13 +35,22 @@ using var certificate = X509CertificateLoader.LoadPkcs12(selfSigned.Export(X509C
 
 var lima = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("America/Lima"));
 var number = (long)lima.TimeOfDay.TotalSeconds + 1;
+// "discount": a taxed line with the four line adjustments (catalogue 53: 00, 47, 01, 48), an exempt line and the four global ones (02, 49, 03, 50).
+var discount = args.Contains("discount", StringComparer.Ordinal);
+TaxableLine[] taxLines = discount
+    ? [new TaxableLine(2, 100m, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m), new TaxableLine(1, 50m, "20")]
+    : [new TaxableLine(1, 100m, "10")];
+UblLine[] ublLines = discount
+    ? [new UblLine(1, "Servicio de prueba", "ZZ", null, 2, 100m, null, "10", 20m, 5m, 10m, 3m), new UblLine(2, "Servicio exonerado", "ZZ", null, 1, 50m, null, "20")]
+    : [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")];
+GlobalAdjustments? adjustments = discount ? new GlobalAdjustments(DiscountAffectingBase: 12m, ChargeAffectingBase: 4m, DiscountNotAffectingBase: 7m, ChargeNotAffectingBase: 2m) : null;
 var totals = provider.GetRequiredService<ITaxCalculator>()
-    .Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10")], new TaxRates(0.18m))).Value;
+    .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m), adjustments)).Value;
 var receipt = args.Contains("boleta", StringComparer.Ordinal);
 var data = new UblInvoiceData(
     receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", "0101",
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"), receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
-    [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")], totals, 0.18m);
+    ublLines, totals, 0.18m, Adjustments: adjustments);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {
@@ -150,6 +159,12 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
     var reference = Environment.GetEnvironmentVariable("SF_BETA_REFERENCE_DAYS_AGO") is { } ago ? today.AddDays(-int.Parse(ago, CultureInfo.InvariantCulture)) : today;
     var voidNumber = Environment.GetEnvironmentVariable("SF_BETA_VOID_NUMBER");
     var line = new SummaryLineData(1, "B001", voidNumber is null ? number : long.Parse(voidNumber, CultureInfo.InvariantCulture), "1", "12345678", "PEN", 118m, 100m, 0m, 0m, 18m, 0.18m, Status: voidNumber is null ? "1" : "3");
+    if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_ADJUST") is not null)
+    {
+        // A receipt of 100 with a 10 discount over the base, a charge of 5 and a discount of 3 that leave it alone: 90 + 16.20 IGV + 5 - 3.
+        line = line with { TotalAmount = 108.2m, TaxedAmount = 90m, IgvAmount = 16.2m, OtherCharges = 5m, OtherDiscounts = 3m };
+    }
+
     var lines = new List<SummaryLineData> { line };
     if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_NOTE") is { } noteKind)
     {

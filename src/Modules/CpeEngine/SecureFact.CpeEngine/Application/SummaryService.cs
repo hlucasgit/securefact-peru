@@ -167,7 +167,8 @@ internal sealed class SummaryService(
                 i + 1, d.Series, d.Number,
                 identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null,
                 d.Currency, d.Totals.PayableAmount, d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalIgv, igvRate,
-                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber);
+                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber,
+                OtherCharges: d.Totals.TotalCharges, OtherDiscounts: d.Totals.TotalAllowances);
         }).ToList();
 
         for (var attempt = 0; attempt < CorrelativeRetries; attempt++)

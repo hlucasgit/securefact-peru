@@ -163,6 +163,35 @@ public class SummaryDocumentGeneratorTests
     }
 
     [Fact]
+    public void Other_charges_are_informed_in_an_allowance_charge_node_and_enter_the_total()
+    {
+        var charged = Taxed(1, "B001", 1) with { TotalAmount = 123m, OtherCharges = 5m };
+
+        var result = _generator.Generate(Data(charged));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml));
+        var node = xml.XPathSelectElement("//sac:SummaryDocumentsLine/cac:AllowanceCharge", Namespaces)!;
+        Assert.Equal("true", node.XPathSelectElement("cbc:ChargeIndicator", Namespaces)!.Value);
+        Assert.Equal("5.00", node.XPathSelectElement("cbc:Amount", Namespaces)!.Value);
+        Assert.Equal("123.00", xml.XPathSelectElement("//sac:SummaryDocumentsLine/sac:TotalAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void Other_discounts_only_lower_the_total_and_a_total_that_ignores_them_is_refused()
+    {
+        var discounted = Taxed(1, "B001", 1) with { TotalAmount = 108m, OtherDiscounts = 10m };
+
+        var result = _generator.Generate(Data(discounted));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        Assert.Empty(XDocument.Parse(result.Value.Xml).XPathSelectElements("//sac:SummaryDocumentsLine/cac:AllowanceCharge", Namespaces));
+        Assert.False(_generator.Generate(Data(Taxed(1, "B001", 1) with { OtherDiscounts = 10m })).IsSuccess);
+        Assert.False(_generator.Generate(Data(Taxed(1, "B001", 1) with { OtherCharges = -1m })).IsSuccess);
+    }
+
+    [Fact]
     public void A_line_with_status_3_voids_a_document_and_validates_against_the_schema()
     {
         var result = _generator.Generate(Data(Taxed(1, "B001", 1) with { Status = "3" }, NoteLine(2, "07", "BC01", 1) with { Status = "3" }));

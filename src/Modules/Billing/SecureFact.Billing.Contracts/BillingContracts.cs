@@ -81,7 +81,26 @@ public enum DocumentStatus
     Validated,
 }
 
-public sealed record DocumentLineDto(int LineNumber, string Description, string UnitCode, string? ProductCode, decimal Quantity, decimal LineExtensionAmount, string TaxCode, decimal TotalTaxAmount, decimal? UnitPriceIncludingTaxes, decimal UnitValue = 0m, string IgvAffectationCode = "");
+/// <param name="DiscountAffectingBase">Line discount, charge code 00 (reduces the taxable base).</param>
+/// <param name="ChargeAffectingBase">Line charge, code 47.</param>
+/// <param name="DiscountNotAffectingBase">Line discount, code 01.</param>
+/// <param name="ChargeNotAffectingBase">Line charge, code 48.</param>
+public sealed record DocumentLineDto(
+    int LineNumber,
+    string Description,
+    string UnitCode,
+    string? ProductCode,
+    decimal Quantity,
+    decimal LineExtensionAmount,
+    string TaxCode,
+    decimal TotalTaxAmount,
+    decimal? UnitPriceIncludingTaxes,
+    decimal UnitValue = 0m,
+    string IgvAffectationCode = "",
+    decimal DiscountAffectingBase = 0m,
+    decimal ChargeAffectingBase = 0m,
+    decimal DiscountNotAffectingBase = 0m,
+    decimal ChargeNotAffectingBase = 0m);
 
 public sealed record DocumentDto(
     Guid Id,
@@ -97,7 +116,8 @@ public sealed record DocumentDto(
     IReadOnlyList<DocumentLineDto> Lines,
     TaxCalculationResult Totals,
     DateTimeOffset CreatedAt,
-    NoteInfo? Note = null)
+    NoteInfo? Note = null,
+    GlobalAdjustments? Adjustments = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

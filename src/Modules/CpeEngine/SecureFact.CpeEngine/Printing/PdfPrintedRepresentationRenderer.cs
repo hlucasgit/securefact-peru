@@ -215,6 +215,16 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
         }
 
         rows.Add(("IGV", totals.IgvAmount, false));
+        if (totals.OtherCharges != 0)
+        {
+            rows.Add(("Otros cargos", totals.OtherCharges, false));
+        }
+
+        if (totals.OtherDiscounts != 0)
+        {
+            rows.Add(("Otros descuentos", -totals.OtherDiscounts, false));
+        }
+
         rows.Add(("IMPORTE TOTAL", totals.TotalAmount, true));
 
         var rowY = top - 18;

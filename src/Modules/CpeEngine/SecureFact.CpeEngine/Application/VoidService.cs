@@ -193,7 +193,8 @@ internal sealed class VoidService(
             lines.Add(new SummaryLineData(
                 lines.Count + 1, d.Series, d.Number, identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null, d.Currency,
                 d.Totals.PayableAmount, d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalIgv, igv.Value,
-                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber, Status: "3"));
+                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber, Status: "3",
+                OtherCharges: d.Totals.TotalCharges, OtherDiscounts: d.Totals.TotalAllowances));
         }
 
         for (var attempt = 0; attempt < CorrelativeRetries; attempt++)
