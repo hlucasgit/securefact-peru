@@ -475,6 +475,7 @@
           "SecureFact.Audit": "[1.0.0, )",
           "SecureFact.Billing": "[1.0.0, )",
           "SecureFact.Catalogs": "[1.0.0, )",
+          "SecureFact.Certificates": "[1.0.0, )",
           "SecureFact.CpeEngine": "[1.0.0, )",
           "SecureFact.Customers": "[1.0.0, )",
           "SecureFact.Identity": "[1.0.0, )",
@@ -530,6 +531,22 @@
         }
       },
       "securefact.catalogs.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.certificates": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Certificates.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.certificates.contracts": {
         "type": "Project",
         "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )"

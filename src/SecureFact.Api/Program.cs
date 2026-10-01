@@ -7,6 +7,7 @@ using SecureFact.Audit;
 using SecureFact.Billing;
 using SecureFact.Catalogs;
 using SecureFact.CpeEngine;
+using SecureFact.Certificates;
 using SecureFact.Customers;
 using SecureFact.Products;
 using SecureFact.Identity;
@@ -99,6 +100,7 @@ if (appConnection is not null)
     builder.Services.AddCatalogsModule(appConnection);
     builder.Services.AddRulesModule(appConnection);
     builder.Services.AddCustomersModule(appConnection);
+    builder.Services.AddCertificatesModule(appConnection);
     builder.Services.AddProductsModule(appConnection);
     builder.Services.AddBillingModule(appConnection);
     builder.Services.AddIdentityModule(appConnection, options => builder.Configuration.GetSection("Identity").Bind(options));
@@ -119,6 +121,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await CatalogsModule.MigrateAsync(migrationsConnection);
     await RulesModule.MigrateAsync(migrationsConnection);
     await CustomersModule.MigrateAsync(migrationsConnection);
+    await CertificatesModule.MigrateAsync(migrationsConnection);
     await ProductsModule.MigrateAsync(migrationsConnection);
     return;
 }
@@ -165,6 +168,7 @@ app.MapBillingEndpoints();
 app.MapCatalogEndpoints();
 app.MapRuleEndpoints();
 app.MapMasterDataEndpoints();
+app.MapCertificateEndpoints();
 
 app.Run();
 

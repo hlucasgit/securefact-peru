@@ -19,6 +19,9 @@ public static class AuditActions
     public const string ProductUpdated = "products.product.updated";
     public const string ProductDeactivated = "products.product.deactivated";
 
+    public const string CertificateUploaded = "certificates.certificate.uploaded";
+    public const string CertificateDeactivated = "certificates.certificate.deactivated";
+
     public const string SeriesCreated = "billing.series.created";
     public const string SeriesDeactivated = "billing.series.deactivated";
     public const string DocumentCreated = "billing.document.created";

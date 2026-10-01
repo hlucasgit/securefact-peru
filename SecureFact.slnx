@@ -18,6 +18,10 @@
     <Project Path="src/Modules/Catalogs/SecureFact.Catalogs.Contracts/SecureFact.Catalogs.Contracts.csproj" />
     <Project Path="src/Modules/Catalogs/SecureFact.Catalogs/SecureFact.Catalogs.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Certificates/">
+    <Project Path="src/Modules/Certificates/SecureFact.Certificates.Contracts/SecureFact.Certificates.Contracts.csproj" />
+    <Project Path="src/Modules/Certificates/SecureFact.Certificates/SecureFact.Certificates.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/CpeEngine/">
     <Project Path="src/Modules/CpeEngine/SecureFact.CpeEngine.Contracts/SecureFact.CpeEngine.Contracts.csproj" />
     <Project Path="src/Modules/CpeEngine/SecureFact.CpeEngine/SecureFact.CpeEngine.csproj" />

@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Modules\CpeEngine\SecureFact.CpeEngine\SecureFact.CpeEngine.csproj" />
     <ProjectReference Include="..\Modules\Rules\SecureFact.Rules\SecureFact.Rules.csproj" />
     <ProjectReference Include="..\Modules\Customers\SecureFact.Customers\SecureFact.Customers.csproj" />
+    <ProjectReference Include="..\Modules\Certificates\SecureFact.Certificates\SecureFact.Certificates.csproj" />
     <ProjectReference Include="..\Modules\Products\SecureFact.Products\SecureFact.Products.csproj" />
     <ProjectReference Include="..\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />
   </ItemGroup>

@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Almacén de certificados digitales (`Certificates`): PKCS#12 cifrado en reposo, validación, un activo por empresa, alertas de vencimiento, permisos y auditoría (ADR-018).
 - Motor CPE: firma XMLDSig (`IXmlSigner`), empaquetado ZIP seguro, parser de CDR con clasificación de códigos SUNAT y canal SOAP `billService` (`sendBill`, `sendSummary`, `getStatus`) probado con un simulador sin red (ADR-017).
 - Rules (reglas con vigencia servidas por `IRuleProvider`; Billing deja de aceptar tasas del cliente), Customers y Products (datos maestros con catálogos oficiales), referencia de cliente en documentos, y generador UBL 2.1 sin firmar de factura/boleta validado contra el XSD oficial y las etiquetas obligatorias del libro de reglas.
 - Catalogs (42 catálogos oficiales importados del libro de reglas con vigencias y versiones, API de lectura, pruebas anti-deriva con TaxEngine/Billing) y CpeEngine (contenido del QR según el Anexo N.° 6). Activos regulatorios oficiales versionados con hashes.
