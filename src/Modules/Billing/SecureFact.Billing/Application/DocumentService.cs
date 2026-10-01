@@ -23,6 +23,7 @@ internal sealed partial class DocumentService(
     ICompanyAdministration companies,
     IRuleProvider rules,
     ICustomerAdministration customers,
+    IVoidStatusProvider voidStatus,
     ITaxCalculator calculator,
     TimeProvider clock,
     IAuditTrail audit) : IDocumentService
@@ -304,6 +305,11 @@ internal sealed partial class DocumentService(
         if (referenced.DocumentTypeCode is not (DocumentTypes.Invoice or DocumentTypes.Receipt))
         {
             return Invalid("Documento no modificable", "Una nota solo modifica una factura o una boleta.");
+        }
+
+        if (await voidStatus.IsVoidedOrBeingVoidedAsync(referenced.Id, cancellationToken))
+        {
+            return Error.Conflict(ErrorCodes.ReferencedDocumentVoided, "Documento anulado", "El documento que la nota modifica está anulado o tiene una baja en curso; una nota no puede referirse a un documento dado de baja.");
         }
 
         // The note series starts with F for notes of invoices and with B for notes of receipts (S16 rule 0151; confirmed against the SUNAT beta).

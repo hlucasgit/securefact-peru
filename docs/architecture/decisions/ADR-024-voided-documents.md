@@ -22,6 +22,10 @@ Hoja `Comunicación de Baja1_0` de las reglas de validación del 26.08.2026 (S16
 - El motivo (3–100 caracteres) solo se guarda en nuestro registro: la línea del resumen no tiene campo de motivo.
 - «Anulado» se deriva de un `RA` **o** `RC` aceptado con un item de estado 3.
 
+## Notas sobre documentos anulados
+- Billing define el puerto `IVoidStatusProvider` (en `Billing.Contracts`) y CpeEngine lo implementa sobre sus registros; sin implementación, Billing no considera anulado ningún documento. Crear una nota (`POST /api/v1/notes`) sobre un documento anulado **o con una baja en curso** (item de estado 3 activo, sea un archivo pendiente, fallido o aceptado) se rechaza con `SF-BIL-011` (409). Si SUNAT rechaza la baja, el item se libera y la nota vuelve a ser posible.
+- El documento anulado sigue siendo de solo inserción; no se bloquean notas ya emitidas antes de la baja.
+
 ## Verificado en el beta (2026-10-01)
 Resumen de estado 3: una boleta enviada con `sendBill` y aceptada, y a continuación un resumen `RC` con esa boleta en estado 3: aceptado con código 0.
 
@@ -29,5 +33,4 @@ Una factura aceptada y su comunicación de baja: `sendSummary` devolvió ticket 
 
 ## Límites
 - Sin estado 2 (modificar) en resúmenes, sin baja de documentos de contingencia ni de otros tipos (25, 28, 30, 34, 42, 56).
-- Billing no se entera: una factura anulada sigue existiendo (solo inserción) y puede recibir notas; falta bloquear notas sobre documentos anulados.
 - El PDF de un documento anulado no lo indica todavía.

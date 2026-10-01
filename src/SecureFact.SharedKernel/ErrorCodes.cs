@@ -22,6 +22,7 @@ public static class ErrorCodes
     public const string IdempotencyConflict = "SF-BIL-008";
     public const string DocumentTypeNotSupported = "SF-BIL-009";
     public const string NoteExceedsOriginal = "SF-BIL-010";
+    public const string ReferencedDocumentVoided = "SF-BIL-011";
 
     public const string TaxInvalidInput = "SF-TAX-001";
     public const string TaxUnsupported = "SF-TAX-002";

@@ -19,6 +19,7 @@ public static class BillingModule
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISeriesAdministration, SeriesAdministration>();
+        services.TryAddScoped<IVoidStatusProvider, NoVoidStatus>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<SecureFact.SharedKernel.Messaging.IOutboxSource, BillingOutboxSource>();
         return services;

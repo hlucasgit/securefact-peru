@@ -108,6 +108,24 @@ public sealed class VoidApiTests(ApiFixture api)
         return (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
     }
 
+    private static async Task<HttpResponseMessage> TryNoteAsync(HttpClient client, SeriesDto series, DocumentDto referenced)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/notes")
+        {
+            Content = JsonContent.Create(new
+            {
+                seriesId = series.Id,
+                referencedDocumentId = referenced.Id,
+                issueDate = Iso(TodayInLima()),
+                reasonCode = "01",
+                reason = "Anulación de la operación",
+                lines = new[] { new { description = "Servicio de consultoría", unitCode = "ZZ", tax = new { quantity = 1m, unitValue = 100m, igvAffectationCode = "10" } } },
+            }),
+        };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+        return await client.SendAsync(request);
+    }
+
     private static async Task<ElectronicDocumentDto> PrepareAsync(HttpClient client, Guid documentId)
     {
         var response = await client.PostAsync($"/api/v1/documents/{documentId}/electronic", null);
@@ -380,6 +398,44 @@ public sealed class VoidApiTests(ApiFixture api)
         var summary = Assert.Single((await (await setup.Owner.PostAsJsonAsync("/api/v1/summaries", new { companyId = setup.Company.Id, referenceDate = Iso(TodayInLima()) })).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
 
         Assert.Equal(HttpStatusCode.NotFound, (await setup.Owner.GetAsync($"/api/v1/voids/{summary.Document.Id}")).StatusCode);
+    }
+
+    // ---------- notes on voided documents ----------
+
+    [Fact]
+    public async Task A_note_cannot_modify_an_invoice_that_is_voided_or_being_voided_until_the_request_is_rejected()
+    {
+        var setup = await NewTenantAsync("Void Notes Invoice SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+        await AcceptedAsync(setup, invoice, $"{invoice.Series}-{invoice.Number}");
+        Assert.Equal(HttpStatusCode.Created, (await TryNoteAsync(setup.Owner, setup.CreditOfInvoice, invoice)).StatusCode); // fine while it stands
+
+        var first = Assert.Single((await (await VoidAsync(setup, (invoice.Id, "Error en la emisión"))).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        var pending = await TryNoteAsync(setup.Owner, setup.CreditOfInvoice, invoice);
+        Assert.Equal(HttpStatusCode.Conflict, pending.StatusCode);
+        Assert.Equal("SF-BIL-011", await ProblemCodeAsync(pending));
+
+        await FinishAsync(setup, first, "T-1", "2323"); // rejected: the invoice stands again
+        Assert.Equal(HttpStatusCode.Created, (await TryNoteAsync(setup.Owner, setup.CreditOfInvoice, invoice)).StatusCode);
+
+        var second = Assert.Single((await (await VoidAsync(setup, (invoice.Id, "Segundo intento"))).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        await FinishAsync(setup, second, "T-2");
+        Assert.Equal("SF-BIL-011", await ProblemCodeAsync(await TryNoteAsync(setup.Owner, setup.CreditOfInvoice, invoice)));
+    }
+
+    [Fact]
+    public async Task A_note_cannot_modify_a_voided_receipt()
+    {
+        var setup = await NewTenantAsync("Void Notes Receipt SAC");
+        var receipt = await IssueAsync(setup.Owner, setup.Receipt, receipt: true);
+        await AcceptReceiptsAsync(setup, "T-1");
+        var voidSummary = Assert.Single((await (await VoidAsync(setup, (receipt.Id, "Operación anulada"))).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        await FinishAsync(setup, voidSummary, "T-2");
+
+        var note = await TryNoteAsync(setup.Owner, setup.CreditOfReceipt, receipt);
+
+        Assert.Equal(HttpStatusCode.Conflict, note.StatusCode);
+        Assert.Equal("SF-BIL-011", await ProblemCodeAsync(note));
     }
 
     // ---------- sending ----------

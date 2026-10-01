@@ -102,6 +102,16 @@ public sealed record DocumentDto(
     public string FullNumber => $"{Series}-{Number}";
 }
 
+/// <summary>
+/// Tells Billing whether a document has been annulled. The electronic-invoicing module implements it (the annulment lives in its records);
+/// without it Billing treats no document as voided.
+/// </summary>
+public interface IVoidStatusProvider
+{
+    /// <summary>True when the document is voided, or when a request to void it (a voided-documents communication or a summary line of status 3) is still pending.</summary>
+    Task<bool> IsVoidedOrBeingVoidedAsync(Guid documentId, CancellationToken cancellationToken);
+}
+
 public interface IDocumentService
 {
     /// <summary>

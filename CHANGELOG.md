@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Billing rechaza notas sobre documentos anulados o con baja en curso (`SF-BIL-011`) mediante el puerto `IVoidStatusProvider` que implementa CpeEngine (ADR-024).
 - Baja de boletas y de notas de boletas por resumen diario con líneas de estado 3 (`POST /api/v1/voids` genera `RA` y/o `RC` según el tipo); `summary_item.line_status`; aceptado en el beta (ADR-024).
 - Comunicación de baja de facturas y notas de facturas: generador UBL 2.0 validado, creación por fecha de emisión con reglas de SUNAT, envío/seguimiento como el resumen, estado «anulado» derivado; aceptada en el beta (ADR-024).
 - Notas de crédito y débito de boletas por resumen diario: líneas 07/08 en el resumen, la nota espera a que su boleta esté informada y el worker la incluye en un resumen posterior; aceptado en el beta (ADR-023).
