@@ -16,5 +16,9 @@ dotnet_style_qualification_for_field = false:warning
 dotnet_sort_system_directives_first = true
 csharp_new_line_before_open_brace = all
 
+# Intentional: Result<T>.Success/Failure factories and the domain-level Error type.
+dotnet_diagnostic.CA1000.severity = none
+dotnet_diagnostic.CA1716.severity = none
+
 [*.md]
 trim_trailing_whitespace = false

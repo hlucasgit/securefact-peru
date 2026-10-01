@@ -3,13 +3,14 @@ using System.Reflection;
 namespace SecureFact.Architecture.Tests;
 
 /// <summary>
-/// Enforces ADR-001/ADR-010: a module may reference only SharedKernel and other modules' Contracts;
+/// Enforces ADR-001/ADR-010: a module may reference only SharedKernel, Platform and Contracts assemblies;
 /// Contracts and SharedKernel stay at the bottom of the graph; hosts may reference anything.
 /// </summary>
 public class ModuleBoundaryTests
 {
     private const string Prefix = "SecureFact.";
     private const string SharedKernel = "SecureFact.SharedKernel";
+    private const string Platform = "SecureFact.Platform";
     private static readonly string[] Hosts = ["SecureFact.Api", "SecureFact.Workers"];
 
     private static IEnumerable<Assembly> LoadSolutionAssemblies() =>
@@ -42,6 +43,15 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void Platform_references_only_SharedKernel()
+    {
+        var platform = LoadSolutionAssemblies().Single(a => a.GetName().Name == Platform);
+
+        var illegal = SolutionReferences(platform).Where(n => n != SharedKernel).ToList();
+        Assert.True(illegal.Count == 0, $"Platform references {string.Join(", ", illegal)}");
+    }
+
+    [Fact]
     public void Contracts_reference_only_SharedKernel()
     {
         foreach (var contracts in LoadSolutionAssemblies().Where(a => IsContracts(a.GetName().Name!)))
@@ -55,15 +65,15 @@ public class ModuleBoundaryTests
     public void Modules_reference_only_SharedKernel_and_other_modules_Contracts()
     {
         var modules = LoadSolutionAssemblies()
-            .Where(a => a.GetName().Name is { } n && n != SharedKernel && !IsContracts(n) && !Hosts.Contains(n));
+            .Where(a => a.GetName().Name is { } n && n != SharedKernel && n != Platform && !IsContracts(n) && !Hosts.Contains(n));
 
         foreach (var module in modules)
         {
             var own = module.GetName().Name!;
             var illegal = SolutionReferences(module)
-                .Where(n => n != SharedKernel && n != $"{own}.Contracts" && !IsContracts(n))
+                .Where(n => n != SharedKernel && n != Platform && !IsContracts(n))
                 .ToList();
-            Assert.True(illegal.Count == 0, $"{own} references non-contract assemblies: {string.Join(", ", illegal)}");
+            Assert.True(illegal.Count == 0, $"{own} references assemblies other than SharedKernel, Platform or Contracts: {string.Join(", ", illegal)}");
         }
     }
 

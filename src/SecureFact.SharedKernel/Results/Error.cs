@@ -17,5 +17,7 @@ public sealed record Error(string Code, string Title, string Detail, ErrorKind K
 
     public static Error NotFound(string code, string title, string detail) => new(code, title, detail, ErrorKind.NotFound);
 
+    public static Error Forbidden(string code, string title, string detail) => new(code, title, detail, ErrorKind.Forbidden);
+
     public static Error Conflict(string code, string title, string detail) => new(code, title, detail, ErrorKind.Conflict);
 }

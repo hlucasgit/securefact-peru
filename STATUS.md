@@ -1,4 +1,11 @@
-# STATUS — sesión 1 (2026-09-30)
+# STATUS — sesiones 1–2 (2026-09-30 / 2026-10-01)
+
+## Actualización sesión 2 — Tenancy + RLS
+- Docker volvió a responder. **Hecho**: `SecureFact.Platform` (ámbito de datos, interceptor RLS, DDL de políticas, `TenantDbContext`), módulo `Tenancy` (registro de tenants, `ITenantAdministration`, migración inicial con RLS forzado y grants al rol `securefact_app`), `tests/Security` con PostgreSQL real (Testcontainers).
+- **Pruebas: 53 pasan en Release con warnings-as-errors** (20 unitarias, 6 arquitectura, 6 integración, 21 seguridad). Mutación manual (interceptor sin tenant) hizo fallar las pruebas de seguridad.
+- Hallazgo: EF/Npgsql genera una columna `xmin` en la migración (no se puede crear en PostgreSQL); se quitó a mano. Documentado en la migración.
+- Pendiente de Tenancy: resolución del tenant desde credenciales (Identity) y `reseller_grant`. Aún sin endpoints HTTP de tenants (requieren Identity).
+- Siguiente: Identity/RBAC → Audit → Organizations. Las imágenes `api`/`workers` siguen sin verificar por build.
 
 ## Estado general
 Fase 0 (Discovery) **completada**. Fase 1 (Foundation) **iniciada**: esqueleto compilable y probado, infraestructura local definida. Nada tributario implementado todavía (intencional). Código **sin commitear** (pendiente de tu orden).

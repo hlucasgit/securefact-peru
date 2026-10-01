@@ -8,6 +8,9 @@ public static class ErrorCodes
     public const string InvalidDocumentNumber = "SF-VAL-003";
     public const string InvalidMoney = "SF-VAL-004";
     public const string InvalidRequest = "SF-VAL-005";
+    public const string InvalidTenantName = "SF-VAL-006";
+
+    public const string TenantNotFound = "SF-TEN-001";
 
     public const string Unauthenticated = "SF-AUTH-001";
     public const string Forbidden = "SF-AUTH-002";

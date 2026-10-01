@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\SecureFact.Tenancy.Contracts\SecureFact.Tenancy.Contracts.csproj" />
+  </ItemGroup>
+</Project>

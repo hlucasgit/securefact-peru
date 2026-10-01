@@ -1,8 +1,14 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/SecureFact.Api/SecureFact.Api.csproj" />
+    <Project Path="src/SecureFact.Platform/SecureFact.Platform.csproj" />
     <Project Path="src/SecureFact.SharedKernel/SecureFact.SharedKernel.csproj" />
     <Project Path="src/SecureFact.Workers/SecureFact.Workers.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Tenancy/">
+    <Project Path="src/Modules/Tenancy/SecureFact.Tenancy.Contracts/SecureFact.Tenancy.Contracts.csproj" />
+    <Project Path="src/Modules/Tenancy/SecureFact.Tenancy/SecureFact.Tenancy.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Architecture/">
@@ -10,6 +16,9 @@
   </Folder>
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/SecureFact.Integration.Tests/SecureFact.Integration.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Security/">
+    <Project Path="tests/Security/SecureFact.Security.Tests/SecureFact.Security.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/SecureFact.Unit.Tests/SecureFact.Unit.Tests.csproj" />
