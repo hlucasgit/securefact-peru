@@ -54,10 +54,12 @@ public class UblInvoiceGeneratorTests
     private static XDocument Parse(UblDocument document) => XDocument.Parse(document.Xml);
 
     /// <summary>Validates against the official UBL 2.1 Invoice schema. A dummy signature stands in for the one the signer adds later.</summary>
-    private static List<string> SchemaErrors(XDocument document)
+    private static List<string> SchemaErrors(XDocument document, bool addDummySignature = true)
     {
         var withSignature = new XDocument(document);
-        withSignature.Descendants(Ext + "ExtensionContent").First().Add(
+        if (addDummySignature)
+        {
+            withSignature.Descendants(Ext + "ExtensionContent").First().Add(
             new XElement(
                 Ds + "Signature",
                 new XAttribute(XNamespace.Xmlns + "ds", Ds.NamespaceName),
@@ -71,6 +73,7 @@ public class UblInvoiceGeneratorTests
                         new XElement(Ds + "DigestMethod", new XAttribute("Algorithm", "http://www.w3.org/2000/09/xmldsig#sha1")),
                         new XElement(Ds + "DigestValue", "AAAAAAAAAAAAAAAAAAAAAAAAAAA="))),
                 new XElement(Ds + "SignatureValue", "AAAA")));
+        }
 
         var maindoc = Path.Combine(RepoRoot(), "docs", "regulatory", "assets", "xsd", "2.1", "maindoc", "UBL-Invoice-2.1.xsd");
         var schemas = new XmlSchemaSet { XmlResolver = new XmlUrlResolver() };
@@ -106,6 +109,15 @@ public class UblInvoiceGeneratorTests
 
         Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
         Assert.Empty(SchemaErrors(Parse(result.Value)));
+    }
+
+    [Fact]
+    public void A_really_signed_invoice_validates_against_the_official_schemas()
+    {
+        using var certificate = SigningTests.NewCertificate();
+        var signed = new XmlDsigSigner().Sign(SigningTests.UnsignedInvoice(), certificate).Value.Xml;
+
+        Assert.Empty(SchemaErrors(XDocument.Parse(signed), addDummySignature: false));
     }
 
     [Fact]

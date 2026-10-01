@@ -9,5 +9,17 @@ public static class CpeEngineModule
     public static IServiceCollection AddCpeEngineModule(this IServiceCollection services) =>
         services
             .AddSingleton<IQrPayloadGenerator, QrPayloadGenerator>()
-            .AddSingleton<IUblDocumentGenerator, UblInvoiceGenerator>();
+            .AddSingleton<IUblDocumentGenerator, UblInvoiceGenerator>()
+            .AddSingleton<IXmlSigner, XmlDsigSigner>()
+            .AddSingleton<ICpePackager, ZipCpePackager>()
+            .AddSingleton<ICdrParser, CdrParser>();
+
+    /// <summary>Registers the SOAP channel to SUNAT. The endpoint is explicit: production and beta are never chosen implicitly.</summary>
+    public static IServiceCollection AddSunatSubmissionChannel(this IServiceCollection services, SunatChannelOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        services.AddSingleton(options);
+        services.AddHttpClient<ICpeSubmissionChannel, SunatSoapChannel>(client => client.Timeout = Timeout.InfiniteTimeSpan);
+        return services;
+    }
 }

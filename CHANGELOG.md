@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Motor CPE: firma XMLDSig (`IXmlSigner`), empaquetado ZIP seguro, parser de CDR con clasificación de códigos SUNAT y canal SOAP `billService` (`sendBill`, `sendSummary`, `getStatus`) probado con un simulador sin red (ADR-017).
 - Rules (reglas con vigencia servidas por `IRuleProvider`; Billing deja de aceptar tasas del cliente), Customers y Products (datos maestros con catálogos oficiales), referencia de cliente en documentos, y generador UBL 2.1 sin firmar de factura/boleta validado contra el XSD oficial y las etiquetas obligatorias del libro de reglas.
 - Catalogs (42 catálogos oficiales importados del libro de reglas con vigencias y versiones, API de lectura, pruebas anti-deriva con TaxEngine/Billing) y CpeEngine (contenido del QR según el Anexo N.° 6). Activos regulatorios oficiales versionados con hashes.
 - TaxEngine (cálculo puro con `decimal`, derivado de las reglas oficiales de factura; 40 pruebas incl. 3 000 documentos aleatorios) y Billing (series por tipo, numeración atómica sin huecos, creación idempotente de facturas/boletas, documentos insert-only, endpoints `/api/v1/series` y `/api/v1/documents`).
