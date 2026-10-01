@@ -12,7 +12,8 @@ public static class CpeEngineModule
             .AddSingleton<IUblDocumentGenerator, UblInvoiceGenerator>()
             .AddSingleton<IXmlSigner, XmlDsigSigner>()
             .AddSingleton<ICpePackager, ZipCpePackager>()
-            .AddSingleton<ICdrParser, CdrParser>();
+            .AddSingleton<ICdrParser, CdrParser>()
+            .AddSingleton<IEDocumentStateMachine, EDocumentStateMachine>();
 
     /// <summary>Registers the SOAP channel to SUNAT. The endpoint is explicit: production and beta are never chosen implicitly.</summary>
     public static IServiceCollection AddSunatSubmissionChannel(this IServiceCollection services, SunatChannelOptions options)

@@ -30,6 +30,7 @@ public static class ErrorCodes
     public const string CpeInvalidQrField = "SF-CPE-001";
     public const string CpeUnsupported = "SF-CPE-002";
     public const string CpeInvalidDocument = "SF-CPE-003";
+    public const string CpeInvalidTransition = "SF-CPE-004";
 
     public const string CatalogNotFound = "SF-CAT-001";
 

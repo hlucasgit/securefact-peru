@@ -24,3 +24,9 @@
 - Seguridad: HTTPS obligatorio (HTTP solo en loopback para simuladores), respuesta limitada a 40 MB, sin DTD, la contraseña SOL no se imprime (`ToString` redactado) ni aparece en errores, validación previa de parámetros (el servicio lanza excepción si falta alguno).
 - El endpoint se pasa de forma explícita (`SunatChannelOptions.Production` o `.Beta`); nunca se elige por defecto. **El beta es solo para pruebas funcionales, no para carga** (contexto maestro).
 - Supuestos por confirmar contra el beta (R-034): contenido en base64 en línea en vez de adjunto `cid:`, y `SOAPAction` vacío. Hasta entonces las pruebas usan un simulador sin red.
+
+## Ciclo de vida del documento electrónico (`IEDocumentStateMachine`)
+- Función pura de transición: `Pending → ReadyToSend → Sending → (AwaitingTicket) → Accepted | AcceptedWithObservations | Rejected`, más `Failed` (falla permanente o intentos agotados; solo `ManualRetry` lo deja). Máximo 5 envíos por documento.
+- Aceptado, aceptado con observaciones y rechazado son **terminales**: cualquier evento posterior devuelve `SF-CPE-004` (el CPE aceptado es inmutable). Un rechazo no se edita: se emite un documento nuevo.
+- Una falla transitoria en `Sending` vuelve a `ReadyToSend`; reenviar el mismo paquete cuando SUNAT pudo haberlo recibido es un supuesto **sin verificar** (la respuesta de SUNAT a un duplicado y `getStatusCdr` se probarán en el beta, R-034). Un trabajador que muera en `Sending` deja el resultado desconocido: debe consultarse, no asumirse.
+- La persistencia (historial de estados por documento, RLS) y el worker llegan con el almacén de certificados y la tubería.
