@@ -230,7 +230,7 @@ public sealed class OutboxTests(ApiFixture api)
         var setup = await NewTenantAsync("Outbox Unknown SAC");
         await ExecuteAsync(
             "INSERT INTO billing.outbox_message (id, tenant_id, event_type, payload, created_at, attempts, next_attempt_at) " +
-            $"VALUES (gen_random_uuid(), '{setup.TenantId}', 'billing.unknown.event', '" + "{}" + "', now(), 0, now())");
+            $"VALUES (gen_random_uuid(), '{setup.TenantId}', 'billing.unknown.event', '" + "{}" + "', now(), 0, now() - interval '5 seconds')");
 
         var report = await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId);
 
