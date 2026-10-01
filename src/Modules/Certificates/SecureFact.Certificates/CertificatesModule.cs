@@ -21,6 +21,9 @@ public static class CertificatesModule
         services.AddScoped<CertificateService>();
         services.AddScoped<ICertificateAdministration>(sp => sp.GetRequiredService<CertificateService>());
         services.AddScoped<ICertificateProvider>(sp => sp.GetRequiredService<CertificateService>());
+        services.AddScoped<SolCredentialService>();
+        services.AddScoped<ISolCredentialAdministration>(sp => sp.GetRequiredService<SolCredentialService>());
+        services.AddScoped<ISolCredentialProvider>(sp => sp.GetRequiredService<SolCredentialService>());
         return services;
     }
 

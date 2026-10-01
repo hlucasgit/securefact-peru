@@ -11,6 +11,8 @@ internal sealed class CertificatesDbContext(DbContextOptions<CertificatesDbConte
 
     public DbSet<CompanyCertificate> Certificates => Set<CompanyCertificate>();
 
+    public DbSet<SolCredential> SolCredentials => Set<SolCredential>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -37,6 +39,21 @@ internal sealed class CertificatesDbContext(DbContextOptions<CertificatesDbConte
 
             // At most one active certificate per company: a race between two uploads cannot leave two signers.
             b.HasIndex(c => new { c.TenantId, c.CompanyId }).IsUnique().HasFilter("is_active").HasDatabaseName("ux_company_certificate_active");
+            ConfigureTenantOwned(b);
+        });
+
+        modelBuilder.Entity<SolCredential>(b =>
+        {
+            b.ToTable("sol_credential");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(c => c.CompanyId).HasColumnName("company_id");
+            b.Property(c => c.SolUser).HasColumnName("sol_user").HasMaxLength(30).IsRequired();
+            b.Property(c => c.ProtectedPassword).HasColumnName("protected_password");
+            b.Property(c => c.UpdatedBy).HasColumnName("updated_by");
+            b.Property(c => c.UpdatedAt).HasColumnName("updated_at");
+            b.Property(c => c.Version).IsRowVersion();
+            b.HasIndex(c => new { c.TenantId, c.CompanyId }).IsUnique();
             ConfigureTenantOwned(b);
         });
     }

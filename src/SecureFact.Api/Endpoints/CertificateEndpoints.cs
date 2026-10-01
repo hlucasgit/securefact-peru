@@ -21,5 +21,16 @@ internal static class CertificateEndpoints
 
         certificates.MapPost("/{id:guid}/deactivate", async (Guid id, ICertificateAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.DeactivateAsync(id, ct)).ToNoContent(http)).RequireAuthorization(Permissions.CertificatesManage);
+
+        var sol = app.MapGroup("/api/v1/sol-credentials").WithTags("Certificates");
+
+        sol.MapPut(string.Empty, async (SetSolCredentialsRequest body, ISolCredentialAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.SetAsync(body, ct)).ToHttp(http)).RequireAuthorization(Permissions.CertificatesManage);
+
+        sol.MapGet("/{companyId:guid}", async (Guid companyId, ISolCredentialAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.GetAsync(companyId, ct)).ToHttp(http)).RequireAuthorization(Permissions.CertificatesRead);
+
+        sol.MapDelete("/{companyId:guid}", async (Guid companyId, ISolCredentialAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.ClearAsync(companyId, ct)).ToNoContent(http)).RequireAuthorization(Permissions.CertificatesManage);
     }
 }

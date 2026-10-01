@@ -21,6 +21,8 @@ public static class AuditActions
 
     public const string CertificateUploaded = "certificates.certificate.uploaded";
     public const string CertificateDeactivated = "certificates.certificate.deactivated";
+    public const string SolCredentialsSet = "certificates.sol_credentials.set";
+    public const string SolCredentialsCleared = "certificates.sol_credentials.cleared";
 
     public const string SeriesCreated = "billing.series.created";
     public const string SeriesDeactivated = "billing.series.deactivated";

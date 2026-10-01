@@ -48,3 +48,38 @@ public interface ICertificateProvider
     /// <summary>Fails with <c>SF-CRT-004</c> when the company has no active certificate or it is not valid now.</summary>
     Task<Result<X509Certificate2>> GetActiveSigningCertificateAsync(Guid companyId, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// SOL user and password of the company, used to authenticate against SUNAT's billService (the password is secondary-user "Clave SOL").
+/// Never stored in clear, logged or returned: <see cref="ToString"/> prints no secret.
+/// </summary>
+public sealed record SetSolCredentialsRequest(Guid CompanyId, string SolUser, string SolPassword)
+{
+    public override string ToString() => $"SetSolCredentialsRequest {{ CompanyId = {CompanyId}, SolUser = {SolUser}, SolPassword = ***** }}";
+}
+
+/// <summary>What is known about the stored SOL credentials. The password is never part of it.</summary>
+public sealed record SolCredentialDto(Guid CompanyId, string SolUser, bool HasPassword, DateTimeOffset UpdatedAt);
+
+public interface ISolCredentialAdministration
+{
+    /// <summary>Stores (or replaces) the SOL credentials of a company, encrypted.</summary>
+    Task<Result<SolCredentialDto>> SetAsync(SetSolCredentialsRequest request, CancellationToken cancellationToken);
+
+    Task<Result<SolCredentialDto>> GetAsync(Guid companyId, CancellationToken cancellationToken);
+
+    /// <summary>Wipes the stored password. The user name is kept as a record that credentials existed.</summary>
+    Task<Result<Unit>> ClearAsync(Guid companyId, CancellationToken cancellationToken);
+}
+
+/// <summary>The decrypted secret, for the submission pipeline only. <see cref="ToString"/> prints no secret.</summary>
+public sealed record SolSecret(string SolUser, string SolPassword)
+{
+    public override string ToString() => $"SolSecret {{ SolUser = {SolUser}, SolPassword = ***** }}";
+}
+
+public interface ISolCredentialProvider
+{
+    /// <summary>Fails with <c>SF-CRT-004</c> when the company has no stored SOL credentials.</summary>
+    Task<Result<SolSecret>> GetAsync(Guid companyId, CancellationToken cancellationToken);
+}
