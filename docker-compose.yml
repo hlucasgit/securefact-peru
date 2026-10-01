@@ -1,0 +1,127 @@
+# Local development stack. Secrets come from .env (see .env.example); nothing sensitive is hard-coded here.
+name: securefact
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      SF_APP_DB_USER: ${SF_APP_DB_USER:?set in .env}
+      SF_APP_DB_PASSWORD: ${SF_APP_DB_PASSWORD:?set in .env}
+    ports:
+      - "127.0.0.1:${SF_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set in .env}", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${SF_REDIS_PORT:-56379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?set in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?set in .env}
+    ports:
+      - "127.0.0.1:${SF_RABBITMQ_PORT:-55672}:5672"
+      - "127.0.0.1:${SF_RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # S3-compatible object store for local development (ADR-005). Application code uses only the S3 API.
+  s3:
+    image: chrislusf/seaweedfs:latest
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-ip.bind=0.0.0.0"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?set in .env}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?set in .env}
+    ports:
+      - "127.0.0.1:${SF_S3_PORT:-58000}:8333"
+    volumes:
+      - s3data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9333/cluster/status >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  s3-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      s3:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?set in .env}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?set in .env}
+      AWS_DEFAULT_REGION: us-east-1
+      SF_STORAGE_BUCKET: ${SF_STORAGE_BUCKET:-securefact-documents}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        aws --endpoint-url http://s3:8333 s3api head-bucket --bucket "$${SF_STORAGE_BUCKET}" 2>/dev/null ||
+        aws --endpoint-url http://s3:8333 s3 mb "s3://$${SF_STORAGE_BUCKET}";
+        aws --endpoint-url http://s3:8333 s3api put-bucket-versioning --bucket "$${SF_STORAGE_BUCKET}" --versioning-configuration Status=Enabled
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/SecureFact.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      SF__Environment: ${SF_ENVIRONMENT:-Local}
+    ports:
+      - "127.0.0.1:${SF_API_PORT:-5180}:8080"
+
+  workers:
+    build:
+      context: .
+      dockerfile: src/SecureFact.Workers/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      SF__Environment: ${SF_ENVIRONMENT:-Local}
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitdata:
+  s3data:

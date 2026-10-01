@@ -1,0 +1,40 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+coverage/
+*.log
+artifacts/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Secrets & certificates — NEVER commit
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+*.snk
+secrets/
+appsettings.*.local.json
+
+# Local data
+.data/
+*.sqlite
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db

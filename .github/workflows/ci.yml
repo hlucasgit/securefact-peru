@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore (locked)
+        run: dotnet restore SecureFact.slnx --locked-mode
+      - name: Build
+        run: dotnet build SecureFact.slnx -c Release --no-restore
+      - name: Unit + architecture tests
+        run: dotnet test SecureFact.slnx -c Release --no-build --filter "FullyQualifiedName!~Integration"
+      - name: Integration tests
+        run: dotnet test tests/Integration/SecureFact.Integration.Tests -c Release --no-build
+      - name: Vulnerable packages
+        run: |
+          dotnet list SecureFact.slnx package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then echo "Vulnerable dependencies found"; exit 1; fi
+      - name: SBOM
+        run: |
+          dotnet tool install --global Microsoft.Sbom.DotNetTool
+          sbom-tool generate -b ./src -bc . -pn SecureFact -pv 0.0.0-${{ github.sha }} -ps SecureFact -nsb https://securefact.invalid -V Error || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom
+          path: _manifest
+          if-no-files-found: ignore
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  container-build:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f src/SecureFact.Api/Dockerfile -t securefact-api:ci .
+      - name: Build workers image
+        run: docker build -f src/SecureFact.Workers/Dockerfile -t securefact-workers:ci .
+      - name: Scan images (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: securefact-api:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
