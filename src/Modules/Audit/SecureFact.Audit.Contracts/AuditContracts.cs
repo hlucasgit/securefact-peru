@@ -12,6 +12,10 @@ public static class AuditActions
     public const string EstablishmentUpdated = "organizations.establishment.updated";
     public const string EstablishmentDeactivated = "organizations.establishment.deactivated";
 
+    public const string SeriesCreated = "billing.series.created";
+    public const string SeriesDeactivated = "billing.series.deactivated";
+    public const string DocumentCreated = "billing.document.created";
+
     public const string LoginSucceeded = "identity.login.succeeded";
     public const string LoginFailed = "identity.login.failed";
     public const string AccountLocked = "identity.account.locked";

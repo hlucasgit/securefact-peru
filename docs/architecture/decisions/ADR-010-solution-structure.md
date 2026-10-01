@@ -21,6 +21,7 @@ tests/{Unit,Integration,Architecture,Contract,Security,Performance,E2E}
 - Dentro de `SecureFact.<Module>` las carpetas `Domain/`, `Application/`, `Infrastructure/` y la regla de dependencia (Domain no depende de nada; Application no depende de Infrastructure) se verifican con pruebas de arquitectura.
 - Un módulo **solo** puede referenciar `SharedKernel`, `SecureFact.Platform` y los `Contracts` de otros módulos (nunca su proyecto principal).
 - `SecureFact.Platform` agrupa la infraestructura transversal que usan todos los módulos (RLS/ámbito de datos, base de DbContext; luego outbox y storage) y solo referencia `SharedKernel`.
+- Un proyecto `Contracts` solo referencia `SharedKernel` y otros proyectos `Contracts` (nunca implementaciones), p. ej. `Billing.Contracts` usa los tipos públicos de `TaxEngine.Contracts`.
 - Los tipos de módulo son `internal`; solo `Contracts` y el registro DI (`AddXxxModule`) son públicos.
 - `Directory.Build.props`: `net10.0`, `Nullable` enable, `TreatWarningsAsErrors` en Release, analizadores, `Directory.Packages.props` para gestión central de versiones y `packages.lock.json`.
 

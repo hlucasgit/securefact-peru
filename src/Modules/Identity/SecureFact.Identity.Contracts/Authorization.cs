@@ -11,10 +11,14 @@ public static class Permissions
     public const string AuditRead = "audit.read";
     public const string CompaniesRead = "companies.read";
     public const string CompaniesManage = "companies.manage";
+    public const string SeriesManage = "series.manage";
+    public const string DocumentsRead = "documents.read";
+    public const string DocumentsCreate = "documents.create";
 
     public static IReadOnlyList<string> All { get; } =
     [
         TenantsCreate, TenantsRead, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
+        SeriesManage, DocumentsRead, DocumentsCreate,
     ];
 }
 
@@ -50,15 +54,17 @@ public static class RoleCatalog
         [Roles.PlatformSupport] = (RoleLevel.Platform, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead]),
         [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.TenantsRead]),
         [Roles.TenantOwner] = (RoleLevel.Tenant,
-            [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage]),
+            [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
+             Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
         [Roles.TenantAdmin] = (RoleLevel.Tenant,
-            [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.CompaniesRead, Permissions.CompaniesManage]),
-        [Roles.BillingAdmin] = (RoleLevel.Tenant, [Permissions.TenantsRead, Permissions.CompaniesRead]),
-        [Roles.Accountant] = (RoleLevel.Tenant, [Permissions.CompaniesRead]),
-        [Roles.Sales] = (RoleLevel.Tenant, [Permissions.CompaniesRead]),
+            [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.CompaniesRead, Permissions.CompaniesManage,
+             Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
+        [Roles.BillingAdmin] = (RoleLevel.Tenant, [Permissions.TenantsRead, Permissions.CompaniesRead, Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
+        [Roles.Accountant] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead]),
+        [Roles.Sales] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.DocumentsCreate]),
         [Roles.Developer] = (RoleLevel.Tenant, [Permissions.CompaniesRead]),
-        [Roles.Auditor] = (RoleLevel.Tenant, [Permissions.AuditRead, Permissions.UsersRead, Permissions.CompaniesRead]),
-        [Roles.ReadOnly] = (RoleLevel.Tenant, [Permissions.CompaniesRead]),
+        [Roles.Auditor] = (RoleLevel.Tenant, [Permissions.AuditRead, Permissions.UsersRead, Permissions.CompaniesRead, Permissions.DocumentsRead]),
+        [Roles.ReadOnly] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead]),
     };
 
     public static IReadOnlyCollection<string> AllRoles => Definitions.Keys;

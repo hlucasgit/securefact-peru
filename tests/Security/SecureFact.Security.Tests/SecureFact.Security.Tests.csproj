@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\..\src\SecureFact.Api\SecureFact.Api.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Billing\SecureFact.Billing\SecureFact.Billing.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Organizations\SecureFact.Organizations\SecureFact.Organizations.csproj" />
   </ItemGroup>
 </Project>

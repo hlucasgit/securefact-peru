@@ -6,7 +6,7 @@ Cada fase tiene **entrada** (qué debe estar listo) y **salida** (criterio de ac
 |------|--------|--------|
 | 0 | Discovery | **Completada (2026-09-30)** — ver `STATUS.md` |
 | 1 | Foundation | **En curso** — entorno + esqueleto |
-| 2 | Core Billing | Pendiente |
+| 2 | Core Billing | **En curso** — TaxEngine, series, numeración e idempotencia hechos; faltan catálogos, clientes, productos y notas |
 | 3 | Motor CPE | Pendiente |
 | 4 | Integración | Pendiente |
 | 5 | MVP comercial | Pendiente |

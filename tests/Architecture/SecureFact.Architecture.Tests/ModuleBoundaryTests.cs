@@ -52,11 +52,11 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
-    public void Contracts_reference_only_SharedKernel()
+    public void Contracts_reference_only_SharedKernel_and_other_Contracts()
     {
         foreach (var contracts in LoadSolutionAssemblies().Where(a => IsContracts(a.GetName().Name!)))
         {
-            var illegal = SolutionReferences(contracts).Where(n => n != SharedKernel).ToList();
+            var illegal = SolutionReferences(contracts).Where(n => n != SharedKernel && !IsContracts(n)).ToList();
             Assert.True(illegal.Count == 0, $"{contracts.GetName().Name} references {string.Join(", ", illegal)}");
         }
     }

@@ -170,11 +170,6 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12"
         }
       },
-      "Microsoft.Extensions.DependencyInjection.Abstractions": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "9/qymSh7hVDMGTGwrLz8MRp5zRyXy9adGDOs4HwRdnLil3oZGYuWeZjbmHgCQ9BL1qBroVfgUK3U/nb61617Cw=="
-      },
       "Microsoft.Extensions.Diagnostics": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -473,10 +468,12 @@
           "OpenTelemetry.Instrumentation.Http": "[1.19.0, )",
           "OpenTelemetry.Instrumentation.Runtime": "[1.19.0, )",
           "SecureFact.Audit": "[1.0.0, )",
+          "SecureFact.Billing": "[1.0.0, )",
           "SecureFact.Identity": "[1.0.0, )",
           "SecureFact.Organizations": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine": "[1.0.0, )",
           "SecureFact.Tenancy": "[1.0.0, )"
         }
       },
@@ -492,6 +489,24 @@
         "type": "Project",
         "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.billing": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.billing.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
         }
       },
       "securefact.identity": {
@@ -537,6 +552,20 @@
       },
       "securefact.sharedkernel": {
         "type": "Project"
+      },
+      "securefact.taxengine": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.taxengine.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
       },
       "securefact.tenancy": {
         "type": "Project",
@@ -601,6 +630,12 @@
           "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
           "Microsoft.Extensions.Logging": "10.0.12"
         }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "9/qymSh7hVDMGTGwrLz8MRp5zRyXy9adGDOs4HwRdnLil3oZGYuWeZjbmHgCQ9BL1qBroVfgUK3U/nb61617Cw=="
       },
       "Microsoft.Extensions.Hosting": {
         "type": "CentralTransitive",

@@ -7,6 +7,7 @@ using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel.Domain;
 using SecureFact.SharedKernel.Tenancy;
 using SecureFact.Audit;
+using SecureFact.Billing;
 using SecureFact.Identity;
 using SecureFact.Organizations;
 using SecureFact.Tenancy;
@@ -46,6 +47,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         await IdentityModule.MigrateAsync(OwnerConnectionString);
         await AuditModule.MigrateAsync(OwnerConnectionString);
         await OrganizationsModule.MigrateAsync(OwnerConnectionString);
+        await BillingModule.MigrateAsync(OwnerConnectionString);
 
         await ExecuteAsOwnerAsync($"""
             CREATE SCHEMA rlstest;

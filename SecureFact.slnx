@@ -10,6 +10,10 @@
     <Project Path="src/Modules/Audit/SecureFact.Audit.Contracts/SecureFact.Audit.Contracts.csproj" />
     <Project Path="src/Modules/Audit/SecureFact.Audit/SecureFact.Audit.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Billing/">
+    <Project Path="src/Modules/Billing/SecureFact.Billing.Contracts/SecureFact.Billing.Contracts.csproj" />
+    <Project Path="src/Modules/Billing/SecureFact.Billing/SecureFact.Billing.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/SecureFact.Identity.Contracts/SecureFact.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/SecureFact.Identity/SecureFact.Identity.csproj" />
@@ -17,6 +21,10 @@
   <Folder Name="/src/Modules/Organizations/">
     <Project Path="src/Modules/Organizations/SecureFact.Organizations.Contracts/SecureFact.Organizations.Contracts.csproj" />
     <Project Path="src/Modules/Organizations/SecureFact.Organizations/SecureFact.Organizations.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/TaxEngine/">
+    <Project Path="src/Modules/TaxEngine/SecureFact.TaxEngine.Contracts/SecureFact.TaxEngine.Contracts.csproj" />
+    <Project Path="src/Modules/TaxEngine/SecureFact.TaxEngine/SecureFact.TaxEngine.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Tenancy/">
     <Project Path="src/Modules/Tenancy/SecureFact.Tenancy.Contracts/SecureFact.Tenancy.Contracts.csproj" />

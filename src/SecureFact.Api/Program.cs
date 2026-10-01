@@ -4,6 +4,7 @@ using SecureFact.Api.Endpoints;
 using SecureFact.Api.Infrastructure;
 using SecureFact.Api.Security;
 using SecureFact.Audit;
+using SecureFact.Billing;
 using SecureFact.Identity;
 using SecureFact.Organizations;
 using SecureFact.Identity.Contracts;
@@ -16,6 +17,7 @@ using OpenTelemetry.Trace;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Telemetry;
 using SecureFact.SharedKernel.Tenancy;
+using SecureFact.TaxEngine;
 using SecureFact.Tenancy;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -87,6 +89,8 @@ if (appConnection is not null)
     builder.Services.AddAuditModule(appConnection);
     builder.Services.AddTenancyModule(appConnection);
     builder.Services.AddOrganizationsModule(appConnection);
+    builder.Services.AddTaxEngineModule();
+    builder.Services.AddBillingModule(appConnection);
     builder.Services.AddIdentityModule(appConnection, options => builder.Configuration.GetSection("Identity").Bind(options));
 }
 
@@ -101,6 +105,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await IdentityModule.MigrateAsync(migrationsConnection);
     await AuditModule.MigrateAsync(migrationsConnection);
     await OrganizationsModule.MigrateAsync(migrationsConnection);
+    await BillingModule.MigrateAsync(migrationsConnection);
     return;
 }
 
@@ -142,6 +147,7 @@ app.MapAuthEndpoints();
 app.MapUserAndTenantEndpoints();
 app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
+app.MapBillingEndpoints();
 
 app.Run();
 

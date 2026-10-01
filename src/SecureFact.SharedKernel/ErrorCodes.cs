@@ -12,6 +12,21 @@ public static class ErrorCodes
 
     public const string TenantNotFound = "SF-TEN-001";
 
+    public const string InvalidSeriesConfiguration = "SF-BIL-001";
+    public const string SeriesNotFound = "SF-BIL-002";
+    public const string SeriesAlreadyExists = "SF-BIL-003";
+    public const string SeriesInactive = "SF-BIL-004";
+    public const string SeriesExhausted = "SF-BIL-005";
+    public const string InvalidDocument = "SF-BIL-006";
+    public const string DocumentNotFound = "SF-BIL-007";
+    public const string IdempotencyConflict = "SF-BIL-008";
+    public const string DocumentTypeNotSupported = "SF-BIL-009";
+
+    public const string TaxInvalidInput = "SF-TAX-001";
+    public const string TaxUnsupported = "SF-TAX-002";
+    public const string TaxPrecisionExceeded = "SF-TAX-003";
+    public const string TaxAmountOverflow = "SF-TAX-004";
+
     public const string InvalidCompany = "SF-ORG-001";
     public const string CompanyNotFound = "SF-ORG-002";
     public const string CompanyAlreadyExists = "SF-ORG-003";
