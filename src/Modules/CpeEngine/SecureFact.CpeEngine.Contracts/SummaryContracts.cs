@@ -3,7 +3,7 @@ using SecureFact.SharedKernel.Results;
 namespace SecureFact.CpeEngine.Contracts;
 
 /// <summary>
-/// One receipt (boleta) line of a daily summary. Amounts are the ones calculated and numbered by Billing, never recomputed here.
+/// One line of a daily summary: a receipt (03) or a credit/debit note (07/08) that modifies a receipt. Amounts are the ones calculated and numbered by Billing, never recomputed here.
 /// <see cref="BuyerDocumentTypeCode"/> and <see cref="BuyerDocumentNumber"/> are both null when the receipt has no buyer identification.
 /// </summary>
 public sealed record SummaryLineData(
@@ -18,7 +18,11 @@ public sealed record SummaryLineData(
     decimal ExemptAmount,
     decimal UnaffectedAmount,
     decimal IgvAmount,
-    decimal IgvRate);
+    decimal IgvRate,
+    string DocumentTypeCode = "03",
+    string? ReferencedDocumentTypeCode = null,
+    string? ReferencedSeries = null,
+    long? ReferencedNumber = null);
 
 /// <param name="ReferenceDate">Issue date of every receipt in the summary (they must all share it).</param>
 /// <param name="IssueDate">Date the summary is generated; it names the file and is never before <paramref name="ReferenceDate"/>.</param>
@@ -36,7 +40,7 @@ public interface ISummaryDocumentGenerator
     /// <summary>Maximum number of lines SUNAT accepts in one summary file (Programmer Manual: summaries are sent in blocks of 500 lines).</summary>
     const int MaxLines = 500;
 
-    /// <summary>Generates the unsigned daily summary of receipts (all lines with status 1, "adicionar"). Unsupported cases fail explicitly.</summary>
+    /// <summary>Generates the unsigned daily summary of receipts and of the notes that modify receipts (all lines with status 1, "adicionar"). Unsupported cases fail explicitly.</summary>
     Result<SummaryDocument> Generate(SummaryData data);
 }
 
@@ -50,8 +54,9 @@ public sealed record CreateSummaryRequest(Guid CompanyId, DateOnly ReferenceDate
 public interface ISummaryService
 {
     /// <summary>
-    /// Builds, signs and stores the daily summary of the receipts a company issued on <paramref name="referenceDate"/> that no active summary
-    /// reports yet (preparing their electronic documents first). More than 500 receipts produce several summaries with consecutive correlatives.
+    /// Builds, signs and stores the daily summary of the receipts, and of the notes that modify receipts, a company issued on
+    /// <paramref name="referenceDate"/> that no active summary reports yet (preparing their electronic documents first). A note is included only
+    /// once the receipt it modifies has an accepted summary; before that it waits. More than 500 receipts produce several summaries with consecutive correlatives.
     /// </summary>
     Task<Result<IReadOnlyList<SummaryDto>>> CreateAsync(Guid companyId, DateOnly referenceDate, CancellationToken cancellationToken);
 

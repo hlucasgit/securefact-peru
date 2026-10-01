@@ -141,6 +141,55 @@ public class SummaryDocumentGeneratorTests
         Assert.Equal("0.00", exempt.XPathSelectElement("cac:TaxTotal/cbc:TaxAmount", Namespaces)!.Value); // IGV is always informed (rule 2278)
     }
 
+    internal static SummaryLineData NoteLine(int line, string type, string series, long number, string referencedSeries = "B001", long referenced = 1, string referencedType = "03") =>
+        new(line, series, number, "1", "12345678", "PEN", 118m, 100m, 0m, 0m, 18m, 0.18m, type, referencedType, referencedSeries, referenced);
+
+    [Fact]
+    public void Notes_of_receipts_validate_against_the_schema_and_carry_the_receipt_they_modify()
+    {
+        var data = Data(Taxed(1, "B001", 1), NoteLine(2, "07", "BC01", 1), NoteLine(3, "08", "BD01", 1));
+
+        var result = _generator.Generate(data);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml));
+        var lines = xml.XPathSelectElements("/sum:SummaryDocuments/sac:SummaryDocumentsLine", Namespaces).ToList();
+        Assert.Equal(["03", "07", "08"], lines.Select(l => l.XPathSelectElement("cbc:DocumentTypeCode", Namespaces)!.Value).ToArray());
+        Assert.Empty(lines[0].XPathSelectElements("cac:BillingReference", Namespaces));
+        var reference = lines[1].XPathSelectElement("cac:BillingReference/cac:InvoiceDocumentReference", Namespaces)!;
+        Assert.Equal("B001-1", reference.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("03", reference.XPathSelectElement("cbc:DocumentTypeCode", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void A_receipt_and_a_note_may_share_series_and_number_because_the_type_differs()
+    {
+        Assert.True(_generator.Generate(Data(Taxed(1, "B001", 1), NoteLine(2, "07", "B001", 1))).IsSuccess);
+        Assert.False(_generator.Generate(Data(NoteLine(1, "07", "BC01", 1), NoteLine(2, "07", "BC01", 1))).IsSuccess);
+    }
+
+    public static TheoryData<string, SummaryData> InvalidNotes() => new()
+    {
+        { "note without reference", Data(NoteLine(1, "07", "BC01", 1) with { ReferencedSeries = null, ReferencedNumber = null, ReferencedDocumentTypeCode = null }) },
+        { "note of an invoice", Data(NoteLine(1, "07", "BC01", 1, "F001", 1, "01")) },
+        { "reference series", Data(NoteLine(1, "07", "BC01", 1, "X001")) },
+        { "reference number", Data(NoteLine(1, "07", "BC01", 1, "B001", 0)) },
+        { "receipt with a reference", Data(Taxed(1, "B001", 1) with { ReferencedSeries = "B001", ReferencedNumber = 1, ReferencedDocumentTypeCode = "03" }) },
+        { "invoice line", Data(Taxed(1, "B001", 1) with { DocumentTypeCode = "01" }) },
+        { "note series", Data(NoteLine(1, "07", "XC01", 1)) },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidNotes))]
+    public void Invalid_note_lines_are_refused(string name, SummaryData data)
+    {
+        var result = _generator.Generate(data);
+
+        Assert.False(result.IsSuccess, name);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, result.Error.Code);
+    }
+
     // ---------- mandatory tags of the official workbook ----------
 
     private static readonly Regex Comment = new(@"\s*\(.*$", RegexOptions.Singleline);

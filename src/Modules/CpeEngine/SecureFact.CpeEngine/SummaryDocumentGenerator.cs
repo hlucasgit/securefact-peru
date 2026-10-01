@@ -13,7 +13,7 @@ namespace SecureFact.CpeEngine;
 /// <summary>
 /// UBL 2.0 <c>SummaryDocuments</c> (daily summary of receipts, "Resumen Diario 1.1"). Element order follows the official XSD
 /// (UBLPE-SummaryDocuments-1.0) and the mandatory tags of sheet <c>Resumen Diario1_1</c> of the 2026-08-26 validation rules (S16);
-/// the 2018 guide (S18) gives the examples. Scope: receipts (03) that are added (status 1) with taxed, exempt and unaffected amounts in
+/// the 2018 guide (S18) gives the examples. Scope: receipts (03) and notes (07/08) of receipts that are added (status 1) with taxed, exempt and unaffected amounts in
 /// the receipt's own currency. Notes, voids (status 3), modifications, free operations, exports, ISC, ICBPER and perception return
 /// <c>SF-CPE-002</c> or are absent from the model, never silently dropped.
 /// </summary>
@@ -109,7 +109,7 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
             return Invalid("La fecha de generación del resumen no puede ser anterior a la fecha de emisión de los comprobantes.");
         }
 
-        var seen = new HashSet<(string, long)>();
+        var seen = new HashSet<(string, string, long)>();
         for (var i = 0; i < data.Lines.Count; i++)
         {
             var line = data.Lines[i];
@@ -124,9 +124,27 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Invalid($"{label}: serie (B + 3 caracteres) o número (1 a 8 dígitos) inválidos.");
             }
 
-            if (!seen.Add((line.Series!, line.Number)))
+            if (line.DocumentTypeCode is not ("03" or "07" or "08"))
             {
-                return Invalid($"{label}: el comprobante {line.Series}-{line.Number} está repetido.");
+                return Invalid($"{label}: el resumen solo informa boletas (03) y notas de crédito (07) o débito (08).");
+            }
+
+            if (!seen.Add((line.DocumentTypeCode, line.Series!, line.Number)))
+            {
+                return Invalid($"{label}: el comprobante {line.DocumentTypeCode} {line.Series}-{line.Number} está repetido.");
+            }
+
+            var isNote = line.DocumentTypeCode is "07" or "08";
+            if (isNote)
+            {
+                if (line.ReferencedDocumentTypeCode != "03" || !ReceiptSeries().IsMatch(line.ReferencedSeries ?? string.Empty) || line.ReferencedNumber is null or < 1 or > 99_999_999)
+                {
+                    return Invalid($"{label}: una nota del resumen debe modificar una boleta (03) identificada por serie B y número (regla 2524).");
+                }
+            }
+            else if (line.ReferencedDocumentTypeCode is not null || line.ReferencedSeries is not null || line.ReferencedNumber is not null)
+            {
+                return Invalid($"{label}: solo las notas llevan documento que modifican (regla 2582).");
             }
 
             if (string.IsNullOrWhiteSpace(line.Currency) || line.Currency.Length != 3)
@@ -185,7 +203,7 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
         var element = new XElement(
             Sac + "SummaryDocumentsLine",
             new XElement(Cbc + "LineID", line.LineNumber.ToString(CultureInfo.InvariantCulture)),
-            new XElement(Cbc + "DocumentTypeCode", "03"),
+            new XElement(Cbc + "DocumentTypeCode", line.DocumentTypeCode),
             new XElement(Cbc + "ID", $"{line.Series}-{line.Number.ToString(CultureInfo.InvariantCulture)}"));
 
         if (line.BuyerDocumentTypeCode is not null)
@@ -194,6 +212,16 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 Cac + "AccountingCustomerParty",
                 new XElement(Cbc + "CustomerAssignedAccountID", line.BuyerDocumentNumber),
                 new XElement(Cbc + "AdditionalAccountID", line.BuyerDocumentTypeCode)));
+        }
+
+        if (line.DocumentTypeCode is "07" or "08")
+        {
+            element.Add(new XElement(
+                Cac + "BillingReference",
+                new XElement(
+                    Cac + "InvoiceDocumentReference",
+                    new XElement(Cbc + "ID", $"{line.ReferencedSeries}-{line.ReferencedNumber!.Value.ToString(CultureInfo.InvariantCulture)}"),
+                    new XElement(Cbc + "DocumentTypeCode", line.ReferencedDocumentTypeCode))));
         }
 
         element.Add(

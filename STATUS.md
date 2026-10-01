@@ -42,7 +42,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 
 ## Notas de crédito y de débito
 - Emisión, UBL, documento electrónico (espera a que el original esté aceptado), PDF y envío de notas de facturas; aceptadas en el beta (crédito 01, débito 02, crédito 07 de boleta). Pruebas: 491 pasan.
-- Pendiente: notas de boletas por resumen diario, motivos 11–13, acumulado de notas de crédito, bajas.
+- Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
+- Pendiente: motivos 11–13, acumulado de notas de crédito, bajas.
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

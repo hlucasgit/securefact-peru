@@ -52,14 +52,20 @@ internal sealed class SummaryService(
             return Error.Validation(ErrorCodes.CpeInvalidDocument, "Fecha no válida", "No se puede resumir una fecha futura.");
         }
 
+        // Receipts first, then the notes of receipts issued the same day (a note of an invoice is never summarized).
         var receipts = new List<DocumentDto>();
-        while (receipts.Count < MaxReceiptsPerDay)
+        foreach (var type in new[] { DocumentTypes.Receipt, DocumentTypes.CreditNote, DocumentTypes.DebitNote })
         {
-            var page = await billing.ListIssuedAsync(companyId, DocumentTypes.Receipt, referenceDate, receipts.Count, Page, cancellationToken);
-            receipts.AddRange(page);
-            if (page.Count < Page)
+            var count = 0;
+            while (count < MaxReceiptsPerDay)
             {
-                break;
+                var page = await billing.ListIssuedAsync(companyId, type, referenceDate, count, Page, cancellationToken);
+                receipts.AddRange(type == DocumentTypes.Receipt ? page : page.Where(n => n.Note?.ReferencedDocumentTypeCode == DocumentTypes.Receipt));
+                count += page.Count;
+                if (page.Count < Page)
+                {
+                    break;
+                }
             }
         }
 
@@ -91,6 +97,16 @@ internal sealed class SummaryService(
         var reported = (await db.SummaryItems.Where(i => ids.Contains(i.ElectronicDocumentId) && i.ReleasedAt == null)
             .Select(i => i.ElectronicDocumentId).ToListAsync(cancellationToken)).ToHashSet();
         var candidates = pending.Where(p => p.Document.State == EDocumentState.ReadyToSend && !reported.Contains(p.Document.Id)).ToList();
+
+        // SUNAT requires the receipt a note modifies to be already informed (rule 2989). The beta does not check it, production does, so a note
+        // is summarized only once its receipt has an accepted summary; until then it waits and the worker brings it in a later summary.
+        var referencedIds = candidates.Where(c => c.Receipt.Note is not null).Select(c => c.Receipt.Note!.ReferencedDocumentId).Distinct().ToList();
+        var informed = referencedIds.Count == 0
+            ? []
+            : (await db.ElectronicDocuments.AsNoTracking()
+                .Where(e => referencedIds.Contains(e.DocumentId) && (e.State == EDocumentState.Accepted || e.State == EDocumentState.AcceptedWithObservations))
+                .Select(e => e.DocumentId).ToListAsync(cancellationToken)).ToHashSet();
+        candidates = candidates.Where(c => c.Receipt.Note is null || informed.Contains(c.Receipt.Note.ReferencedDocumentId)).ToList();
         if (candidates.Count == 0)
         {
             return Nothing();
@@ -150,7 +166,8 @@ internal sealed class SummaryService(
             return new SummaryLineData(
                 i + 1, d.Series, d.Number,
                 identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null,
-                d.Currency, d.Totals.PayableAmount, d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalIgv, igvRate);
+                d.Currency, d.Totals.PayableAmount, d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalIgv, igvRate,
+                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber);
         }).ToList();
 
         for (var attempt = 0; attempt < CorrelativeRetries; attempt++)

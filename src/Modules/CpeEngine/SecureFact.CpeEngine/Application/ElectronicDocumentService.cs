@@ -159,7 +159,7 @@ internal sealed class ElectronicDocumentService(
         var isNote = entity.DocumentTypeCode is DocumentTypes.CreditNote or DocumentTypes.DebitNote;
         if (entity.DocumentTypeCode is not (DocumentTypes.Invoice or ElectronicDocument.SummaryType) && !(isNote && entity.ReferenceTypeCode == DocumentTypes.Invoice))
         {
-            return Error.Validation(ErrorCodes.CpeUnsupported, "Envío no soportado", "Las boletas y sus notas se informan en el resumen diario (las notas de boletas aún no están soportadas): cree el resumen y envíelo.");
+            return Error.Validation(ErrorCodes.CpeUnsupported, "Envío no soportado", "Las boletas y sus notas se informan en el resumen diario: cree el resumen y envíelo.");
         }
 
         if (entity.Snapshot.IsTerminal)

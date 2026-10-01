@@ -128,7 +128,8 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
         // Receipts of closed days still waiting to be reported. Receipts already inside an unsent summary appear here too; creating
         // a summary for them answers "nothing to summarize", which is harmless.
         var closed = await db.ElectronicDocuments.AsNoTracking()
-            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.DocumentTypeCode == receipt && e.State == EDocumentState.ReadyToSend && e.IssueDate < today)
+            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.ReadyToSend && e.IssueDate < today
+                && (e.DocumentTypeCode == receipt || ((e.DocumentTypeCode == DocumentTypes.CreditNote || e.DocumentTypeCode == DocumentTypes.DebitNote) && e.ReferenceTypeCode == receipt)))
             .Select(e => new { e.TenantId, e.CompanyId, e.IssueDate })
             .Distinct()
             .OrderBy(e => e.IssueDate)
