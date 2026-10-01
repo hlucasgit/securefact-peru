@@ -25,7 +25,7 @@ Nuevo: fórmulas de totales y tolerancias de la hoja de reglas (S16). Supuestos 
 - Notas de crédito/débito esperan el flujo de CDR (Fase 4).
 
 ## Pendientes
-1. Decisión del usuario: descargar xlsx/XSD/guías a `docs/regulatory/assets/`.
+1. ✔ Descargas autorizadas y hechas: xlsx, guías XML y 19 XSD UBL 2.1 en `docs/regulatory/assets/` (con hashes). El zip de XSD lo descargó el propietario; UBL 2.1 y UBLPE 2.0 están extraídos y verificados por hash.
 2. Commit y push.
 3. `Catalogs` (importación versionada), `Customers`, `Products`, reglas con vigencia como servicio (`IRuleProvider`).
 4. Cerrar Fase 1: outbox + `IMessageBus` (RabbitMQ) + `IObjectStorage` (S3) y ejecutar el CI.

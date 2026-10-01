@@ -3,3 +3,6 @@
 Dockerfile text eol=lf
 *.pfx binary
 *.p12 binary
+
+# Official regulatory assets are stored byte-for-byte (hashes are part of their provenance).
+docs/regulatory/assets/** -text

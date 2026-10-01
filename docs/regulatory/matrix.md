@@ -21,7 +21,7 @@ Estados: `Pendiente` (sin implementar), `Parcial`, `Hecho`, `Bloqueado` (falta v
 | R-013 | Requisitos PSE (150 UIT, 5 trabajadores, ISO 27001, etc.) | S01 | Gap analysis | docs/pse | — | Parcial (doc) | vigente | 2026-09-30 |
 | R-014 | Servicio beta solo para estructura XML; sin estrés | S04 | Simulador interno para carga | Sunat | — | Pendiente | vigente | 2026-09-30 |
 | R-015 | Receptor único `e-factura.sunat.gob.pe` | S08 | Config de endpoints versionada | Sunat | — | Pendiente | 2021-07-20 | 2026-09-30 |
-| R-016 | Catálogos SUNAT vigentes (Anexo N.°8, 47 catálogos en la hoja `Catálogos` de S16) | S16 (V) | Módulo `Catalogs` con vigencias; carga desde el xlsx versionado por hash | Catalogs | — | Desbloqueado (falta importar; requiere autorizar descarga del xlsx) | 2026-08-26 | 2026-10-01 |
+| R-016 | Catálogos SUNAT vigentes (Anexo N.°8, 47 catálogos en la hoja `Catálogos` de S16) | S16 (V) | Módulo `Catalogs` con vigencias; carga desde el xlsx versionado por hash | Catalogs | — | Desbloqueado (xlsx versionado en `assets/`; falta el importador del módulo `Catalogs`) | 2026-08-26 | 2026-10-01 |
 | R-017 | Boletas: envío individual dentro del plazo máximo (Parámetro 004); fuera de plazo (1079) o contingencia, Resumen Diario | S16 (V), S02, S04; guía XML boleta S18 (**P**) | Ambos caminos modelados; `DailySummary` independiente | Sunat | — | Parcial | 2026-08-26 | 2026-10-01 |
 | R-018 | Contenido del QR | **P** | `IQrPayloadGenerator` | ElectronicDocuments | — | Bloqueado | — | — |
 | R-019 | Detracciones SPOT | S12 **P** | Reglas versionadas | TaxEngine | — | Bloqueado | — | — |
