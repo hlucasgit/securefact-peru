@@ -26,6 +26,11 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - **Worker** (ADR-021): host real (`SecureFact.Workers`) con resúmenes de días cerrados, envíos vencidos, tickets y detección de atascados (recuperación solo por un operador).
 - **Pruebas: 405 pasan** (226 unitarias, 6 arquitectura, 6 integración, 167 seguridad/API).
 
+## Novedades de la sexta tanda
+- **Outbox transaccional** (ADR-022): Billing escribe el evento con el documento; el despachador (Platform) lo entrega al consumidor de CPE, que prepara el documento electrónico. Cadena completa probada con el host real y el simulador: emitir → preparar → enviar → aceptado.
+- **Corregido**: documentos con credenciales faltantes llenaban el lote del worker y bloqueaban a los demás; ahora se aplazan 5 minutos.
+- **Pruebas: 415 pasan** (226 unitarias, 6 arquitectura, 6 integración, 177 seguridad/API).
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT del XML y de la firma no probada (solo XSD y etiquetas obligatorias; el canal SOAP solo se probó con simulador); algoritmo de firma, base64 en línea y `SOAPAction` por confirmar en el beta (R-032, R-034).
@@ -36,6 +41,6 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Pendientes
 1. Commit y push.
 2. Factor de descuento porcentual y descuentos globales por categoría (casos oficiales de la guía) en TaxEngine y UBL.
-3. Generación automática del documento electrónico al emitir (outbox Billing → CPE), prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas.
+3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF, retención del outbox.
 4. Outbox + bus + S3 de código; ejecutar el CI; medir cobertura.
 5. PDF y renderizado del QR.

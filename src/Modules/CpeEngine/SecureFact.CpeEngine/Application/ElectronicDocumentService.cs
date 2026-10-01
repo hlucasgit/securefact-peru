@@ -36,6 +36,7 @@ internal sealed class ElectronicDocumentService(
     private const string OperationTypeSale = "0101";
     private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromHours(1);
+    private static readonly TimeSpan PreconditionBackoff = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan TicketPollInterval = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromHours(24);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -174,7 +175,7 @@ internal sealed class ElectronicDocumentService(
         var prepared = await PrepareRemoteCallAsync(entity, cancellationToken);
         if (!prepared.IsSuccess)
         {
-            return prepared.Error;
+            return await DeferAsync(entity, prepared.Error, cancellationToken);
         }
 
         var (channel, credentials) = prepared.Value;
@@ -253,7 +254,7 @@ internal sealed class ElectronicDocumentService(
         var prepared = await PrepareRemoteCallAsync(entity, cancellationToken);
         if (!prepared.IsSuccess)
         {
-            return prepared.Error;
+            return await DeferAsync(entity, prepared.Error, cancellationToken);
         }
 
         var (channel, credentials) = prepared.Value;
@@ -398,6 +399,18 @@ internal sealed class ElectronicDocumentService(
     }
 
     // ---------- remote call preparation ----------
+
+    /// <summary>
+    /// A precondition (SOL credentials, channel, company) is missing. The document keeps its state and attempts, but its next attempt moves
+    /// away so that a handful of misconfigured documents can never fill the worker's batch and starve everyone else.
+    /// </summary>
+    private async Task<Error> DeferAsync(ElectronicDocument entity, Error error, CancellationToken cancellationToken)
+    {
+        entity.RecordError(error.Code, error.Detail);
+        entity.ScheduleRetry(clock.GetUtcNow() + PreconditionBackoff);
+        await TrySaveAsync(cancellationToken);
+        return error;
+    }
 
     private async Task<Result<(ICpeSubmissionChannel Channel, SunatCredentials Credentials)>> PrepareRemoteCallAsync(ElectronicDocument entity, CancellationToken cancellationToken)
     {

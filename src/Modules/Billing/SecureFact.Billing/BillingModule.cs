@@ -20,6 +20,7 @@ public static class BillingModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISeriesAdministration, SeriesAdministration>();
         services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<SecureFact.SharedKernel.Messaging.IOutboxSource, BillingOutboxSource>();
         return services;
     }
 

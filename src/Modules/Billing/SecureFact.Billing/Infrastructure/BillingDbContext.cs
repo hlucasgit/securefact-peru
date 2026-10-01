@@ -18,6 +18,8 @@ internal sealed class BillingDbContext(DbContextOptions<BillingDbContext> option
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -101,6 +103,26 @@ internal sealed class BillingDbContext(DbContextOptions<BillingDbContext> option
             b.Property(r => r.DocumentId).HasColumnName("document_id");
             b.Property(r => r.CreatedAt).HasColumnName("created_at");
             b.HasIndex(r => new { r.TenantId, r.Key }).IsUnique();
+            ConfigureTenantOwned(b);
+        });
+
+        modelBuilder.Entity<OutboxMessageEntity>(b =>
+        {
+            b.ToTable("outbox_message");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(m => m.EventType).HasColumnName("event_type").HasMaxLength(100).IsRequired();
+            b.Property(m => m.PayloadJson).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
+            b.Property(m => m.CreatedAt).HasColumnName("created_at");
+            b.Property(m => m.Attempts).HasColumnName("attempts");
+            b.Property(m => m.NextAttemptAt).HasColumnName("next_attempt_at");
+            b.Property(m => m.LockedUntil).HasColumnName("locked_until");
+            b.Property(m => m.ProcessedAt).HasColumnName("processed_at");
+            b.Property(m => m.DeadAt).HasColumnName("dead_at");
+            b.Property(m => m.LastError).HasColumnName("last_error").HasMaxLength(500);
+
+            // The dispatcher scans only what is pending: due, not processed and not dead.
+            b.HasIndex(m => m.NextAttemptAt).HasFilter("processed_at IS NULL AND dead_at IS NULL").HasDatabaseName("ix_outbox_message_pending");
             ConfigureTenantOwned(b);
         });
     }

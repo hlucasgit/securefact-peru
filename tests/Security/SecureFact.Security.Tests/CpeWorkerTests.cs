@@ -171,6 +171,9 @@ public sealed class CpeWorkerTests(ApiFixture api)
         Assert.Equal(EDocumentState.Accepted, (await GetAsync(setup.Owner, healthy.Id)).State);
         var untouched = await GetAsync(setup.Owner, blocked.Id);
         Assert.Equal((EDocumentState.ReadyToSend, 0), (untouched.State, untouched.Attempts)); // a missing credential never burns an attempt
+        Assert.Equal("SF-CRT-004", untouched.LastErrorCode);
+        Assert.True(untouched.NextAttemptAt > DateTimeOffset.UtcNow); // ...but it steps aside, so broken documents cannot starve the batch
+        Assert.Equal(0, (await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId)).Skipped);
     }
 
     // ---------- daily summaries ----------

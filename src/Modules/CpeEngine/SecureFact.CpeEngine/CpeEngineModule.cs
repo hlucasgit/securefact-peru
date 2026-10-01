@@ -34,6 +34,7 @@ public static class CpeEngineModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IElectronicDocumentService, ElectronicDocumentService>();
         services.AddScoped<ISummaryService, SummaryService>();
+        services.AddScoped<SecureFact.SharedKernel.Messaging.IIntegrationEventConsumer, DocumentIssuedHandler>();
         services.AddSingleton<ICpeWorkProcessor, CpeWorkProcessor>();
         return services;
     }

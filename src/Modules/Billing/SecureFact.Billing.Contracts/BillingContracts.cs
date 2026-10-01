@@ -100,3 +100,12 @@ public interface IDocumentService
     /// <summary>Documents of one company, type and issue date, ordered by series and number (for daily summaries).</summary>
     Task<IReadOnlyList<DocumentDto>> ListIssuedAsync(Guid companyId, string documentTypeCode, DateOnly issueDate, int skip, int take, CancellationToken cancellationToken);
 }
+
+/// <summary>Integration event types published by Billing through its transactional outbox.</summary>
+public static class BillingEvents
+{
+    /// <summary>A document was numbered and stored. Payload: <see cref="DocumentIssuedEvent"/> (JSON, web casing).</summary>
+    public const string DocumentIssued = "billing.document.issued";
+}
+
+public sealed record DocumentIssuedEvent(Guid TenantId, Guid DocumentId, Guid CompanyId, string DocumentTypeCode, string Series, long Number);

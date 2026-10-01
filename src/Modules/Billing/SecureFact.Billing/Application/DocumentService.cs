@@ -158,6 +158,11 @@ internal sealed partial class DocumentService(
         }
 
         db.Documents.Add(document);
+
+        // The integration event commits (or rolls back) with the document: it can neither be lost nor announce a document that does not exist.
+        db.OutboxMessages.Add(OutboxMessageEntity.Create(
+            tenant.Value, BillingEvents.DocumentIssued,
+            JsonSerializer.Serialize(new DocumentIssuedEvent(tenant.Value, documentId, document.CompanyId, document.DocumentTypeCode, document.SeriesCode, document.Number), Json), now));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 

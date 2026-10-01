@@ -188,6 +188,7 @@ app.MapRuleEndpoints();
 app.MapMasterDataEndpoints();
 app.MapCertificateEndpoints();
 app.MapCpeEndpoints();
+app.MapOutboxEndpoints();
 
 app.Run();
 

@@ -7,6 +7,7 @@ using SecureFact.CpeEngine.Contracts;
 using SecureFact.Customers;
 using SecureFact.Organizations;
 using SecureFact.Platform;
+using SecureFact.Platform.Messaging;
 using SecureFact.Platform.Security;
 using SecureFact.Rules;
 using SecureFact.SharedKernel.Tenancy;
@@ -70,6 +71,8 @@ internal static class WorkerHost
                 throw new InvalidOperationException("Sunat:Environment must be 'Beta' or 'Production'.");
         }
 
+        builder.Services.AddOutboxProcessing();
+        builder.Services.AddHostedService<OutboxWorker>();
         builder.Services.AddHostedService<CpeWorker>();
 
         return builder;
