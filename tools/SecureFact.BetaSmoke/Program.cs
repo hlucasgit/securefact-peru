@@ -148,7 +148,8 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
 {
     var today = DateOnly.FromDateTime(lima.DateTime);
     var reference = Environment.GetEnvironmentVariable("SF_BETA_REFERENCE_DAYS_AGO") is { } ago ? today.AddDays(-int.Parse(ago, CultureInfo.InvariantCulture)) : today;
-    var line = new SummaryLineData(1, "B001", number, "1", "12345678", "PEN", 118m, 100m, 0m, 0m, 18m, 0.18m);
+    var voidNumber = Environment.GetEnvironmentVariable("SF_BETA_VOID_NUMBER");
+    var line = new SummaryLineData(1, "B001", voidNumber is null ? number : long.Parse(voidNumber, CultureInfo.InvariantCulture), "1", "12345678", "PEN", 118m, 100m, 0m, 0m, 18m, 0.18m, Status: voidNumber is null ? "1" : "3");
     var lines = new List<SummaryLineData> { line };
     if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_NOTE") is { } noteKind)
     {

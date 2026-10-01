@@ -94,7 +94,7 @@ internal sealed class SummaryService(
         }
 
         var ids = pending.Select(p => p.Document.Id).ToList();
-        var reported = (await db.SummaryItems.Where(i => ids.Contains(i.ElectronicDocumentId) && i.ReleasedAt == null)
+        var reported = (await db.SummaryItems.Where(i => ids.Contains(i.ElectronicDocumentId) && i.ReleasedAt == null && i.LineStatus == 1)
             .Select(i => i.ElectronicDocumentId).ToListAsync(cancellationToken)).ToHashSet();
         var candidates = pending.Where(p => p.Document.State == EDocumentState.ReadyToSend && !reported.Contains(p.Document.Id)).ToList();
 

@@ -86,11 +86,12 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.ElectronicDocumentId).HasColumnName("electronic_document_id");
             b.Property(e => e.LineNumber).HasColumnName("line_number");
             b.Property(e => e.Reason).HasColumnName("reason").HasMaxLength(100);
+            b.Property(e => e.LineStatus).HasColumnName("line_status").HasDefaultValue(1);
             b.Property(e => e.ReleasedAt).HasColumnName("released_at");
             b.HasIndex(e => e.SummaryId);
 
             // A receipt belongs to at most one active summary: two concurrent summaries cannot both report it.
-            b.HasIndex(e => new { e.TenantId, e.ElectronicDocumentId }).IsUnique().HasFilter("released_at IS NULL").HasDatabaseName("ux_summary_item_active");
+            b.HasIndex(e => new { e.TenantId, e.ElectronicDocumentId, e.LineStatus }).IsUnique().HasFilter("released_at IS NULL").HasDatabaseName("ux_summary_item_active");
             ConfigureTenantOwned(b);
         });
     }

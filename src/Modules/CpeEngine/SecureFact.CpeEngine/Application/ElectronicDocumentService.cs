@@ -196,7 +196,7 @@ internal sealed class ElectronicDocumentService(
         }
 
         var children = await LoadChildrenAsync(entity, cancellationToken);
-        if (entity.IsSummary && children.Any(c => c.Document.State != EDocumentState.ReadyToSend))
+        if (entity.IsSummary && children.Any(c => c.Item.LineStatus == 1 && c.Document.State != EDocumentState.ReadyToSend))
         {
             return Error.Conflict(ErrorCodes.CpeInvalidTransition, "Transición de estado inválida", "Alguna boleta del resumen ya no está lista para enviarse.");
         }
@@ -387,9 +387,9 @@ internal sealed class ElectronicDocumentService(
     /// <summary>A document is voided once a voided-documents communication that covers it was accepted by SUNAT.</summary>
     private Task<bool> IsVoidedAsync(Guid electronicDocumentId, CancellationToken cancellationToken) =>
         db.SummaryItems.AsNoTracking()
-            .Where(i => i.ElectronicDocumentId == electronicDocumentId && i.ReleasedAt == null)
+            .Where(i => i.ElectronicDocumentId == electronicDocumentId && i.ReleasedAt == null && i.LineStatus == 3)
             .Join(
-                db.ElectronicDocuments.AsNoTracking().Where(e => e.DocumentTypeCode == ElectronicDocument.VoidType && e.State == EDocumentState.Accepted),
+                db.ElectronicDocuments.AsNoTracking().Where(e => (e.DocumentTypeCode == ElectronicDocument.VoidType || e.DocumentTypeCode == ElectronicDocument.SummaryType) && e.State == EDocumentState.Accepted),
                 i => i.SummaryId, e => e.Id, (i, e) => i)
             .AnyAsync(cancellationToken);
 
@@ -647,21 +647,23 @@ internal sealed class ElectronicDocumentService(
     /// </summary>
     private void Propagate(ElectronicDocument summary, IReadOnlyList<Child> children, EDocumentEvent @event, string detail, DateTimeOffset now, (CdrInfo Cdr, string ObservationsJson)? outcome)
     {
-        if (summary.IsVoidCommunication)
+        if (!summary.IsTicketBatch)
         {
-            // The voided documents already have a final answer and never change state. A rejected communication frees them to be voided again.
-            if (@event == EDocumentEvent.CdrRejected)
-            {
-                foreach (var child in children)
-                {
-                    child.Item.Release(now);
-                }
-            }
-
             return;
         }
 
-        if (!summary.IsSummary)
+        // Items that void a document (an "RA" communication, or a summary line with status 3) concern documents that already have a final
+        // answer: they never change state. A rejected file frees them to be voided again.
+        if (@event == EDocumentEvent.CdrRejected)
+        {
+            foreach (var voided in children.Where(c => c.Item.LineStatus == 3))
+            {
+                voided.Item.Release(now);
+            }
+        }
+
+        children = children.Where(c => c.Item.LineStatus == 1).ToList();
+        if (summary.IsVoidCommunication)
         {
             return;
         }

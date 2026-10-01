@@ -218,12 +218,16 @@ internal sealed class SummaryItem : ITenantOwned
     /// <summary>Set when the summary was rejected: the receipt can then be reported again.</summary>
     public DateTimeOffset? ReleasedAt { get; private set; }
 
-    /// <summary>Voided-documents communications only: why the document is voided.</summary>
+    /// <summary>1 when the item reports the document (daily summary), 3 when it voids it (voided-documents communication or summary line with status 3).</summary>
+    public int LineStatus { get; private set; } = 1;
+
+    /// <summary>Voids only: why the document is voided.</summary>
     public string? Reason { get; private set; }
 
-    public static SummaryItem Create(Guid tenantId, Guid summaryId, Guid electronicDocumentId, int lineNumber, string? reason = null) => new()
+    public static SummaryItem Create(Guid tenantId, Guid summaryId, Guid electronicDocumentId, int lineNumber, string? reason = null, int lineStatus = 1) => new()
     {
         Reason = reason,
+        LineStatus = lineStatus,
         Id = Guid.CreateVersion7(),
         TenantId = tenantId,
         SummaryId = summaryId,

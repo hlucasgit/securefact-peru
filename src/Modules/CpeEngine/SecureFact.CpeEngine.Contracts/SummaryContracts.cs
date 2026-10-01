@@ -22,7 +22,8 @@ public sealed record SummaryLineData(
     string DocumentTypeCode = "03",
     string? ReferencedDocumentTypeCode = null,
     string? ReferencedSeries = null,
-    long? ReferencedNumber = null);
+    long? ReferencedNumber = null,
+    string Status = "1");
 
 /// <param name="ReferenceDate">Issue date of every receipt in the summary (they must all share it).</param>
 /// <param name="IssueDate">Date the summary is generated; it names the file and is never before <paramref name="ReferenceDate"/>.</param>

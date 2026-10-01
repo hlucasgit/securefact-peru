@@ -163,6 +163,28 @@ public class SummaryDocumentGeneratorTests
     }
 
     [Fact]
+    public void A_line_with_status_3_voids_a_document_and_validates_against_the_schema()
+    {
+        var result = _generator.Generate(Data(Taxed(1, "B001", 1) with { Status = "3" }, NoteLine(2, "07", "BC01", 1) with { Status = "3" }));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal(["3", "3"], xml.XPathSelectElements("//sac:SummaryDocumentsLine/cac:Status/cbc:ConditionCode", Namespaces).Select(e => e.Value).ToArray());
+    }
+
+    [Theory]
+    [InlineData("2")]
+    [InlineData("0")]
+    [InlineData("")]
+    public void Statuses_other_than_add_and_void_are_refused(string status) =>
+        Assert.False(_generator.Generate(Data(Taxed(1, "B001", 1) with { Status = status })).IsSuccess);
+
+    [Fact]
+    public void The_same_document_added_and_voided_in_one_file_is_refused() =>
+        Assert.False(_generator.Generate(Data(Taxed(1, "B001", 1), Taxed(2, "B001", 1) with { Status = "3" })).IsSuccess);
+
+    [Fact]
     public void A_receipt_and_a_note_may_share_series_and_number_because_the_type_differs()
     {
         Assert.True(_generator.Generate(Data(Taxed(1, "B001", 1), NoteLine(2, "07", "B001", 1))).IsSuccess);

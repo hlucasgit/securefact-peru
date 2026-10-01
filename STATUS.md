@@ -43,11 +43,11 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Notas de crédito y de débito
 - Emisión, UBL, documento electrónico (espera a que el original esté aceptado), PDF y envío de notas de facturas; aceptadas en el beta (crédito 01, débito 02, crédito 07 de boleta). Pruebas: 491 pasan.
 - Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
-- Pendiente: motivos 11–13, acumulado de notas de crédito, bajas.
+- Pendiente: motivos 11–13, acumulado de notas de crédito.
 
 ## Comunicación de baja
-- `POST /api/v1/voids`: baja de facturas y notas de facturas aceptadas (≤ 7 días), una comunicación por fecha; se envía y sigue como un resumen; «anulado» se deriva de la comunicación aceptada. Aceptada en el beta. Pruebas: 538 pasan.
-- Pendiente: baja de boletas por resumen con estado 3, bloquear notas sobre documentos anulados, indicar «anulado» en el PDF.
+- `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 541 pasan (318 unitarias, 6 arquitectura, 6 integración, 211 seguridad/API).
+- Pendiente: bloquear notas sobre documentos anulados, indicar «anulado» en el PDF.
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

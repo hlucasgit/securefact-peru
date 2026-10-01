@@ -25,7 +25,7 @@ public interface IVoidedDocumentsGenerator
     Result<VoidedDocument> Generate(VoidedData data);
 }
 
-/// <param name="DocumentId">The billing document (an invoice, or a note of an invoice) to void.</param>
+/// <param name="DocumentId">The billing document to void: an invoice or a note of an invoice (voided with a communication), or a receipt or a note of a receipt (voided with a daily summary whose line has status 3).</param>
 /// <param name="Reason">3 to 100 characters.</param>
 public sealed record VoidItem(Guid DocumentId, string Reason);
 
@@ -34,8 +34,9 @@ public sealed record CreateVoidRequest(Guid CompanyId, IReadOnlyList<VoidItem> I
 public interface IVoidService
 {
     /// <summary>
-    /// Builds, signs and stores the voided-documents communications for the given documents: one per issue date (SUNAT wants a single reference
-    /// date per file) and at most 500 lines each. Each document must have an accepted CDR, be an invoice or a note of an invoice, not be voided
+    /// Builds, signs and stores the files that void the given documents: one per issue date and kind (SUNAT wants a single reference date per
+    /// file) and at most 500 lines each. Invoices and their notes go in a voided-documents communication (RA); receipts and their notes go in a
+    /// daily summary with status 3 (RC). Each document must have an accepted CDR, not be voided
     /// or in a pending communication already, and be at most 7 days old (rule 2957). Send and follow each communication with the electronic-document
     /// endpoints (<c>send</c>, <c>poll</c>); the document is voided once SUNAT accepts it.
     /// </summary>

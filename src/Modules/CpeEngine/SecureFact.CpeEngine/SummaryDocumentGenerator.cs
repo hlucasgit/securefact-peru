@@ -28,7 +28,6 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
 
     private const decimal ReceiptIdentificationThreshold = 700m;
     private const decimal TotalTolerance = 0.05m;
-    private const string StatusAdd = "1";
 
     [GeneratedRegex("^B[A-Z0-9]{3}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex ReceiptSeries();
@@ -129,6 +128,12 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Invalid($"{label}: el resumen solo informa boletas (03) y notas de crédito (07) o débito (08).");
             }
 
+            if (line.Status is not ("1" or "3"))
+            {
+                return Invalid($"{label}: el estado debe ser 1 (adicionar) o 3 (anular); las modificaciones (2) aún no están soportadas.");
+            }
+
+            // The same document twice in one file is refused whatever the status (rules 3094, 3095, 3096).
             if (!seen.Add((line.DocumentTypeCode, line.Series!, line.Number)))
             {
                 return Invalid($"{label}: el comprobante {line.DocumentTypeCode} {line.Series}-{line.Number} está repetido.");
@@ -225,7 +230,7 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
         }
 
         element.Add(
-            new XElement(Cac + "Status", new XElement(Cbc + "ConditionCode", StatusAdd)),
+            new XElement(Cac + "Status", new XElement(Cbc + "ConditionCode", line.Status)),
             new XElement(Sac + "TotalAmount", new XAttribute("currencyID", line.Currency), Money(line.TotalAmount)));
 
         // One BillingPayment per sale-value type that applies (catalogue 11: 01 taxed, 02 exempt, 03 unaffected); the sheet marks them "only if applicable".

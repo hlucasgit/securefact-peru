@@ -219,7 +219,7 @@ public sealed class VoidApiTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task Only_accepted_invoices_and_notes_of_invoices_are_voidable()
+    public async Task Only_documents_with_an_accepted_cdr_are_voidable()
     {
         var setup = await NewTenantAsync("Void Guards SAC");
         var pending = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
@@ -234,7 +234,7 @@ public sealed class VoidApiTests(ApiFixture api)
         await PrepareAsync(setup.Owner, receiptNote.Id);
         var unprepared = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
 
-        foreach (var (name, id) in new[] { ("not sent yet", pending.Id), ("rejected", rejected.Id), ("receipt", receipt.Id), ("note of a receipt", receiptNote.Id) })
+        foreach (var (name, id) in new[] { ("not sent yet", pending.Id), ("rejected", rejected.Id), ("receipt not informed", receipt.Id), ("note of a receipt not informed", receiptNote.Id) })
         {
             var response = await VoidAsync(setup, (id, "Error en la emisión"));
             Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
@@ -270,17 +270,7 @@ public sealed class VoidApiTests(ApiFixture api)
         // Billing cannot issue an old invoice, so the age is faked by moving the clock of the service: today + 8 days.
         await using var scope = api.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<SecureFact.Platform.Tenancy.DataScope>().UseTenant(new SecureFact.SharedKernel.Domain.TenantId(setup.TenantId));
-        var late = new VoidService(
-            scope.ServiceProvider.GetRequiredService<SecureFact.CpeEngine.Infrastructure.CpeDbContext>(),
-            scope.ServiceProvider.GetRequiredService<SecureFact.Platform.Tenancy.IDataScope>(),
-            scope.ServiceProvider.GetRequiredService<ICompanyAdministration>(),
-            scope.ServiceProvider.GetRequiredService<SecureFact.Certificates.Contracts.ICertificateProvider>(),
-            scope.ServiceProvider.GetRequiredService<IVoidedDocumentsGenerator>(),
-            scope.ServiceProvider.GetRequiredService<IXmlSigner>(),
-            scope.ServiceProvider.GetRequiredService<ICpePackager>(),
-            scope.ServiceProvider.GetRequiredService<IEDocumentStateMachine>(),
-            new OffsetClock(TimeSpan.FromDays(8)),
-            scope.ServiceProvider.GetRequiredService<SecureFact.Audit.Contracts.IAuditTrail>());
+        var late = ActivatorUtilities.CreateInstance<VoidService>(scope.ServiceProvider, (TimeProvider)new OffsetClock(TimeSpan.FromDays(8)));
 
         var result = await late.CreateAsync(new CreateVoidRequest(setup.Company.Id, [new VoidItem(invoice.Id, "Error en la emisión")]), CancellationToken.None);
 
@@ -288,6 +278,108 @@ public sealed class VoidApiTests(ApiFixture api)
         Assert.Equal("SF-CPE-011", result.Error.Code);
         Assert.Contains("7 días", result.Error.Detail, StringComparison.Ordinal);
         Assert.NotEqual(Guid.Empty, electronic.Id);
+    }
+
+    // ---------- receipts: a summary line with status 3 ----------
+
+    /// <summary>Reports the receipts of today (then, in a later call, their notes) in daily summaries and gets them accepted: SUNAT must have informed them before they can be voided.</summary>
+    private async Task AcceptReceiptsAsync(Setup setup, string ticket)
+    {
+        var created = await setup.Owner.PostAsJsonAsync("/api/v1/summaries", new { companyId = setup.Company.Id, referenceDate = Iso(TodayInLima()) });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        foreach (var summary in (await created.Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!)
+        {
+            await FinishAsync(setup, summary, ticket);
+        }
+    }
+
+    private static async Task<ElectronicDocumentDto> ElectronicOfAsync(HttpClient client, Guid documentId) =>
+        (await client.GetFromJsonAsync<ElectronicDocumentDto>($"/api/v1/documents/{documentId}/electronic", ApiFixture.JsonOptions))!;
+
+    [Fact]
+    public async Task A_receipt_and_its_note_are_voided_with_a_summary_line_of_status_3()
+    {
+        var setup = await NewTenantAsync("Void Receipt SAC");
+        var receipt = await IssueAsync(setup.Owner, setup.Receipt, receipt: true);
+        var note = await NoteAsync(setup.Owner, setup.CreditOfReceipt, receipt);
+        await AcceptReceiptsAsync(setup, "T-1"); // the receipt
+        await AcceptReceiptsAsync(setup, "T-2"); // its note, once the receipt is informed
+        Assert.Equal(EDocumentState.Accepted, (await ElectronicOfAsync(setup.Owner, receipt.Id)).State);
+        Assert.Equal(EDocumentState.Accepted, (await ElectronicOfAsync(setup.Owner, note.Id)).State);
+
+        var response = await VoidAsync(setup, (receipt.Id, "Operación anulada"), (note.Id, "Se anula con la boleta"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var voidSummary = Assert.Single((await response.Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        Assert.Equal("RC", voidSummary.Document.DocumentTypeCode); // a summary, not a communication
+        Assert.Equal(2, voidSummary.ElectronicDocumentIds.Count);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{voidSummary.Document.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Count(xml, "<cbc:ConditionCode>3</cbc:ConditionCode>", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)));
+        Assert.DoesNotContain("<cbc:ConditionCode>1</cbc:ConditionCode>", xml, StringComparison.Ordinal);
+        Assert.Contains($"<cbc:ID>B001-{receipt.Number}</cbc:ID>", xml, StringComparison.Ordinal);
+        Assert.Contains($"<cbc:ID>BC01-{note.Number}</cbc:ID>", xml, StringComparison.Ordinal);
+
+        // Nothing changes until SUNAT accepts the summary; then both are voided but keep their own final answer.
+        Assert.False((await ElectronicOfAsync(setup.Owner, receipt.Id)).Voided);
+        await FinishAsync(setup, voidSummary, "T-3");
+        var voided = await ElectronicOfAsync(setup.Owner, receipt.Id);
+        Assert.True(voided.Voided);
+        Assert.Equal(EDocumentState.Accepted, voided.State);
+        Assert.True((await ElectronicOfAsync(setup.Owner, note.Id)).Voided);
+
+        var read = (await setup.Owner.GetFromJsonAsync<SummaryDto>($"/api/v1/voids/{voidSummary.Document.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal(voidSummary.ElectronicDocumentIds, read.ElectronicDocumentIds);
+        var again = await VoidAsync(setup, (receipt.Id, "Otra vez"));
+        Assert.Equal("SF-CPE-011", await ProblemCodeAsync(again));
+    }
+
+    [Fact]
+    public async Task A_rejected_summary_of_status_3_frees_the_receipt_which_itself_is_never_touched()
+    {
+        var setup = await NewTenantAsync("Void Receipt Reject SAC");
+        var receipt = await IssueAsync(setup.Owner, setup.Receipt, receipt: true);
+        await AcceptReceiptsAsync(setup, "T-1");
+        var first = Assert.Single((await (await VoidAsync(setup, (receipt.Id, "Operación anulada"))).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await VoidAsync(setup, (receipt.Id, "Mientras tanto"))).StatusCode); // already in a pending file
+
+        await FinishAsync(setup, first, "T-2", "2513");
+
+        var electronic = await ElectronicOfAsync(setup.Owner, receipt.Id);
+        Assert.False(electronic.Voided);
+        Assert.Equal(EDocumentState.Accepted, electronic.State);
+        var second = Assert.Single((await (await VoidAsync(setup, (receipt.Id, "Segundo intento"))).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        Assert.EndsWith("-3", second.Document.FileBaseName, StringComparison.Ordinal);
+
+        // The ordinary summary never picks the already reported receipt up again, and the pending void does not count as a report.
+        Assert.Equal(HttpStatusCode.NotFound, (await setup.Owner.PostAsJsonAsync("/api/v1/summaries", new { companyId = setup.Company.Id, referenceDate = Iso(TodayInLima()) })).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_request_with_invoices_and_receipts_produces_a_communication_and_a_summary()
+    {
+        var setup = await NewTenantAsync("Void Mixed SAC");
+        var invoice = await IssueAsync(setup.Owner, setup.Invoice, receipt: false);
+        await AcceptedAsync(setup, invoice, $"{invoice.Series}-{invoice.Number}");
+        var receipt = await IssueAsync(setup.Owner, setup.Receipt, receipt: true);
+        await AcceptReceiptsAsync(setup, "T-1");
+
+        var response = await VoidAsync(setup, (invoice.Id, "Error en la emisión"), (receipt.Id, "Operación anulada"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var files = (await response.Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!;
+        Assert.Equal(["RA", "RC"], files.Select(f => f.Document.DocumentTypeCode).OrderBy(t => t, StringComparer.Ordinal).ToArray());
+        Assert.All(files, f => Assert.Single(f.ElectronicDocumentIds));
+    }
+
+    [Fact]
+    public async Task An_ordinary_summary_is_not_a_void_record()
+    {
+        var setup = await NewTenantAsync("Void Not A Void SAC");
+        await IssueAsync(setup.Owner, setup.Receipt, receipt: true);
+        var summary = Assert.Single((await (await setup.Owner.PostAsJsonAsync("/api/v1/summaries", new { companyId = setup.Company.Id, referenceDate = Iso(TodayInLima()) })).Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await setup.Owner.GetAsync($"/api/v1/voids/{summary.Document.Id}")).StatusCode);
     }
 
     // ---------- sending ----------
