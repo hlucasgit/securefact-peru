@@ -94,7 +94,50 @@ if (reply.CdrZip is { } cdrZip)
     }
 }
 
+if (args.Contains("nc", StringComparer.Ordinal) || args.Contains("nd", StringComparer.Ordinal))
+{
+    return await NoteRoundTripAsync(provider, certificate, algorithm, ruc, user, password, lima, number, data, args.Contains("nc", StringComparer.Ordinal));
+}
+
 return 0;
+
+static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, DateTimeOffset lima, long number, UblInvoiceData original, bool credit)
+{
+    var reason = Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
+    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10")], new TaxRates(0.18m))).Value;
+    var note = new UblNoteData(
+        credit ? "07" : "08", original.DocumentTypeCode == "03" ? "BC01" : "FC01", number, original.IssueDate, TimeOnly.FromDateTime(lima.DateTime), "PEN", reason,
+        credit ? "Anulacion de la operacion" : "Aumento en el valor", original.DocumentTypeCode, original.Series, original.Number, original.Issuer, original.Buyer,
+        [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")], totals, 0.18m);
+    var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateNote(note);
+    if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL note: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
+    var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);
+    if (!signed.IsSuccess) { Console.Error.WriteLine($"Sign: {signed.Error.Code} {signed.Error.Detail}"); return 1; }
+    var zip = provider.GetRequiredService<ICpePackager>().Zip(generated.Value.FileBaseName, signed.Value.Xml);
+    Console.WriteLine($"Sending note {generated.Value.FileBaseName}.zip (reason {reason})...");
+    var reply = await provider.GetRequiredService<ICpeSubmissionChannel>().SendBillAsync(new SunatCredentials(ruc, user, password), generated.Value.ZipFileName, zip.Value);
+    Console.WriteLine($"Outcome: {reply.Outcome}");
+    if (reply.Fault is { } fault)
+    {
+        Console.WriteLine($"Fault: side={fault.Side} code={fault.Code?.ToString(CultureInfo.InvariantCulture)} kind={fault.Kind}");
+        Console.WriteLine($"Message: {fault.Message}");
+        return 3;
+    }
+
+    if (reply.CdrZip is { } cdrZip)
+    {
+        var cdr = provider.GetRequiredService<ICdrParser>().ParseZip(cdrZip);
+        if (!cdr.IsSuccess) { Console.WriteLine($"CDR could not be parsed: {cdr.Error.Detail}"); return 4; }
+        Console.WriteLine($"CDR: status={cdr.Value.Status} code={cdr.Value.ResponseCode} ref={cdr.Value.ReferenceId}");
+        Console.WriteLine($"Description: {cdr.Value.Description}");
+        foreach (var n in cdr.Value.Observations)
+        {
+            Console.WriteLine($"Note {n.Code}: {n.Message}");
+        }
+    }
+
+    return 0;
+}
 
 static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, DateTimeOffset lima, long number)
 {

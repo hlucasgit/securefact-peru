@@ -20,6 +20,8 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     private static readonly XNamespace Inv = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2";
     private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
     private static readonly XNamespace Cbc = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
+    private static readonly XNamespace CreditNoteNs = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2";
+    private static readonly XNamespace DebitNoteNs = "urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2";
     private static readonly XNamespace Ext = "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2";
     private static readonly XNamespace Ds = "http://www.w3.org/2000/09/xmldsig#";
 
@@ -98,6 +100,141 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         var fileBase = $"{data.Issuer.DocumentNumber}-{data.DocumentTypeCode}-{data.Series}-{data.Number.ToString(CultureInfo.InvariantCulture)}";
         return new UblDocument(buffer.ToString(), fileBase);
+    }
+
+    /// <summary>Reasons whose structure is supported today: credit 01-10 and debit 01-03. Export (11), IVAP (12) and credit-installment (13) adjustments are not.</summary>
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"];
+
+    private static readonly HashSet<string> DebitReasons = ["01", "02", "03"];
+
+    public Result<UblDocument> GenerateNote(UblNoteData data)
+    {
+        if (ValidateNote(data) is { } invalid)
+        {
+            return invalid;
+        }
+
+        var credit = data.DocumentTypeCode == "07";
+        var ns = credit ? CreditNoteNs : DebitNoteNs;
+        var currency = data.Currency;
+        var totals = data.Totals;
+        var reference = $"{data.ReferencedSeries}-{data.ReferencedNumber.ToString(CultureInfo.InvariantCulture)}";
+        var root = new XElement(
+            ns + (credit ? "CreditNote" : "DebitNote"),
+            new XAttribute(XNamespace.Xmlns + "cac", Cac),
+            new XAttribute(XNamespace.Xmlns + "cbc", Cbc),
+            new XAttribute(XNamespace.Xmlns + "ext", Ext),
+            new XAttribute(XNamespace.Xmlns + "ds", Ds),
+            new XElement(Ext + "UBLExtensions", new XElement(Ext + "UBLExtension", new XElement(Ext + "ExtensionContent"))),
+            new XElement(Cbc + "UBLVersionID", "2.1"),
+            new XElement(Cbc + "CustomizationID", "2.0"),
+            new XElement(Cbc + "ID", $"{data.Series}-{data.Number.ToString(CultureInfo.InvariantCulture)}"),
+            new XElement(Cbc + "IssueDate", data.IssueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+
+        if (data.IssueTime is { } time)
+        {
+            root.Add(new XElement(Cbc + "IssueTime", time.ToString("HH:mm:ss", CultureInfo.InvariantCulture)));
+        }
+
+        root.Add(
+            new XElement(Cbc + "DocumentCurrencyCode", currency),
+            new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
+            new XElement(
+                Cac + "DiscrepancyResponse",
+                new XElement(Cbc + "ReferenceID", reference),
+                new XElement(
+                    Cbc + "ResponseCode",
+                    new XAttribute("listAgencyName", "PE:SUNAT"),
+                    new XAttribute("listName", credit ? "Tipo de nota de credito" : "Tipo de nota de debito"),
+                    new XAttribute("listURI", credit ? "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo09" : "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo10"),
+                    data.ReasonCode),
+                new XElement(Cbc + "Description", data.ReasonDescription)),
+            new XElement(
+                Cac + "BillingReference",
+                new XElement(
+                    Cac + "InvoiceDocumentReference",
+                    new XElement(Cbc + "ID", reference),
+                    new XElement(
+                        Cbc + "DocumentTypeCode",
+                        new XAttribute("listAgencyName", "PE:SUNAT"),
+                        new XAttribute("listName", "Tipo de Documento"),
+                        new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01"),
+                        data.ReferencedDocumentTypeCode))),
+            SignatureInfo(data.Issuer),
+            Supplier(data.Issuer),
+            Customer(data.Buyer),
+            TaxTotal(totals, data.IgvRate, currency),
+            new XElement(
+                Cac + (credit ? "LegalMonetaryTotal" : "RequestedMonetaryTotal"),
+                Amount("LineExtensionAmount", totals.TotalLineExtensionAmount, currency),
+                Amount("TaxInclusiveAmount", totals.TotalTaxInclusiveAmount, currency),
+                Amount("PayableAmount", totals.PayableAmount, currency)));
+
+        for (var i = 0; i < data.Lines.Count; i++)
+        {
+            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, currency, credit ? "CreditNoteLine" : "DebitNoteLine", credit ? "CreditedQuantity" : "DebitedQuantity"));
+        }
+
+        var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
+        using var buffer = new StringWriterUtf8();
+        using (var writer = XmlWriter.Create(buffer, new XmlWriterSettings { Indent = true, Encoding = new UTF8Encoding(false), OmitXmlDeclaration = false }))
+        {
+            document.Save(writer);
+        }
+
+        var fileBase = $"{data.Issuer.DocumentNumber}-{data.DocumentTypeCode}-{data.Series}-{data.Number.ToString(CultureInfo.InvariantCulture)}";
+        return new UblDocument(buffer.ToString(), fileBase);
+    }
+
+    private static Error? ValidateNote(UblNoteData data)
+    {
+        static Error Unsupported(string detail) => Error.Validation(ErrorCodes.CpeUnsupported, "Nota no soportada por el generador", detail);
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de nota inválidos", detail);
+
+        if (data is null || data.Lines is not { Count: > 0 } || data.Totals is null || data.Totals.Lines.Count != data.Lines.Count)
+        {
+            return Invalid("La nota requiere líneas y totales calculados que coincidan línea a línea.");
+        }
+
+        if (data.DocumentTypeCode is not ("07" or "08"))
+        {
+            return Invalid($"El tipo de documento '{data.DocumentTypeCode}' no es una nota de crédito (07) ni de débito (08).");
+        }
+
+        if (!(data.DocumentTypeCode == "07" ? CreditReasons : DebitReasons).Contains(data.ReasonCode ?? string.Empty))
+        {
+            return Unsupported($"El código de motivo '{data.ReasonCode}' no está soportado para este tipo de nota (crédito 01-10, débito 01-03).");
+        }
+
+        if (string.IsNullOrWhiteSpace(data.ReasonDescription) || data.ReasonDescription.Length > 500 || data.ReasonDescription.Any(c => c is '\n' or '\r' or '\t'))
+        {
+            return Invalid("El sustento es obligatorio (1 a 500 caracteres, sin saltos de línea ni tabulaciones).");
+        }
+
+        if (data.ReferencedDocumentTypeCode is not ("01" or "03") || string.IsNullOrWhiteSpace(data.ReferencedSeries) || data.ReferencedNumber < 1)
+        {
+            return Invalid("La nota debe modificar una factura (01) o boleta (03) identificada por serie y número.");
+        }
+
+        if (data.Totals.TotalIvap != 0 || data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
+        {
+            return Unsupported("IVAP, ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+        }
+
+        if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0)
+        {
+            return Unsupported("Cargos, descuentos y redondeo aún no están soportados por el generador UBL.");
+        }
+
+        for (var i = 0; i < data.Lines.Count; i++)
+        {
+            if (!Schemes.ContainsKey(data.Totals.Lines[i].TaxCode))
+            {
+                return Unsupported($"La línea {i + 1} usa el tributo {data.Totals.Lines[i].TaxCode}, no soportado todavía.");
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(data.Series) || data.Number < 1 ? Invalid("Serie y número son obligatorios.") : null;
     }
 
     private static Error? Validate(UblInvoiceData data)
@@ -246,14 +383,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             Amount("TaxInclusiveAmount", totals.TotalTaxInclusiveAmount, currency),
             Amount("PayableAmount", totals.PayableAmount, currency));
 
-    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, string currency)
+    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, string currency, string lineName = "InvoiceLine", string quantityName = "InvoicedQuantity")
     {
         var isFree = result.TaxCode == TaxCodes.Free;
         var element = new XElement(
-            Cac + "InvoiceLine",
+            Cac + lineName,
             new XElement(Cbc + "ID", line.LineNumber.ToString(CultureInfo.InvariantCulture)),
             new XElement(
-                Cbc + "InvoicedQuantity",
+                Cbc + quantityName,
                 new XAttribute("unitCode", line.UnitCode),
                 new XAttribute("unitCodeListID", "UN/ECE rec 20"),
                 new XAttribute("unitCodeListAgencyName", "United Nations Economic Commission for Europe"),
