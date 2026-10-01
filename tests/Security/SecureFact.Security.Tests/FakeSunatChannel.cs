@@ -14,18 +14,34 @@ public sealed class FakeSunatChannel : ICpeSubmissionChannel
 
     private readonly ConcurrentQueue<Func<Call, ChannelReply>> _script = new();
     private readonly ConcurrentQueue<Call> _calls = new();
+    private readonly ConcurrentQueue<Func<Call, ChannelReply>> _summaryScript = new();
+    private readonly ConcurrentQueue<Call> _summaryCalls = new();
+    private readonly ConcurrentQueue<ChannelReply> _statusScript = new();
+    private readonly ConcurrentQueue<string> _statusCalls = new();
 
     public IReadOnlyCollection<Call> Calls => [.. _calls];
+
+    public IReadOnlyCollection<Call> SummaryCalls => [.. _summaryCalls];
+
+    public IReadOnlyCollection<string> StatusCalls => [.. _statusCalls];
 
     public void Reset()
     {
         _script.Clear();
         _calls.Clear();
+        _summaryScript.Clear();
+        _summaryCalls.Clear();
+        _statusScript.Clear();
+        _statusCalls.Clear();
     }
 
     public void Enqueue(ChannelReply reply) => _script.Enqueue(_ => reply);
 
     public void Enqueue(Func<Call, ChannelReply> reply) => _script.Enqueue(reply);
+
+    public void EnqueueSummary(ChannelReply reply) => _summaryScript.Enqueue(_ => reply);
+
+    public void EnqueueStatus(ChannelReply reply) => _statusScript.Enqueue(reply);
 
     public Task<ChannelReply> SendBillAsync(SunatCredentials credentials, string zipFileName, byte[] zip, CancellationToken cancellationToken = default)
     {
@@ -34,11 +50,18 @@ public sealed class FakeSunatChannel : ICpeSubmissionChannel
         return Task.FromResult(_script.TryDequeue(out var reply) ? reply(call) : ChannelReply.Down("simulator has no scripted reply"));
     }
 
-    public Task<ChannelReply> SendSummaryAsync(SunatCredentials credentials, string zipFileName, byte[] zip, CancellationToken cancellationToken = default) =>
-        Task.FromResult(ChannelReply.Down("not simulated"));
+    public Task<ChannelReply> SendSummaryAsync(SunatCredentials credentials, string zipFileName, byte[] zip, CancellationToken cancellationToken = default)
+    {
+        var call = new Call(credentials, zipFileName, zip);
+        _summaryCalls.Enqueue(call);
+        return Task.FromResult(_summaryScript.TryDequeue(out var reply) ? reply(call) : ChannelReply.Down("simulator has no scripted summary reply"));
+    }
 
-    public Task<ChannelReply> GetStatusAsync(SunatCredentials credentials, string ticket, CancellationToken cancellationToken = default) =>
-        Task.FromResult(ChannelReply.Down("not simulated"));
+    public Task<ChannelReply> GetStatusAsync(SunatCredentials credentials, string ticket, CancellationToken cancellationToken = default)
+    {
+        _statusCalls.Enqueue(ticket);
+        return Task.FromResult(_statusScript.TryDequeue(out var reply) ? reply : ChannelReply.Down("simulator has no scripted status reply"));
+    }
 
     /// <summary>A CDR ZIP with the structure of the Programmer Manual's examples (Annex 1).</summary>
     public static byte[] CdrZip(string taxpayerRuc, string reference, string code = "0", string description = "ha sido aceptada", params string[] notes)

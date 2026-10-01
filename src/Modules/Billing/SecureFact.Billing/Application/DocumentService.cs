@@ -195,6 +195,16 @@ internal sealed partial class DocumentService(
         return rows.Select(ToDto).ToList();
     }
 
+    public async Task<IReadOnlyList<DocumentDto>> ListIssuedAsync(Guid companyId, string documentTypeCode, DateOnly issueDate, int skip, int take, CancellationToken cancellationToken)
+    {
+        var rows = await db.Documents.AsNoTracking().Include(d => d.Lines)
+            .Where(d => d.CompanyId == companyId && d.DocumentTypeCode == documentTypeCode && d.IssueDate == issueDate)
+            .OrderBy(d => d.SeriesCode).ThenBy(d => d.Number)
+            .Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, MaxPage))
+            .ToListAsync(cancellationToken);
+        return rows.Select(ToDto).ToList();
+    }
+
     private async Task<Result<DocumentDto>?> TryReplayAsync(Guid tenantId, string key, byte[] requestHash, CancellationToken cancellationToken)
     {
         var existing = await db.IdempotencyRecords.AsNoTracking().SingleOrDefaultAsync(r => r.TenantId == tenantId && r.Key == key, cancellationToken);

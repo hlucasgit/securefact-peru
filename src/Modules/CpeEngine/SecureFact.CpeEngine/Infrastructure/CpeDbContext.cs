@@ -13,6 +13,8 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
 
     public DbSet<ElectronicDocumentEvent> Events => Set<ElectronicDocumentEvent>();
 
+    public DbSet<SummaryItem> SummaryItems => Set<SummaryItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -24,6 +26,7 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
             b.Property(e => e.DocumentId).HasColumnName("document_id");
             b.Property(e => e.CompanyId).HasColumnName("company_id");
+            b.Property(e => e.IssueDate).HasColumnName("issue_date");
             b.Property(e => e.DocumentTypeCode).HasColumnName("document_type_code").HasMaxLength(2).IsRequired();
             b.Property(e => e.Series).HasColumnName("series").HasMaxLength(4).IsRequired();
             b.Property(e => e.Number).HasColumnName("number");
@@ -47,7 +50,9 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.ProcessedAt).HasColumnName("processed_at");
             b.Property(e => e.Version).IsRowVersion();
             b.Ignore(e => e.Snapshot);
+            b.Ignore(e => e.IsSummary);
             b.HasIndex(e => new { e.TenantId, e.DocumentId }).IsUnique();
+            b.HasIndex(e => new { e.TenantId, e.FileBaseName }).IsUnique();
             b.HasIndex(e => new { e.State, e.NextAttemptAt });
             ConfigureTenantOwned(b);
         });
@@ -65,6 +70,22 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
             b.Property(e => e.Detail).HasColumnName("detail").HasMaxLength(500);
             b.Property(e => e.OccurredAt).HasColumnName("occurred_at");
             b.HasIndex(e => new { e.ElectronicDocumentId, e.OccurredAt });
+            ConfigureTenantOwned(b);
+        });
+
+        modelBuilder.Entity<SummaryItem>(b =>
+        {
+            b.ToTable("summary_item");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(e => e.SummaryId).HasColumnName("summary_id");
+            b.Property(e => e.ElectronicDocumentId).HasColumnName("electronic_document_id");
+            b.Property(e => e.LineNumber).HasColumnName("line_number");
+            b.Property(e => e.ReleasedAt).HasColumnName("released_at");
+            b.HasIndex(e => e.SummaryId);
+
+            // A receipt belongs to at most one active summary: two concurrent summaries cannot both report it.
+            b.HasIndex(e => new { e.TenantId, e.ElectronicDocumentId }).IsUnique().HasFilter("released_at IS NULL").HasDatabaseName("ux_summary_item_active");
             ConfigureTenantOwned(b);
         });
     }

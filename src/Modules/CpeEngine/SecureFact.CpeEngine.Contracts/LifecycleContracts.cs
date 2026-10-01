@@ -50,6 +50,12 @@ public enum EDocumentEvent
 
     /// <summary>An operator re-queues a failed document.</summary>
     ManualRetry,
+
+    /// <summary>
+    /// The daily summary that carried this receipt was rejected: the receipt itself was not judged, so it goes back to the queue
+    /// (attempts unchanged) to be reported in a new summary.
+    /// </summary>
+    ReturnedToQueue,
 }
 
 /// <param name="State">State after the event.</param>
@@ -95,7 +101,8 @@ public sealed record ElectronicDocumentDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? SentAt,
-    DateTimeOffset? ProcessedAt);
+    DateTimeOffset? ProcessedAt,
+    DateOnly IssueDate);
 
 public sealed record ElectronicDocumentEventDto(Guid Id, EDocumentState From, EDocumentState To, EDocumentEvent Event, int Attempt, string? Detail, DateTimeOffset OccurredAt);
 
@@ -112,6 +119,12 @@ public interface IElectronicDocumentService
     /// Receipts (03) are reported in daily summaries and are not sent by this method.
     /// </summary>
     Task<Result<ElectronicDocumentDto>> SendAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Asks SUNAT for the result of a document sent as a summary (<c>getStatus</c> with its ticket) and records the CDR when it is ready.
+    /// Only valid in state <see cref="EDocumentState.AwaitingTicket"/>.
+    /// </summary>
+    Task<Result<ElectronicDocumentDto>> PollAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
 
     /// <summary>An operator puts a failed document back in the queue (resets its send attempts).</summary>
     Task<Result<ElectronicDocumentDto>> RetryAsync(Guid electronicDocumentId, CancellationToken cancellationToken);

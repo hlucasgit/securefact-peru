@@ -96,4 +96,7 @@ public interface IDocumentService
     Task<Result<DocumentDto>> GetAsync(Guid documentId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<DocumentDto>> ListAsync(Guid? companyId, int skip, int take, CancellationToken cancellationToken);
+
+    /// <summary>Documents of one company, type and issue date, ordered by series and number (for daily summaries).</summary>
+    Task<IReadOnlyList<DocumentDto>> ListIssuedAsync(Guid companyId, string documentTypeCode, DateOnly issueDate, int skip, int take, CancellationToken cancellationToken);
 }

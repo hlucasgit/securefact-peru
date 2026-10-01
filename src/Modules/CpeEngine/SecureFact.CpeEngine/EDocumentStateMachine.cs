@@ -36,6 +36,8 @@ internal sealed class EDocumentStateMachine : IEDocumentStateMachine
 
             (EDocumentState.Sending or EDocumentState.AwaitingTicket, EDocumentEvent.PermanentFailure) => current with { State = EDocumentState.Failed },
 
+            (EDocumentState.Sending or EDocumentState.AwaitingTicket, EDocumentEvent.ReturnedToQueue) => current with { State = EDocumentState.ReadyToSend },
+
             (EDocumentState.Failed, EDocumentEvent.ManualRetry) => new(EDocumentState.ReadyToSend, 0),
 
             _ => null,

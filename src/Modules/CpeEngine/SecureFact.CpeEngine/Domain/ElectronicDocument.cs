@@ -17,6 +17,9 @@ internal sealed class ElectronicDocument : ITenantOwned
 
     public Guid CompanyId { get; private set; }
 
+    /// <summary>Issue date of the document; for a daily summary, the date of the receipts it reports.</summary>
+    public DateOnly IssueDate { get; private set; }
+
     public string DocumentTypeCode { get; private set; } = string.Empty;
 
     public string Series { get; private set; } = string.Empty;
@@ -66,12 +69,13 @@ internal sealed class ElectronicDocument : ITenantOwned
 
     public static ElectronicDocument Create(
         Guid id, Guid tenantId, Guid documentId, Guid companyId, string documentTypeCode, string series, long number,
-        string fileBaseName, string signedXml, string digestValue, DateTimeOffset now) => new()
+        string fileBaseName, string signedXml, string digestValue, DateTimeOffset now, DateOnly issueDate) => new()
     {
         Id = id,
         TenantId = tenantId,
         DocumentId = documentId,
         CompanyId = companyId,
+        IssueDate = issueDate,
         DocumentTypeCode = documentTypeCode,
         Series = series,
         Number = number,
@@ -82,6 +86,15 @@ internal sealed class ElectronicDocument : ITenantOwned
         CreatedAt = now,
         UpdatedAt = now,
     };
+
+    /// <summary>A daily summary has no billing document: it uses its own id as document id, "RC" as type and its correlative as number.</summary>
+    public static ElectronicDocument CreateSummary(
+        Guid id, Guid tenantId, Guid companyId, DateOnly referenceDate, int correlative, string fileBaseName, string signedXml, string digestValue, DateTimeOffset now) =>
+        Create(id, tenantId, id, companyId, SummaryType, "RC", correlative, fileBaseName, signedXml, digestValue, now, referenceDate);
+
+    public const string SummaryType = "RC";
+
+    public bool IsSummary => DocumentTypeCode == SummaryType;
 
     public void MoveTo(EDocumentSnapshot snapshot, DateTimeOffset now)
     {
@@ -105,6 +118,16 @@ internal sealed class ElectronicDocument : ITenantOwned
     public void RecordCdr(byte[] zip, CdrInfo cdr, string observationsJson, DateTimeOffset now)
     {
         CdrZip = zip;
+        CdrProcessId = cdr.ProcessId;
+        CdrResponseCode = cdr.ResponseCode;
+        CdrDescription = cdr.Description.Length > 1000 ? cdr.Description[..1000] : cdr.Description;
+        CdrObservationsJson = observationsJson;
+        ProcessedAt = now;
+    }
+
+    /// <summary>A receipt reported in an accepted summary shows the summary's outcome; the CDR file itself belongs to the summary.</summary>
+    public void RecordSummaryOutcome(CdrInfo cdr, string observationsJson, DateTimeOffset now)
+    {
         CdrProcessId = cdr.ProcessId;
         CdrResponseCode = cdr.ResponseCode;
         CdrDescription = cdr.Description.Length > 1000 ? cdr.Description[..1000] : cdr.Description;
@@ -153,4 +176,36 @@ internal sealed class ElectronicDocumentEvent : ITenantOwned
         Detail = detail is { Length: > 500 } ? detail[..500] : detail,
         OccurredAt = now,
     };
+}
+
+/// <summary>Links a daily summary to a receipt it reports. A receipt is in at most one active (unreleased) summary.</summary>
+internal sealed class SummaryItem : ITenantOwned
+{
+    private SummaryItem()
+    {
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public Guid SummaryId { get; private set; }
+
+    public Guid ElectronicDocumentId { get; private set; }
+
+    public int LineNumber { get; private set; }
+
+    /// <summary>Set when the summary was rejected: the receipt can then be reported again.</summary>
+    public DateTimeOffset? ReleasedAt { get; private set; }
+
+    public static SummaryItem Create(Guid tenantId, Guid summaryId, Guid electronicDocumentId, int lineNumber) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        SummaryId = summaryId,
+        ElectronicDocumentId = electronicDocumentId,
+        LineNumber = lineNumber,
+    };
+
+    public void Release(DateTimeOffset now) => ReleasedAt ??= now;
 }

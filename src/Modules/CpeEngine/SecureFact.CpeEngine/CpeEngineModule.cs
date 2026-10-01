@@ -33,6 +33,7 @@ public static class CpeEngineModule
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IElectronicDocumentService, ElectronicDocumentService>();
+        services.AddScoped<ISummaryService, SummaryService>();
         return services;
     }
 

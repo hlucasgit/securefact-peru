@@ -31,7 +31,19 @@ internal static class CpeEndpoints
         group.MapPost("/{id:guid}/send", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.SendAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
 
+        group.MapPost("/{id:guid}/poll", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
+            (await service.PollAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
+
         group.MapPost("/{id:guid}/retry", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.RetryAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
+
+        var summaries = app.MapGroup("/api/v1/summaries").WithTags("CPE");
+
+        summaries.MapPost(string.Empty, async (CreateSummaryRequest body, ISummaryService service, HttpContext http, CancellationToken ct) =>
+            (await service.CreateAsync(body.CompanyId, body.ReferenceDate, ct)).ToHttp(http, created => Results.Created($"/api/v1/summaries/{created[0].Document.Id}", created)))
+            .RequireAuthorization(Permissions.CpeSend);
+
+        summaries.MapGet("/{id:guid}", async (Guid id, ISummaryService service, HttpContext http, CancellationToken ct) =>
+            (await service.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
     }
 }
