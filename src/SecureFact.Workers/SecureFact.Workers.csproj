@@ -1,6 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
   <ItemGroup>
+    <InternalsVisibleTo Include="SecureFact.Security.Tests" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <ProjectReference Include="..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
+    <ProjectReference Include="..\Modules\Organizations\SecureFact.Organizations\SecureFact.Organizations.csproj" />
+    <ProjectReference Include="..\Modules\Billing\SecureFact.Billing\SecureFact.Billing.csproj" />
+    <ProjectReference Include="..\Modules\TaxEngine\SecureFact.TaxEngine\SecureFact.TaxEngine.csproj" />
+    <ProjectReference Include="..\Modules\Catalogs\SecureFact.Catalogs\SecureFact.Catalogs.csproj" />
+    <ProjectReference Include="..\Modules\CpeEngine\SecureFact.CpeEngine\SecureFact.CpeEngine.csproj" />
+    <ProjectReference Include="..\Modules\Rules\SecureFact.Rules\SecureFact.Rules.csproj" />
+    <ProjectReference Include="..\Modules\Customers\SecureFact.Customers\SecureFact.Customers.csproj" />
+    <ProjectReference Include="..\Modules\Certificates\SecureFact.Certificates\SecureFact.Certificates.csproj" />
   </ItemGroup>
 </Project>

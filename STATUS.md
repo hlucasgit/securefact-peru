@@ -21,6 +21,11 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - **Tubería** (ADR-019): preparar (UBL + firma) → enviar (`sendBill`) → CDR validado contra el documento → estado final inmutable (disparadores en la base de datos). Historial de eventos, reintentos con espera exponencial, reintento manual, concurrencia (un solo envío a SUNAT por documento). Probada con un simulador de SUNAT en proceso.
 - **Pruebas: 363 pasan** (202 unitarias, 6 arquitectura, 6 integración, 149 seguridad/API).
 
+## Novedades de la quinta tanda
+- **Resumen diario de boletas** (ADR-020): UBL 2.0 validado contra el XSD oficial y la hoja `Resumen Diario1_1`; el resumen es un documento electrónico firmado que se envía con `sendSummary` y se sigue con `getStatus`; las boletas reflejan su resumen y, si se rechaza, vuelven a la cola.
+- **Worker** (ADR-021): host real (`SecureFact.Workers`) con resúmenes de días cerrados, envíos vencidos, tickets y detección de atascados (recuperación solo por un operador).
+- **Pruebas: 405 pasan** (226 unitarias, 6 arquitectura, 6 integración, 167 seguridad/API).
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT del XML y de la firma no probada (solo XSD y etiquetas obligatorias; el canal SOAP solo se probó con simulador); algoritmo de firma, base64 en línea y `SOAPAction` por confirmar en el beta (R-032, R-034).
@@ -31,6 +36,6 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## Pendientes
 1. Commit y push.
 2. Factor de descuento porcentual y descuentos globales por categoría (casos oficiales de la guía) en TaxEngine y UBL.
-3. Worker (reintentos por `next_attempt_at`, documentos atascados en `Sending`, tickets), resumen diario de boletas, prueba en el beta de SUNAT (con credenciales del usuario).
+3. Generación automática del documento electrónico al emitir (outbox Billing → CPE), prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas.
 4. Outbox + bus + S3 de código; ejecutar el CI; medir cobertura.
 5. PDF y renderizado del QR.

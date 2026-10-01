@@ -128,6 +128,7 @@ public class EDocumentStateMachineTests
             (EDocumentState.AwaitingTicket, EDocumentEvent.TransientFailure),
             (EDocumentState.AwaitingTicket, EDocumentEvent.PermanentFailure),
             (EDocumentState.Sending, EDocumentEvent.ReturnedToQueue),
+            (EDocumentState.Sending, EDocumentEvent.Recovered),
             (EDocumentState.AwaitingTicket, EDocumentEvent.ReturnedToQueue),
             (EDocumentState.Failed, EDocumentEvent.ManualRetry),
         };

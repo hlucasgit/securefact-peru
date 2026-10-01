@@ -32,6 +32,36 @@
           "Microsoft.Extensions.Options": "10.0.12"
         }
       },
+      "Microsoft.EntityFrameworkCore.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.12",
+        "contentHash": "kDrux7T6C3V/YYYe2LXr7x6AEsVyq5Y2YoTE9er1SwbDtap3z1g8RgxNh5eKQVyB4T+DKvBBJ4Ezd/VZzJQJZg=="
+      },
+      "Microsoft.EntityFrameworkCore.Analyzers": {
+        "type": "Transitive",
+        "resolved": "10.0.12",
+        "contentHash": "Kd4o2oO1A6dfKxjz5LS16QyLtpCFTUiFWwmBABETAXRsSImBdRdWeKjSgbbRhAMiV3a3/nWr95ZtzClT4uaADQ=="
+      },
+      "Microsoft.Extensions.Caching.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.12",
+        "contentHash": "sI3A6MUAyZwccLnwq0cXuRmC3WBtXieimBWafXSfhRJ4jnM2uGVXrqImDDVyW27u4vVaTOGlJxNJd8d1FGvCNQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Primitives": "10.0.12"
+        }
+      },
+      "Microsoft.Extensions.Caching.Memory": {
+        "type": "Transitive",
+        "resolved": "10.0.12",
+        "contentHash": "fhC3DHcBcFF4bXvHIxFtXJYNut7q7ZItqNFcgWfrIgmpVImlcEKNHhE7ztpNSPJYMHYYStS5QGND2I5mC26yeA==",
+        "dependencies": {
+          "Microsoft.Extensions.Caching.Abstractions": "10.0.12",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Options": "10.0.12",
+          "Microsoft.Extensions.Primitives": "10.0.12"
+        }
+      },
       "Microsoft.Extensions.Configuration": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -265,19 +295,226 @@
         "resolved": "10.0.12",
         "contentHash": "dYfCLR52UA+3DL7C4I/pvSaRPkNqxrUAQmbFL2u0zvYKKzqgrFCJl08Df+F1aYc8leu9JvpC9bsURUdpExcBXQ=="
       },
+      "Npgsql": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
+        }
+      },
       "System.Diagnostics.EventLog": {
         "type": "Transitive",
         "resolved": "10.0.12",
         "contentHash": "sOZM+VyRj1pg/ItlHsvrSbjws6oGqZveTzTNBGZ9ziwRDyKsOF3ub6vhvOdxotCIqtlnyHAIwP5sLNvgiZC+pQ=="
       },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "Transitive",
+        "resolved": "10.0.12",
+        "contentHash": "W6BsawU2tB2qy6u4+3cBOSOmiTUgYWW365b5WMVA1bDxQwZZeNWD+qufKJkDQNKzAKq4b6Q04DDKhmr2SNJ1eg=="
+      },
+      "securefact.audit": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.audit.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.billing": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.Customers.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.billing.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.catalogs": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Catalogs.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.catalogs.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.certificates": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Certificates.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.certificates.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.cpeengine": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
+          "Microsoft.Extensions.Http": "[10.0.12, )",
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.Certificates.Contracts": "[1.0.0, )",
+          "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )",
+          "System.Security.Cryptography.Xml": "[10.0.12, )"
+        }
+      },
+      "securefact.cpeengine.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.customers": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Catalogs.Contracts": "[1.0.0, )",
+          "SecureFact.Customers.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.customers.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.organizations": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.organizations.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.platform": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "[10.0.12, )",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.rules": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.rules.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "securefact.sharedkernel": {
         "type": "Project"
+      },
+      "securefact.taxengine": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.taxengine.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "Microsoft.EntityFrameworkCore": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "e7OrVN8U5yr4kuwdTHWBHGVQIVsGfMkAr0Ej1/BnrS989Q0XBVANpIzNZ2bc1GvMZ0/XwMt5InTnmKskxGy99Q==",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore.Abstractions": "10.0.12",
+          "Microsoft.EntityFrameworkCore.Analyzers": "10.0.12",
+          "Microsoft.Extensions.Caching.Memory": "10.0.12",
+          "Microsoft.Extensions.Logging": "10.0.12"
+        }
+      },
+      "Microsoft.EntityFrameworkCore.Relational": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "OiHmr8XzX96dbgMsYGe8qoqg4KxibdZG2r0QUVJBGktFInOp8IrABe8jvcbo5hrqeWfbwpK7fCEBiEPbY/ik4A==",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "10.0.12",
+          "Microsoft.Extensions.Caching.Memory": "10.0.12",
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Logging": "10.0.12"
+        }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "CentralTransitive",
         "requested": "[10.0.12, )",
         "resolved": "10.0.12",
         "contentHash": "9/qymSh7hVDMGTGwrLz8MRp5zRyXy9adGDOs4HwRdnLil3oZGYuWeZjbmHgCQ9BL1qBroVfgUK3U/nb61617Cw=="
+      },
+      "Microsoft.Extensions.Http": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "x/fnoUGgmIUjSgLR1p6Mpi/vXc1Xe0xDPJnggPp23I6vwM/kY4nxyOjo8i6G5KPVw+esJM+rJsqnHbdjasvCBw==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Diagnostics": "10.0.12",
+          "Microsoft.Extensions.Logging": "10.0.12",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Options": "10.0.12"
+        }
       },
       "Microsoft.Extensions.Options.ConfigurationExtensions": {
         "type": "CentralTransitive",
@@ -290,6 +527,26 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12",
           "Microsoft.Extensions.Options": "10.0.12",
           "Microsoft.Extensions.Primitives": "10.0.12"
+        }
+      },
+      "Npgsql.EntityFrameworkCore.PostgreSQL": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "IPGrrZnRkuW7OlHDhUESZz4G5DLkW7Nej/O3Cx+0iTsgyU5XJxBgpsvTHLloo3WWuAKKbDHXBvWPVkX1deRh1Q==",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "[10.0.4, 11.0.0)",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.4, 11.0.0)",
+          "Npgsql": "10.0.3"
+        }
+      },
+      "System.Security.Cryptography.Xml": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "T3snzcc04R1JDj2XmzrLyk5fHT0YroBz5o2P+YdyJKYePSMqp8JsrxEJQPvUnK6oozQBvKLki9vnI7uMuWepKQ==",
+        "dependencies": {
+          "System.Security.Cryptography.Pkcs": "10.0.12"
         }
       }
     }

@@ -1,4 +1,6 @@
-var builder = Host.CreateApplicationBuilder(args);
+namespace SecureFact.Workers;
 
-// Background services (outbox publisher, document pipeline, webhook delivery) are registered here as their phases land.
-await builder.Build().RunAsync();
+internal static class WorkerProgram
+{
+    private static async Task Main(string[] args) => await WorkerHost.Create(args).Build().RunAsync();
+}

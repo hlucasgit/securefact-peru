@@ -1,0 +1,77 @@
+using SecureFact.Audit;
+using SecureFact.Billing;
+using SecureFact.Catalogs;
+using SecureFact.Certificates;
+using SecureFact.CpeEngine;
+using SecureFact.CpeEngine.Contracts;
+using SecureFact.Customers;
+using SecureFact.Organizations;
+using SecureFact.Platform;
+using SecureFact.Platform.Security;
+using SecureFact.Rules;
+using SecureFact.SharedKernel.Tenancy;
+using SecureFact.TaxEngine;
+using SecureFact.Workers.Infrastructure;
+
+namespace SecureFact.Workers;
+
+/// <summary>Composition of the worker host; shared by <c>Program</c> and the tests so that both run the real wiring.</summary>
+internal static class WorkerHost
+{
+    public static HostApplicationBuilder Create(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        var appConnection = builder.Configuration.GetConnectionString("App")
+            ?? throw new InvalidOperationException("ConnectionStrings:App is required (the runtime role, never the migration owner).");
+
+        if (!builder.Environment.IsDevelopment())
+        {
+            builder.Logging.AddJsonConsole();
+        }
+
+        builder.Services.AddPlatformDataScope();
+        builder.Services.AddSingleton<ISecretProtector>(_ =>
+        {
+            // ADR-007: the in-process KEK is for development and tests only. Production needs a KMS/Vault-backed protector.
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException("No production ISecretProtector is configured. Register a KMS/Vault-backed implementation (ADR-007).");
+            }
+
+            return LocalEnvelopeSecretProtector.FromBase64(builder.Configuration["Security:LocalDevKek"]);
+        });
+        builder.Services.AddScoped<ICurrentUser, SystemCurrentUser>();
+        builder.Services.AddScoped<IRequestContext, WorkerRequestContext>();
+
+        builder.Services.AddAuditModule(appConnection);
+        builder.Services.AddOrganizationsModule(appConnection);
+        builder.Services.AddTaxEngineModule();
+        builder.Services.AddCatalogsModule(appConnection);
+        builder.Services.AddRulesModule(appConnection);
+        builder.Services.AddCustomersModule(appConnection);
+        builder.Services.AddBillingModule(appConnection);
+        builder.Services.AddCertificatesModule(appConnection);
+        builder.Services.AddCpeEngineModule();
+        builder.Services.AddCpePipeline(appConnection);
+
+        // SUNAT is never reached implicitly: the environment must be named. Without it the worker only prepares summaries.
+        switch (builder.Configuration["Sunat:Environment"])
+        {
+            case "Beta":
+                builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Beta);
+                break;
+            case "Production":
+                builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Production);
+                break;
+            case null or "":
+                break;
+            default:
+                throw new InvalidOperationException("Sunat:Environment must be 'Beta' or 'Production'.");
+        }
+
+        builder.Services.AddHostedService<CpeWorker>();
+
+        return builder;
+    }
+}

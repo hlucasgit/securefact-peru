@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\..\src\Modules\Customers\SecureFact.Customers\SecureFact.Customers.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Certificates\SecureFact.Certificates\SecureFact.Certificates.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\CpeEngine\SecureFact.CpeEngine\SecureFact.CpeEngine.csproj" />
+    <ProjectReference Include="..\..\..\src\SecureFact.Workers\SecureFact.Workers.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Products\SecureFact.Products\SecureFact.Products.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Rules\SecureFact.Rules\SecureFact.Rules.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Catalogs\SecureFact.Catalogs\SecureFact.Catalogs.csproj" />

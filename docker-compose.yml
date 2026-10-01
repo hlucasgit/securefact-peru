@@ -132,13 +132,18 @@ services:
       context: .
       dockerfile: src/SecureFact.Workers/Dockerfile
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     environment:
       DOTNET_ENVIRONMENT: Development
       SF__Environment: ${SF_ENVIRONMENT:-Local}
+      ConnectionStrings__App: Host=postgres;Database=${POSTGRES_DB};Username=${SF_APP_DB_USER};Password=${SF_APP_DB_PASSWORD}
+      Security__LocalDevKek: ${SF_LOCAL_DEV_KEK:?set in .env}
+      # SUNAT is never reached implicitly: leave empty to only prepare summaries, or set Beta / Production explicitly.
+      Sunat__Environment: ${SF_SUNAT_ENVIRONMENT:-}
+      Cpe__WorkerIntervalSeconds: ${SF_CPE_WORKER_INTERVAL:-15}
 
   # Optional local observability stack: docker compose --profile observability up -d
   # Grafana http://localhost:3000 (Loki, Tempo, Prometheus); set SF_OTLP_ENDPOINT=http://otel:4317 for the API.

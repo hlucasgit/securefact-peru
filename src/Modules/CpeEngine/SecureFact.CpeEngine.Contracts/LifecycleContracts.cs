@@ -56,6 +56,12 @@ public enum EDocumentEvent
     /// (attempts unchanged) to be reported in a new summary.
     /// </summary>
     ReturnedToQueue,
+
+    /// <summary>
+    /// An operator re-queues a document that stayed in <see cref="EDocumentState.Sending"/> past the lease (the worker died or the call never
+    /// returned). The outcome at SUNAT is unknown, so the operator must have checked it first: sending again may create a duplicate (R-038).
+    /// </summary>
+    Recovered,
 }
 
 /// <param name="State">State after the event.</param>
@@ -125,6 +131,12 @@ public interface IElectronicDocumentService
     /// Only valid in state <see cref="EDocumentState.AwaitingTicket"/>.
     /// </summary>
     Task<Result<ElectronicDocumentDto>> PollAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Puts a document stuck in <see cref="EDocumentState.Sending"/> (beyond <see cref="ICpeWorkProcessor.SendingLease"/>) back in the queue.
+    /// The caller is asserting that the outcome at SUNAT was checked.
+    /// </summary>
+    Task<Result<ElectronicDocumentDto>> RecoverAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
 
     /// <summary>An operator puts a failed document back in the queue (resets its send attempts).</summary>
     Task<Result<ElectronicDocumentDto>> RetryAsync(Guid electronicDocumentId, CancellationToken cancellationToken);

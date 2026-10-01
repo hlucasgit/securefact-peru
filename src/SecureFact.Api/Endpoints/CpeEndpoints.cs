@@ -34,6 +34,9 @@ internal static class CpeEndpoints
         group.MapPost("/{id:guid}/poll", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.PollAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
 
+        group.MapPost("/{id:guid}/recover", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
+            (await service.RecoverAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
+
         group.MapPost("/{id:guid}/retry", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.RetryAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
 

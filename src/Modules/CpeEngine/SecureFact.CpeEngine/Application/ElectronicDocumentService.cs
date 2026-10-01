@@ -295,6 +295,44 @@ internal sealed class ElectronicDocumentService(
         return ToDto(entity);
     }
 
+    public async Task<Result<ElectronicDocumentDto>> RecoverAsync(Guid electronicDocumentId, CancellationToken cancellationToken)
+    {
+        var entity = await db.ElectronicDocuments.SingleOrDefaultAsync(e => e.Id == electronicDocumentId, cancellationToken);
+        if (entity is null)
+        {
+            return Missing;
+        }
+
+        var now = clock.GetUtcNow();
+        if (entity.State != EDocumentState.Sending)
+        {
+            return Error.Conflict(ErrorCodes.CpeInvalidTransition, "Transición de estado inválida", $"El documento está en estado {entity.State}; solo un envío atascado se puede recuperar.");
+        }
+
+        if (now - entity.UpdatedAt < ICpeWorkProcessor.SendingLease)
+        {
+            return Error.Conflict(ErrorCodes.CpeBusy, "Envío en curso", "El documento todavía está dentro del plazo de envío; espere antes de recuperarlo.");
+        }
+
+        var moved = Lifecycle.Transition(db, machine, entity, EDocumentEvent.Recovered, "Recuperado por un operador tras un envío sin respuesta.", now);
+        if (!moved.IsSuccess)
+        {
+            return moved.Error;
+        }
+
+        Propagate(entity, await LoadChildrenAsync(entity, cancellationToken), EDocumentEvent.Recovered, "Resumen recuperado por un operador.", now, null);
+        entity.ScheduleRetry(null);
+        if (await TrySaveAsync(cancellationToken) is { } busy)
+        {
+            return busy;
+        }
+
+        await audit.RecordAsync(new AuditEvent(
+            AuditActions.ElectronicDocumentRecovered, "electronic_document", entity.Id.ToString("D"), entity.TenantId,
+            NewValues: new Dictionary<string, object?> { ["state"] = entity.State.ToString(), ["attempts"] = entity.Attempts }), cancellationToken);
+        return ToDto(entity);
+    }
+
     public async Task<Result<ElectronicDocumentDto>> RetryAsync(Guid electronicDocumentId, CancellationToken cancellationToken)
     {
         var entity = await db.ElectronicDocuments.SingleOrDefaultAsync(e => e.Id == electronicDocumentId, cancellationToken);
@@ -519,6 +557,7 @@ internal sealed class ElectronicDocumentService(
             EDocumentEvent.TransientFailure => EDocumentEvent.TransientFailure,
             EDocumentEvent.PermanentFailure => EDocumentEvent.PermanentFailure,
             EDocumentEvent.ManualRetry => EDocumentEvent.ManualRetry,
+            EDocumentEvent.Recovered => EDocumentEvent.Recovered,
             _ => null,
         };
         if (mapped is null)

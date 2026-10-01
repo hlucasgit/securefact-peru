@@ -18,6 +18,7 @@ public sealed class FakeSunatChannel : ICpeSubmissionChannel
     private readonly ConcurrentQueue<Call> _summaryCalls = new();
     private readonly ConcurrentQueue<ChannelReply> _statusScript = new();
     private readonly ConcurrentQueue<string> _statusCalls = new();
+    private volatile Func<Call, ChannelReply>? _billHandler;
 
     public IReadOnlyCollection<Call> Calls => [.. _calls];
 
@@ -33,11 +34,15 @@ public sealed class FakeSunatChannel : ICpeSubmissionChannel
         _summaryCalls.Clear();
         _statusScript.Clear();
         _statusCalls.Clear();
+        _billHandler = null;
     }
 
     public void Enqueue(ChannelReply reply) => _script.Enqueue(_ => reply);
 
     public void Enqueue(Func<Call, ChannelReply> reply) => _script.Enqueue(reply);
+
+    /// <summary>Answers every sendBill call with this function instead of the queue (for tests that share the database with other documents).</summary>
+    public void RespondToBills(Func<Call, ChannelReply> handler) => _billHandler = handler;
 
     public void EnqueueSummary(ChannelReply reply) => _summaryScript.Enqueue(_ => reply);
 
@@ -47,6 +52,11 @@ public sealed class FakeSunatChannel : ICpeSubmissionChannel
     {
         var call = new Call(credentials, zipFileName, zip);
         _calls.Enqueue(call);
+        if (_billHandler is { } handler)
+        {
+            return Task.FromResult(handler(call));
+        }
+
         return Task.FromResult(_script.TryDequeue(out var reply) ? reply(call) : ChannelReply.Down("simulator has no scripted reply"));
     }
 
