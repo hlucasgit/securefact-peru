@@ -161,6 +161,41 @@ public class SigningTests
     }
 
     [Fact]
+    public void Empty_directory_entries_such_as_the_dummy_folder_of_sunat_cdrs_are_ignored()
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            archive.CreateEntry("dummy/");
+            using var writer = new StreamWriter(archive.CreateEntry("R-20614754151-01-F001-1.xml").Open());
+            writer.Write("<a/>");
+        }
+
+        var result = _packager.Unzip(stream.ToArray());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        Assert.Equal("R-20614754151-01-F001-1.xml", result.Value.FileName);
+    }
+
+    [Fact]
+    public void A_folder_with_content_or_a_second_file_is_still_refused()
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            using (var one = new StreamWriter(archive.CreateEntry("a.xml").Open()))
+            {
+                one.Write("<a/>");
+            }
+
+            using var two = new StreamWriter(archive.CreateEntry("dummy/b.xml").Open());
+            two.Write("<b/>");
+        }
+
+        Assert.False(_packager.Unzip(stream.ToArray()).IsSuccess);
+    }
+
+    [Fact]
     public void The_signed_digest_can_be_printed_in_the_qr()
     {
         using var certificate = NewCertificate();

@@ -37,12 +37,15 @@ internal sealed partial class ZipCpePackager : ICpePackager
         try
         {
             using var archive = new ZipArchive(new MemoryStream(zip), ZipArchiveMode.Read);
-            if (archive.Entries.Count != 1)
+            // SUNAT's CDR archives carry an empty "dummy/" directory entry next to the XML (seen against the beta service): empty directory
+            // entries are ignored, but exactly one real file must remain.
+            var files = archive.Entries.Where(e => !(e.FullName.EndsWith('/') && e.Length == 0)).ToList();
+            if (files.Count != 1)
             {
                 return Bad("El ZIP debe contener exactamente un archivo.");
             }
 
-            var entry = archive.Entries[0];
+            var entry = files[0];
             // Guards against zip bombs and path tricks in archives that come from outside.
             if (entry.Length > MaxUncompressedBytes || entry.FullName.IndexOfAny(['/', '\\']) >= 0 || entry.FullName.Contains("..", StringComparison.Ordinal))
             {

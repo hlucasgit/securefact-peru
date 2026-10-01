@@ -55,8 +55,7 @@ internal sealed partial class CdrParser(ICpePackager packager) : ICdrParser
 
         var response = responses[0].Element(Cac + "Response");
         var processId = Text(root.Element(Cbc + "ID"));
-        var receivedDate = ParseDate(Text(root.Element(Cbc + "IssueDate")));
-        var receivedTime = ParseTime(Text(root.Element(Cbc + "IssueTime")));
+        var (receivedDate, receivedTime) = ParseReceived(Text(root.Element(Cbc + "IssueDate")), Text(root.Element(Cbc + "IssueTime")));
         var responseDate = ParseDate(Text(root.Element(Cbc + "ResponseDate")));
         var responseTime = ParseTime(Text(root.Element(Cbc + "ResponseTime")));
         var sunat = PartyId(root.Element(Cac + "SenderParty"));
@@ -100,6 +99,21 @@ internal sealed partial class CdrParser(ICpePackager packager) : ICdrParser
     private static string PartyId(XElement? party) => Text(party?.Element(Cac + "PartyIdentification")?.Element(Cbc + "ID"));
 
     private static string Text(XElement? element) => element?.Value.Trim() ?? string.Empty;
+
+    /// <summary>
+    /// The manual shows a date plus a time. The beta service answers with a full timestamp in <c>IssueDate</c> (<c>2026-10-01T11:42:05</c>) and a
+    /// meaningless <c>IssueTime</c> of 00:00:00; both shapes are accepted and the timestamp wins when present.
+    /// </summary>
+    private static (DateOnly? Date, TimeOnly? Time) ParseReceived(string date, string time)
+    {
+        if (date.Contains('T', StringComparison.Ordinal)
+            && DateTime.TryParseExact(date, "yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var stamp))
+        {
+            return (DateOnly.FromDateTime(stamp), TimeOnly.FromDateTime(stamp));
+        }
+
+        return (ParseDate(date), ParseTime(time));
+    }
 
     private static DateOnly? ParseDate(string value) =>
         DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;

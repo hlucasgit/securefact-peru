@@ -8,6 +8,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="QRCoder" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
     <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />

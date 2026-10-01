@@ -4,6 +4,8 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Primera aceptación real: factura enviada al **beta de SUNAT** y aceptada (CDR código 0, sin observaciones). Herramienta `tools/SecureFact.BetaSmoke`; correcciones de forma de pago (3244), atributos del UBL y lectura del CDR real (`docs/regulatory/beta-findings.md`).
+- Representación impresa: importe en letras y renderizador PDF A4 con QR vectorial (sin integrar en la API todavía).
 - Outbox transaccional (Billing → CPE): el documento emitido prepara su documento electrónico sin pasos manuales; entrega al menos una vez, reintentos con espera, mensajes muertos con reencolado por un operador, y corrección de la inanición del lote del worker (ADR-022).
 - Worker de documentos electrónicos: resúmenes de días cerrados, envíos con espera exponencial, consulta de tickets y detección de envíos atascados con recuperación por un operador (ADR-021).
 - Resumen diario de boletas: generador UBL 2.0 validado contra el XSD y la hoja oficial, resumen firmado, enviado con `sendSummary`, consulta del ticket con `getStatus`, boletas que siguen a su resumen y se liberan si se rechaza (ADR-020).

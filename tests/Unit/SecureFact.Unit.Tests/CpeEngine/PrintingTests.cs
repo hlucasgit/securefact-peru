@@ -1,0 +1,240 @@
+using System.IO.Compression;
+using System.Text;
+using System.Text.RegularExpressions;
+using QRCoder;
+using SecureFact.CpeEngine.Contracts;
+using SecureFact.CpeEngine.Printing;
+using SecureFact.SharedKernel;
+
+namespace SecureFact.Unit.Tests.CpeEngine;
+
+public class AmountInWordsTests
+{
+    [Theory]
+    [InlineData(0, "SON: CERO CON 00/100 SOLES")]
+    [InlineData(1, "SON: UNO CON 00/100 SOLES")]
+    [InlineData(21, "SON: VEINTIUNO CON 00/100 SOLES")]
+    [InlineData(100, "SON: CIEN CON 00/100 SOLES")]
+    [InlineData(101, "SON: CIENTO UNO CON 00/100 SOLES")]
+    [InlineData(118, "SON: CIENTO DIECIOCHO CON 00/100 SOLES")]
+    [InlineData(236, "SON: DOSCIENTOS TREINTA Y SEIS CON 00/100 SOLES")]
+    [InlineData(1000, "SON: MIL CON 00/100 SOLES")]
+    [InlineData(1001, "SON: MIL UNO CON 00/100 SOLES")]
+    [InlineData(21000, "SON: VEINTIÚN MIL CON 00/100 SOLES")]
+    [InlineData(100000, "SON: CIEN MIL CON 00/100 SOLES")]
+    [InlineData(1000000, "SON: UN MILLÓN CON 00/100 SOLES")]
+    [InlineData(1000001, "SON: UN MILLÓN UNO CON 00/100 SOLES")]
+    [InlineData(21000000, "SON: VEINTIÚN MILLONES CON 00/100 SOLES")]
+    public void Whole_amounts_are_spelled_out(decimal amount, string expected) =>
+        Assert.Equal(expected, AmountInWords.Describe(amount, "PEN"));
+
+    [Fact]
+    public void Cents_are_printed_as_a_fraction_of_100_and_rounded_like_money()
+    {
+        Assert.Equal("SON: DOS MILLONES TRESCIENTOS CUARENTA Y CINCO MIL SEISCIENTOS SETENTA Y OCHO CON 90/100 SOLES", AmountInWords.Describe(2_345_678.90m, "PEN"));
+        Assert.Equal("SON: CINCO CON 05/100 SOLES", AmountInWords.Describe(5.05m, "PEN"));
+        Assert.Equal("SON: UNO CON 00/100 SOLES", AmountInWords.Describe(0.995m, "PEN"));
+    }
+
+    [Theory]
+    [InlineData("USD", "DÓLARES AMERICANOS")]
+    [InlineData("EUR", "EUROS")]
+    [InlineData("XYZ", "XYZ")]
+    public void The_currency_is_named(string currency, string name) =>
+        Assert.EndsWith(" " + name, AmountInWords.Describe(10m, currency), StringComparison.Ordinal);
+
+    [Fact]
+    public void Out_of_range_amounts_are_refused_and_the_maximum_works()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => AmountInWords.Describe(-1m, "PEN"));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AmountInWords.Describe(AmountInWords.Max + 1m, "PEN"));
+        Assert.StartsWith("SON: NOVECIENTOS NOVENTA Y NUEVE MIL", AmountInWords.Describe(AmountInWords.Max, "PEN"), StringComparison.Ordinal);
+    }
+}
+
+public class PrintedRepresentationTests
+{
+    private readonly PdfPrintedRepresentationRenderer _renderer = new();
+
+    private static PrintedDocument Document(string type = "01", int lines = 2, string description = "Servicio de consultoría") => new(
+        type, type == "01" ? "F001" : "B001", 123, new DateOnly(2026, 9, 30), "PEN",
+        "EMISORA DEMO S.A.C.", "Emisora Demo", "20100066603", "AV. LARCO 123 - MIRAFLORES - LIMA - LIMA",
+        type == "01" ? "Registro Unico de Contributentes" : "Documento Nacional de Identidad",
+        type == "01" ? "20100070970" : "12345678",
+        type == "01" ? "CLIENTE DEMO SAC" : "JUAN PEREZ",
+        "CALLE LOS OLIVOS 456",
+        Enumerable.Range(1, lines).Select(i => new PrintedLine(i % 2 == 0 ? "NIU" : "KGM", i, $"{description} {i}", 100m, 118m, 100m * i, 18m * i)).ToList(),
+        new PrintedTotals(200m, 0m, 0m, 0m, 36m, 236m),
+        "20100066603|01|F001|123|36.00|236.00|2026-09-30|6|20100070970|AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+
+    /// <summary>Content of every page, decompressed, as Latin-1 text.</summary>
+    private static List<string> PageContents(byte[] pdf)
+    {
+        var text = Encoding.Latin1.GetString(pdf);
+        var contents = new List<string>();
+        foreach (Match stream in Regex.Matches(text, @"stream\n(?<body>.*?)\nendstream", RegexOptions.Singleline, TimeSpan.FromSeconds(5)))
+        {
+            var bytes = Encoding.Latin1.GetBytes(stream.Groups["body"].Value);
+            using var zlib = new ZLibStream(new MemoryStream(bytes), CompressionMode.Decompress);
+            using var reader = new StreamReader(zlib, Encoding.Latin1);
+            contents.Add(reader.ReadToEnd());
+        }
+
+        return contents;
+    }
+
+    [Fact]
+    public void The_pdf_is_structurally_valid_with_correct_cross_reference_offsets()
+    {
+        var pdf = _renderer.Render(Document()).Value;
+        var text = Encoding.Latin1.GetString(pdf);
+
+        Assert.StartsWith("%PDF-1.4", text, StringComparison.Ordinal);
+        Assert.EndsWith("%%EOF\n", text, StringComparison.Ordinal);
+        var startxref = long.Parse(Regex.Match(text, @"startxref\n(\d+)\n").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal("xref", text.Substring((int)startxref, 4));
+
+        var entries = Regex.Matches(text[(int)startxref..], @"(\d{10}) 00000 n ").Select(m => int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)).ToList();
+        Assert.Equal(7, entries.Count); // catalog, page tree, 2 fonts, info, page, contents
+        for (var i = 0; i < entries.Count; i++)
+        {
+            Assert.StartsWith($"{i + 1} 0 obj", text[entries[i]..], StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("01", "FACTURA ELECTRÓNICA", "Representación impresa de la factura electrónica")]
+    [InlineData("03", "BOLETA DE VENTA ELECTRÓNICA", "Representación impresa de la boleta de venta electrónica")]
+    public void The_mandatory_content_of_the_annexes_is_printed(string type, string denomination, string legend)
+    {
+        var content = string.Concat(PageContents(_renderer.Render(Document(type)).Value));
+
+        foreach (var expected in new[]
+        {
+            denomination, legend, "(RUC 20100066603)", type == "01" ? "(F001-123)" : "(B001-123)", "EMISORA DEMO S.A.C.", "Emisora Demo", "30/09/2026",
+            @"SOLES \(S/\)", "Op. gravadas", "S/ 200.00", "IGV", "S/ 36.00", "IMPORTE TOTAL", "S/ 236.00", "SON: DOSCIENTOS TREINTA Y SEIS CON 00/100 SOLES",
+            @"Resumen \(hash\):", "Servicio de consultoría 1",
+        })
+        {
+            Assert.Contains(expected, content, StringComparison.Ordinal);
+        }
+
+        // The type code is replaced by its denomination, never printed as a bare code.
+        Assert.DoesNotContain("(01)", content, StringComparison.Ordinal);
+        Assert.Contains(type == "01" ? "Registro Unico de Contributentes:" : "Documento Nacional de Identidad:", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Unit_codes_niu_and_zz_are_not_printed_but_others_are()
+    {
+        var content = string.Concat(PageContents(_renderer.Render(Document(lines: 2)).Value));
+
+        Assert.Contains("(KGM)", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("(NIU)", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Operation_types_that_do_not_apply_are_not_printed_and_free_ones_are()
+    {
+        var plain = string.Concat(PageContents(_renderer.Render(Document()).Value));
+        Assert.DoesNotContain("Op. exoneradas", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Op. inafectas", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Op. gratuitas", plain, StringComparison.Ordinal);
+
+        var mixed = Document() with { Totals = new PrintedTotals(200m, 50m, 30m, 10m, 36m, 316m) };
+        var content = string.Concat(PageContents(_renderer.Render(mixed).Value));
+        foreach (var label in new[] { "Op. exoneradas", "Op. inafectas", "Op. gratuitas" })
+        {
+            Assert.Contains(label, content, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_receipt_without_buyer_identification_prints_no_buyer_block()
+    {
+        var anonymous = Document("03") with { BuyerDocumentNumber = null, BuyerDocumentTypeName = null, BuyerName = null, BuyerAddress = null };
+
+        var content = string.Concat(PageContents(_renderer.Render(anonymous).Value));
+
+        Assert.DoesNotContain("Adquirente:", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Long_documents_paginate_and_the_totals_and_qr_appear_once_on_the_last_page()
+    {
+        var pdf = _renderer.Render(Document(lines: 120)).Value;
+        var pages = PageContents(pdf);
+
+        Assert.True(pages.Count >= 3, $"expected several pages, got {pages.Count}");
+        Assert.Contains(@"\(continuación\)", pages[1], StringComparison.Ordinal);
+        Assert.Equal(1, pages.Count(p => p.Contains("IMPORTE TOTAL", StringComparison.Ordinal)));
+        Assert.Contains("IMPORTE TOTAL", pages[^1], StringComparison.Ordinal);
+        Assert.Equal(1, pages.Count(p => p.Contains(@"Resumen \(hash\):", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Text_is_escaped_so_hostile_descriptions_cannot_break_the_pdf()
+    {
+        var hostile = Document(description: "Cable (USB) \\ ) ET Q 0 0 0 rg ñandú €");
+
+        var content = string.Concat(PageContents(_renderer.Render(hostile).Value));
+
+        Assert.Contains(@"Cable \(USB\) \\ \) ET Q 0 0 0 rg ñandú ?", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Long_descriptions_wrap_inside_their_column()
+    {
+        var description = string.Join(' ', Enumerable.Repeat("descripcion", 30));
+
+        var content = string.Concat(PageContents(_renderer.Render(Document(lines: 1, description: description)).Value));
+
+        Assert.True(Regex.Count(content, @"\(descripcion[^)]*\) Tj", RegexOptions.None, TimeSpan.FromSeconds(5)) > 2);
+    }
+
+    [Fact]
+    public void Output_is_deterministic_and_depends_on_the_qr_payload()
+    {
+        var first = _renderer.Render(Document()).Value;
+
+        Assert.Equal(first, _renderer.Render(Document()).Value);
+        Assert.NotEqual(first, _renderer.Render(Document() with { QrPayload = "otro|contenido" }).Value);
+    }
+
+    [Fact]
+    public void Unprintable_documents_are_refused()
+    {
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _renderer.Render(Document("07")).Error.Code);
+        Assert.False(_renderer.Render(Document() with { Lines = [] }).IsSuccess);
+        Assert.False(_renderer.Render(Document() with { QrPayload = " " }).IsSuccess);
+    }
+
+    [Fact]
+    public void The_font_width_tables_cover_the_printable_ascii_range()
+    {
+        // 95 printable characters from space to tilde: the table length is what keeps the alignment honest.
+        var width = Helvetica.Width(PdfFont.Regular, new string(Enumerable.Range(32, 95).Select(i => (char)i).ToArray()), 1000);
+        var bold = Helvetica.Width(PdfFont.Bold, new string(Enumerable.Range(32, 95).Select(i => (char)i).ToArray()), 1000);
+
+        Assert.True(width is > 40_000 and < 60_000);
+        Assert.True(bold > width);
+        Assert.Equal(Helvetica.Width(PdfFont.Regular, "n", 10), Helvetica.Width(PdfFont.Regular, "ñ", 10));
+        Assert.Equal(5.56, Helvetica.Width(PdfFont.Regular, "0", 10), 2);
+    }
+
+    [Fact]
+    public void The_qr_follows_the_official_symbol_parameters()
+    {
+        // S19 §6.4: QR Code 2005, level Q, UTF-8. QRCoder keeps a 4-module quiet zone around the symbol, which the renderer strips.
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode("20100066603|01|F001|123|36.00|236.00|2026-09-30|6|20100070970|digest", QRCodeGenerator.ECCLevel.Q, forceUtf8: true);
+
+        var symbolModules = data.ModuleMatrix.Count - 8;
+
+        Assert.Equal(0, (symbolModules - 17) % 4); // 17 + 4 × version
+        Assert.True(symbolModules is >= 21 and <= 177);
+        // At 100 pt for the symbol, each module is far above the 0.19 mm minimum and the whole image far below 6 cm.
+        Assert.True((100.0 - (2 * 2.835)) / symbolModules * 25.4 / 72.0 > 0.19);
+    }
+}

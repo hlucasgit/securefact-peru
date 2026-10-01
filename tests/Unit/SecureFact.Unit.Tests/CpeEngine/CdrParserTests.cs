@@ -52,6 +52,33 @@ public class CdrParserTests
         Assert.Equal([new CdrObservation("4031", "Debe indicar el nombre comercial"), new CdrObservation("4001", "El numero de RUC del receptor no existe.")], cdr.Observations);
     }
 
+    // Shape of the CDR the SUNAT BETA service returned for an invoice accepted without observations (signature block removed; 2026-10-01).
+    private const string BetaCdr =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ar:ApplicationResponse xmlns=\"urn:oasis:names:specification:ubl:schema:xsd:Invoice-2\" " +
+        "xmlns:ar=\"urn:oasis:names:specification:ubl:schema:xsd:ApplicationResponse-2\" xmlns:ext=\"urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2\" " +
+        "xmlns:cbc=\"urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2\" xmlns:cac=\"urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2\">" +
+        "<ext:UBLExtensions xmlns=\"\"><ext:UBLExtension><ext:ExtensionContent/></ext:UBLExtension></ext:UBLExtensions>" +
+        "<cbc:UBLVersionID>2.0</cbc:UBLVersionID><cbc:CustomizationID>1.0</cbc:CustomizationID><cbc:ID>1790872984648</cbc:ID>" +
+        "<cbc:IssueDate>2026-10-01T11:42:05</cbc:IssueDate><cbc:IssueTime>00:00:00</cbc:IssueTime><cbc:ResponseDate>2026-10-01</cbc:ResponseDate><cbc:ResponseTime>12:43:04</cbc:ResponseTime>" +
+        "<cac:SenderParty><cac:PartyIdentification><cbc:ID>20131312955</cbc:ID></cac:PartyIdentification></cac:SenderParty>" +
+        "<cac:ReceiverParty><cac:PartyIdentification><cbc:ID>20614754151</cbc:ID></cac:PartyIdentification></cac:ReceiverParty>" +
+        "<cac:DocumentResponse><cac:Response><cbc:ReferenceID>F001-42126</cbc:ReferenceID><cbc:ResponseCode>0</cbc:ResponseCode>" +
+        "<cbc:Description>La Factura numero F001-42126, ha sido aceptada</cbc:Description></cac:Response>" +
+        "<cac:DocumentReference><cbc:ID>F001-42126</cbc:ID></cac:DocumentReference></cac:DocumentResponse></ar:ApplicationResponse>";
+
+    [Fact]
+    public void The_cdr_the_beta_service_really_returns_is_read()
+    {
+        var result = _parser.Parse(BetaCdr);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        Assert.Equal(CdrStatus.Accepted, result.Value.Status);
+        Assert.Equal("F001-42126", result.Value.ReferenceId);
+        Assert.Equal("20614754151", result.Value.TaxpayerRuc);
+        Assert.Equal(new DateOnly(2026, 10, 1), result.Value.ReceivedDate);
+        Assert.Equal(new TimeOnly(11, 42, 5), result.Value.ReceivedTime);
+    }
+
     [Fact]
     public void An_accepted_cdr_without_notes_is_plain_accepted()
     {

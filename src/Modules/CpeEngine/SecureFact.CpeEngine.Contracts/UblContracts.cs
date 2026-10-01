@@ -20,6 +20,7 @@ public sealed record UblLine(
 /// what was calculated and numbered (§17: no XML straight from API DTOs).
 /// </summary>
 /// <param name="OperationTypeCode">Catalogue 51 code, e.g. <c>0101</c> internal sale.</param>
+/// <param name="PaymentForm">Forma de pago of an invoice: only <c>Contado</c> is supported; credit needs installments and is refused (SUNAT errors 3245–3267).</param>
 public sealed record UblInvoiceData(
     string DocumentTypeCode,
     string Series,
@@ -32,7 +33,8 @@ public sealed record UblInvoiceData(
     UblParty Buyer,
     IReadOnlyList<UblLine> Lines,
     TaxCalculationResult Totals,
-    decimal IgvRate);
+    decimal IgvRate,
+    string PaymentForm = "Contado");
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)

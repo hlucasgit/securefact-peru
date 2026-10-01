@@ -65,14 +65,22 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 Cbc + "InvoiceTypeCode",
                 new XAttribute("listID", data.OperationTypeCode),
                 new XAttribute("listAgencyName", "PE:SUNAT"),
-                new XAttribute("listName", "SUNAT:Identificador de Tipo de Documento"),
+                new XAttribute("listName", "Tipo de Documento"),
                 new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01"),
                 data.DocumentTypeCode),
             new XElement(Cbc + "DocumentCurrencyCode", currency),
             new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
             SignatureInfo(data.Issuer),
             Supplier(data.Issuer),
-            Customer(data.Buyer),
+            Customer(data.Buyer));
+
+        // Invoices must state their payment form (error 3244 since 2022-01-01, found against the SUNAT beta service). Receipts do not carry it.
+        if (data.DocumentTypeCode == "01")
+        {
+            root.Add(new XElement(Cac + "PaymentTerms", new XElement(Cbc + "ID", "FormaPago"), new XElement(Cbc + "PaymentMeansID", data.PaymentForm)));
+        }
+
+        root.Add(
             TaxTotal(totals, data.IgvRate, currency),
             MonetaryTotal(totals, currency));
 
@@ -125,6 +133,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             }
         }
 
+        if (data.PaymentForm != "Contado")
+        {
+            return Unsupported("Solo se admite la forma de pago al contado; el crédito exige cuotas y aún no está soportado.");
+        }
+
         if (string.IsNullOrWhiteSpace(data.Series) || data.Number < 1 || string.IsNullOrWhiteSpace(data.OperationTypeCode))
         {
             return Invalid("Serie, número y tipo de operación son obligatorios.");
@@ -149,7 +162,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     {
         var party = new XElement(
             Cac + "Party",
-            new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", new XAttribute("schemeID", issuer.DocumentTypeCode), issuer.DocumentNumber)));
+            new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", IdentityScheme(issuer.DocumentTypeCode), issuer.DocumentNumber)));
         if (!string.IsNullOrWhiteSpace(issuer.TradeName))
         {
             party.Add(new XElement(Cac + "PartyName", new XElement(Cbc + "Name", issuer.TradeName)));
@@ -167,7 +180,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             Cac + "AccountingCustomerParty",
             new XElement(
                 Cac + "Party",
-                new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", new XAttribute("schemeID", buyer.DocumentTypeCode), buyer.DocumentNumber)),
+                new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", IdentityScheme(buyer.DocumentTypeCode), buyer.DocumentNumber)),
                 new XElement(Cac + "PartyLegalEntity", new XElement(Cbc + "RegistrationName", buyer.LegalName))));
 
     private static XElement TaxTotal(TaxCalculationResult totals, decimal igvRate, string currency)
@@ -207,7 +220,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             category.Add(new XElement(
                 Cbc + "TaxExemptionReasonCode",
                 new XAttribute("listAgencyName", "PE:SUNAT"),
-                new XAttribute("listName", "SUNAT:Codigo de Tipo de Afectación del IGV"),
+                new XAttribute("listName", "Afectacion del IGV"),
                 new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07"),
                 exemptionReasonCode));
         }
@@ -217,8 +230,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             new XElement(
                 Cbc + "ID",
                 new XAttribute("schemeID", "UN/ECE 5153"),
-                new XAttribute("schemeName", "Tax Scheme Identifier"),
-                new XAttribute("schemeAgencyName", "United Nations Economic Commission for Europe"),
+                new XAttribute("schemeName", "Codigo de tributos"),
+                new XAttribute("schemeAgencyName", "PE:SUNAT"),
+                new XAttribute("schemeURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05"),
                 taxCode),
             new XElement(Cbc + "Name", name),
             new XElement(Cbc + "TaxTypeCode", typeCode)));
@@ -275,6 +289,15 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         element.Add(new XElement(Cac + "Price", new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", currency), Decimal(isFree ? 0m : line.UnitValue))));
         return element;
     }
+
+    /// <summary>Attributes of a catalogue 06 identity number, with the values the validation rules expect (observations 4255–4257 otherwise).</summary>
+    private static XAttribute[] IdentityScheme(string typeCode) =>
+    [
+        new("schemeID", typeCode),
+        new("schemeName", "Documento de Identidad"),
+        new("schemeAgencyName", "PE:SUNAT"),
+        new("schemeURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"),
+    ];
 
     private static XElement Amount(string name, decimal value, string currency) =>
         new(Cbc + name, new XAttribute("currencyID", currency), value.ToString("0.00", CultureInfo.InvariantCulture));

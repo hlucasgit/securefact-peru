@@ -192,6 +192,36 @@ public class UblInvoiceGeneratorTests
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(baseData with { Lines = [] }).Error.Code);
     }
 
+    // Found against the SUNAT beta service: invoices need their payment form (error 3244) and attribute values must match the catalogue
+    // names the validation rules list (observations 4252, 4255, 4256).
+    [Fact]
+    public void An_invoice_states_its_payment_form_and_a_receipt_does_not()
+    {
+        var invoice = Parse(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m))).Value);
+        var receipt = Parse(_generator.GenerateInvoice(Data("03", ("10", 1m, 100m))).Value);
+
+        var terms = Assert.Single(invoice.XPathSelectElements("/inv:Invoice/cac:PaymentTerms", Namespaces));
+        Assert.Equal("FormaPago", terms.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("Contado", terms.XPathSelectElement("cbc:PaymentMeansID", Namespaces)!.Value);
+        Assert.Empty(receipt.XPathSelectElements("/inv:Invoice/cac:PaymentTerms", Namespaces));
+        Assert.False(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m)) with { PaymentForm = "Credito" }).IsSuccess);
+    }
+
+    [Fact]
+    public void Attribute_values_match_the_names_the_validation_rules_expect()
+    {
+        var xml = Parse(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m))).Value);
+
+        Assert.Equal("Tipo de Documento", (string?)xml.XPathSelectElement("//cbc:InvoiceTypeCode", Namespaces)!.Attribute("listName"));
+        Assert.Equal("Afectacion del IGV", (string?)xml.XPathSelectElement("//cbc:TaxExemptionReasonCode", Namespaces)!.Attribute("listName"));
+        var scheme = xml.XPathSelectElement("//cac:TaxScheme/cbc:ID", Namespaces)!;
+        Assert.Equal("Codigo de tributos", (string?)scheme.Attribute("schemeName"));
+        Assert.Equal("PE:SUNAT", (string?)scheme.Attribute("schemeAgencyName"));
+        var buyer = xml.XPathSelectElement("//cac:AccountingCustomerParty//cac:PartyIdentification/cbc:ID", Namespaces)!;
+        Assert.Equal("Documento de Identidad", (string?)buyer.Attribute("schemeName"));
+        Assert.Equal("urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06", (string?)buyer.Attribute("schemeURI"));
+    }
+
     [Fact]
     public void Text_content_is_escaped_so_the_document_stays_well_formed()
     {
