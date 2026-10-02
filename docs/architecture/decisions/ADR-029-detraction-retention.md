@@ -1,0 +1,24 @@
+# ADR-029: Detracción y retención del IGV en facturas
+
+- Estado: Aceptada · Fecha: 2026-10-02
+
+## Fuentes
+Hoja `Factura2_0` de las reglas de validación del 26.08.2026 (S16: reglas 3033–3037, 3114, 3127–3129, 3174, 3208, 3262–3264, 3269, 4265), catálogos 53 (62 «Retención del IGV»), 54 (bienes y servicios sujetos a detracción), 59 (001 «Depósito en cuenta») y 51 (1001), la guía XML de factura (S18: ejemplo de `PaymentMeans` y `PaymentTerms` de detracción), la RS 193-2020/SUNAT (S23: monto neto pendiente de pago) y el texto original de la RS 037-2002/SUNAT (S24: exclusión de las operaciones sujetas a detracción, art. 5 numeral 6) y la prueba contra el beta del 2026-10-02.
+
+## Decisión
+- **La plataforma no fija porcentajes ni cuentas.** SUNAT valida la estructura, no el porcentaje ni el monto de la detracción (la hoja marca `PaymentPercent` «SIN VALIDACIÓN») ni el factor de la retención; las tasas y los bienes sujetos cambian por norma y no hay en las fuentes de este proyecto una tabla vigente verificada. Son datos del emisor; la plataforma comprueba que sean coherentes.
+- **Detracción** (`detraction` en `POST /api/v1/documents`, solo facturas en soles): `goodsOrServiceCode` (catálogo 54, ordinario: no 004, 027 ni 028, que pertenecen a los tipos de operación 1002–1004, no soportados), `percentage` (0–100, hasta 5 decimales), `amount` (positivo, hasta 2 decimales, no mayor que el importe total y dentro de un sol del porcentaje del importe total: el depósito se redondea a soles enteros) y `accountNumber` (cuenta de detracciones del emisor en el Banco de la Nación, alfanumérico de hasta 100 caracteres). El tipo de operación de la factura pasa a **1001** (se deduce de la detracción; pedir 1001 sin detracción se rechaza) y no se combina con la exportación. El monto es siempre en soles (regla 3208), por eso no se admiten facturas en otra moneda.
+- **Retención del IGV** (`retention: { percentage }`, solo facturas de venta interna): el monto retenido es el porcentaje del importe total (importe de la operación, S24), redondeado a centavos (regla 3263, tolerancia de 1). No cambia el importe total. No procede en una exportación ni en una operación sujeta a detracción (RS 037-2002, art. 5 numeral 6): ambas se rechazan juntas.
+- **UBL**: la detracción agrega `cac:PaymentMeans` (`ID` «Detraccion», `PaymentMeansCode` 001, cuenta en `PayeeFinancialAccount/ID`), un `cac:PaymentTerms` «Detraccion» (`PaymentMeansID` con el código del catálogo 54, `PaymentPercent`, `Amount` en PEN) y la leyenda 2006 «Operación sujeta a detracción» (observación 4265); `InvoiceTypeCode@listID` 1001. La retención agrega un `cac:AllowanceCharge` global con `ChargeIndicator` false, motivo 62, factor, monto y base. El generador repite las comprobaciones.
+- **Venta al crédito**: el monto neto pendiente de pago (y por tanto la suma de las cuotas) excluye la detracción o la retención y la entrega inicial (S23: «descontando las retenciones del IGV, detracciones … y otras deducciones»). Billing y el generador lo comprueban.
+- **Persistencia y PDF**: como las cuotas, viven en la solicitud original (`DocumentDto.Detraction`, `Retention`, `OperationTypeCode`); el PDF imprime una línea con la detracción (código, porcentaje, monto, cuenta) y otra con la retención antes de los totales (decisión de producto: el anexo no fija su ubicación).
+
+## Verificado en el beta (2026-10-02)
+Factura con detracción (código 037, 12 %, 14.00 sobre 118.00, cuenta de once ceros): aceptada, código 0, sin observaciones. La misma al crédito con cuotas que suman lo pendiente tras la detracción: aceptada. Factura con retención del 3 %: aceptada. **El beta no comprueba que el adquirente sea agente de retención** (la hoja lo exige desde 2021, reglas 3262 y 3269, con el padrón de agentes): no se probó esa regla.
+
+## Límites (P)
+- **Agente de retención**: la plataforma no tiene el padrón; quien indica la retención afirma que el adquirente es agente. SUNAT puede rechazar o no según el padrón vigente (el beta no lo hizo).
+- Sin tabla de bienes y porcentajes de detracción ni umbral de S/ 700 (la hoja no los valida): son responsabilidad del emisor.
+- Sin tipos 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte) ni sus propiedades; sin detracción en boletas ni en notas; sin retención de renta de segunda categoría (63).
+- El texto original de la RS 037-2002 que se leyó fija 6 % y fue modificado: el porcentaje de la retención nunca se toma de él.
+- La cuenta de detracciones se envía en cada factura; no vive aún en los datos de la empresa.

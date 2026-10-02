@@ -39,6 +39,9 @@ var number = (long)lima.TimeOfDay.TotalSeconds + 1;
 var discount = args.Contains("discount", StringComparer.Ordinal);
 // "ivap": a line of rice taxed with the IVAP (affectation 17, tax 1016) at 4 %.
 var ivapSale = args.Contains("ivap", StringComparer.Ordinal);
+// "detraction": an invoice of services taxed with the IGV subject to detraction (operation type 1001); "retention": the buyer withholds 3 % of the IGV.
+var detractionSale = args.Contains("detraction", StringComparer.Ordinal);
+var retentionSale = args.Contains("retention", StringComparer.Ordinal);
 // "export": an export of goods (operation type 0200): affectation 40, tax 9995, a buyer abroad without RUC.
 var exportSale = args.Contains("export", StringComparer.Ordinal);
 TaxableLine[] taxLines = exportSale
@@ -64,14 +67,16 @@ var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
 // SF_BETA_INITIAL: part of the credit sale paid on the issue date; the installments add up to what is left.
 var initialPayment = credit && decimal.TryParse(Environment.GetEnvironmentVariable("SF_BETA_INITIAL"), NumberStyles.Number, CultureInfo.InvariantCulture, out var initial) ? initial : 0m;
 var data = new UblInvoiceData(
-    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : "0101",
+    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : detractionSale ? "1001" : "0101",
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"),
     exportSale ? new UblParty(Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_TYPE") ?? "0", Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_NUMBER") ?? "-", "CLIENTE DEL EXTERIOR")
     : receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
     ublLines, totals, 0.18m,
     credit ? "Credito" : "Contado", adjustments,
-    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - initialPayment - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
-    0.04m, initialPayment);
+    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - initialPayment - 50m - (detractionSale ? Math.Round(totals.PayableAmount * 0.12m, 0, MidpointRounding.AwayFromZero) : 0m) - (retentionSale ? Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero) : 0m), DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
+    0.04m, initialPayment,
+    detractionSale ? new UblDetraction("037", 12m, Math.Round(totals.PayableAmount * 0.12m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000") : null,
+    retentionSale ? new UblRetention(3m, totals.PayableAmount, Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero)) : null);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {

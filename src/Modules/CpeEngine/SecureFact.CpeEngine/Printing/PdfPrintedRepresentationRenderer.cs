@@ -108,6 +108,22 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             }
         }
 
+        if (document.AdditionalInformation is { Count: > 0 } information)
+        {
+            y -= 4;
+            foreach (var text in information.SelectMany(i => Wrap(i, Right - Left - 4, 8)))
+            {
+                if (y - 11 < Margin + FooterHeight)
+                {
+                    page = NewPage(pdf, document, denomination, number, firstPage: false, out y);
+                    y -= 4;
+                }
+
+                page.Text(PdfFont.Regular, 8, Left, y - 8, text);
+                y -= 11;
+            }
+        }
+
         if (y < Margin + FooterHeight)
         {
             page = NewPage(pdf, document, denomination, number, firstPage: false, out y);

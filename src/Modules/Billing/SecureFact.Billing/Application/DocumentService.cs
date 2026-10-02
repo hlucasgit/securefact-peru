@@ -112,7 +112,12 @@ internal sealed partial class DocumentService(
             return calculated.Error;
         }
 
-        if (ValidateInstallments(series, request.IssueDate, request.Installments, request.InitialPayment, calculated.Value.PayableAmount) is { } badInstallments)
+        if (ValidateDeductions(series, request, calculated.Value.PayableAmount, out var deducted) is { } badDeduction)
+        {
+            return badDeduction;
+        }
+
+        if (ValidateInstallments(series, request.IssueDate, request.Installments, request.InitialPayment, deducted, calculated.Value.PayableAmount) is { } badInstallments)
         {
             return badInstallments;
         }
@@ -646,7 +651,8 @@ internal sealed partial class DocumentService(
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
-            stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment);
+            stored?.Detraction is not null ? OperationTypes.SaleWithDetraction : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
+            stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null);
     }
 
     /// <summary>Affectation code of the IVAP (catalogue 07).</summary>
@@ -738,7 +744,7 @@ internal sealed partial class DocumentService(
     /// issue date (3267); the net pending amount is the sum of the installments (3319) and cannot exceed the payable amount (3265). With no detraction or withholding supported,
     /// the net pending amount is the whole payable amount, so the installments must add up to it.
     /// </summary>
-    private static Error? ValidateInstallments(Series series, DateOnly issueDate, IReadOnlyList<Installment>? installments, decimal? initialPayment, decimal payable)
+    private static Error? ValidateInstallments(Series series, DateOnly issueDate, IReadOnlyList<Installment>? installments, decimal? initialPayment, decimal deductions, decimal payable)
     {
         static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Cuotas inválidas", detail);
 
@@ -749,12 +755,13 @@ internal sealed partial class DocumentService(
 
         // The part paid on the issue date (RS 193-2020, annex 1, fields 49-A and 64-A: a credit sale is paid "total o parcialmente en fecha posterior"; the net pending
         // amount is the pending balance): the installments add up to what is left. Without it they add up to the whole payable amount.
-        if (initialPayment is { } initial && (initial <= 0 || decimal.Round(initial, 2) != initial || initial >= payable))
+        if (initialPayment is { } initial && (initial <= 0 || decimal.Round(initial, 2) != initial || initial >= payable - deductions))
         {
             return Invalid("La entrega inicial debe ser mayor que cero, tener hasta 2 decimales y ser menor que el importe total.");
         }
 
-        var pending = payable - (initialPayment ?? 0m);
+        // The net pending amount also excludes the detraction and the withholding the buyer deposits or keeps (RS 193-2020, annex 1, field 64-A).
+        var pending = payable - deductions - (initialPayment ?? 0m);
 
         if (series.DocumentTypeCode != DocumentTypes.Invoice)
         {
@@ -786,9 +793,97 @@ internal sealed partial class DocumentService(
         return sum == pending
             ? null
             : Invalid(initialPayment is null
-                ? $"Las cuotas suman {sum:0.00} y el importe total es {payable:0.00}: deben coincidir."
-                : $"Las cuotas suman {sum:0.00} y lo pendiente tras la entrega inicial es {pending:0.00} (importe total {payable:0.00} menos {initialPayment:0.00}): deben coincidir.");
+                ? $"Las cuotas suman {sum:0.00} y lo pendiente de pago es {pending:0.00}: deben coincidir."
+                : $"Las cuotas suman {sum:0.00} y lo pendiente tras la entrega inicial es {pending:0.00}: deben coincidir.");
     }
+
+    /// <summary>Catalogue 54 codes (goods and services subject to detraction) accepted for an ordinary operation of type 1001. The fishing (004) and transport (027, 028) codes belong to the operation types 1002–1004, which are not supported.</summary>
+    private static readonly HashSet<string> DetractionCodes =
+    [
+        "001", "002", "003", "005", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "019", "020", "021", "022", "023", "024", "025", "026",
+        "030", "031", "032", "034", "035", "036", "037", "038", "039", "040", "041", "042", "043", "044", "045", "046", "047", "099",
+    ];
+
+    [GeneratedRegex("^[0-9A-Za-z-]{1,100}$")]
+    private static partial Regex AccountNumberPattern();
+
+    /// <summary>
+    /// Detraction and withholding of an invoice (sheet Factura2_0: rules 3033–3037, 3127, 3128, 3208, 3262–3264; RS 037-2002, art. 5). SUNAT checks the structure but not the percentage or the
+    /// amount of the detraction, which are the issuer's data: the platform checks that they agree (the deposit is rounded to whole soles, so within one sol). A detraction needs an invoice in soles
+    /// and its code from catalogue 54; a withholding is a percentage of the payable amount. They exclude each other and neither applies to an export. <paramref name="deducted"/> is the amount
+    /// that the net pending amount of a credit sale leaves out.
+    /// </summary>
+    private static Error? ValidateDeductions(Series series, CreateDocumentRequest request, decimal payable, out decimal deducted)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Detracción o retención inválida", detail);
+
+        deducted = 0m;
+        var detraction = request.Detraction;
+        var retention = request.Retention;
+        if (detraction is null && retention is null)
+        {
+            return null;
+        }
+
+        if (series.DocumentTypeCode != DocumentTypes.Invoice)
+        {
+            return Invalid("La detracción y la retención del IGV son de las facturas.");
+        }
+
+        if (request.OperationTypeCode?.Trim() == OperationTypes.Export)
+        {
+            return Invalid("Una exportación no está sujeta a detracción ni a retención.");
+        }
+
+        if (detraction is not null && retention is not null)
+        {
+            return Invalid("Una operación sujeta a detracción queda fuera de la retención del IGV (RS 037-2002, art. 5): indique una u otra.");
+        }
+
+        if (detraction is not null)
+        {
+            if (request.Currency != "PEN")
+            {
+                return Invalid("La detracción se declara en soles: la factura debe ser en soles.");
+            }
+
+            if (detraction.GoodsOrServiceCode is null || !DetractionCodes.Contains(detraction.GoodsOrServiceCode.Trim()))
+            {
+                return Invalid("El código del bien o servicio debe ser del catálogo 54 y de una operación ordinaria (no 004, 027 ni 028, que tienen su propio tipo de operación).");
+            }
+
+            if (detraction.Percentage is <= 0 or > 100 || decimal.Round(detraction.Percentage, 5) != detraction.Percentage)
+            {
+                return Invalid("El porcentaje de la detracción debe ser mayor que 0 y no superar 100, con hasta 5 decimales.");
+            }
+
+            if (detraction.Amount <= 0 || decimal.Round(detraction.Amount, 2) != detraction.Amount || detraction.Amount > payable
+                || Math.Abs(detraction.Amount - (payable * detraction.Percentage / 100m)) >= 1m)
+            {
+                return Invalid($"El monto de la detracción debe ser positivo, con hasta 2 decimales, y coincidir con el porcentaje del importe total ({payable:0.00}) con un redondeo de hasta un sol.");
+            }
+
+            if (detraction.AccountNumber is null || !AccountNumberPattern().IsMatch(detraction.AccountNumber.Trim()))
+            {
+                return Invalid("Indique el número de cuenta de detracciones en el Banco de la Nación (alfanumérico, hasta 100 caracteres).");
+            }
+
+            deducted = detraction.Amount;
+            return null;
+        }
+
+        if (retention!.Percentage is <= 0 or >= 100 || decimal.Round(retention.Percentage, 5) != retention.Percentage || RetainedAmount(payable, retention.Percentage) <= 0)
+        {
+            return Invalid("El porcentaje de la retención debe ser mayor que 0 y menor que 100, con hasta 5 decimales.");
+        }
+
+        deducted = RetainedAmount(payable, retention.Percentage);
+        return null;
+    }
+
+    /// <summary>The amount withheld: the percentage of the operation amount (the payable amount), in cents (rule 3263).</summary>
+    private static decimal RetainedAmount(decimal payable, decimal percentage) =>
+        decimal.Round(payable * percentage / 100m, 2, MidpointRounding.AwayFromZero);
 
     /// <summary>Affectation code of the export of goods or services (catalogue 07): tax 9995.</summary>
     private const string ExportAffectation = "40";
@@ -802,12 +897,17 @@ internal sealed partial class DocumentService(
         static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Tipo de operación inválido", detail);
 
         var operation = request.OperationTypeCode?.Trim();
-        if (operation is not (null or OperationTypes.Sale or OperationTypes.Export))
+        if (operation is not (null or OperationTypes.Sale or OperationTypes.Export or OperationTypes.SaleWithDetraction))
         {
-            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna) o 0200 (exportación de bienes).");
+            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200 (exportación de bienes) o 1001 (sujeta a detracción).");
         }
 
         var exportLines = request.Lines.Count(l => l?.Tax?.IgvAffectationCode == ExportAffectation);
+        if (operation == OperationTypes.SaleWithDetraction && request.Detraction is null)
+        {
+            return Invalid("El tipo de operación 1001 (sujeta a detracción) requiere los datos de la detracción.");
+        }
+
         if (operation != OperationTypes.Export)
         {
             return exportLines > 0 ? Invalid("Las líneas de exportación (afectación 40) requieren el tipo de operación 0200.") : null;
@@ -848,7 +948,8 @@ internal sealed partial class DocumentService(
 
     private sealed record StoredLine(TaxableLine? Tax);
 
-    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment);
+    private sealed record StoredRequest(
+        List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment, Detraction? Detraction, RetentionRequest? Retention);
 
     private static StoredRequest? ReadStoredRequest(string json)
     {

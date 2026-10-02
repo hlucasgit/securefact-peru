@@ -223,6 +223,20 @@ public class PrintedRepresentationTests
     }
 
     [Fact]
+    public void Additional_information_lines_are_printed_before_the_totals_and_wrap()
+    {
+        var information = new[] { "Operación sujeta a detracción: código 037, 12% = S/ 28.00; cuenta en el Banco de la Nación N.° 00012345678", "Retención del IGV: 3% sobre 236.00 = 7.08" };
+
+        var with = string.Concat(PageContents(_renderer.Render(Document() with { AdditionalInformation = information }).Value));
+        var without = string.Concat(PageContents(_renderer.Render(Document()).Value));
+
+        Assert.Contains("Operación sujeta a detracción", with, StringComparison.Ordinal);
+        Assert.Contains("Retención del IGV: 3% sobre 236.00 = 7.08", with, StringComparison.Ordinal);
+        Assert.DoesNotContain("detracción", without, StringComparison.Ordinal);
+        Assert.Contains("IMPORTE TOTAL", with, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Many_installments_paginate_and_the_totals_stay_on_the_last_page()
     {
         var installments = Enumerable.Range(1, 90).Select(i => new PrintedInstallment(i, new DateOnly(2026, 10, 1).AddDays(i), 2m)).ToList();

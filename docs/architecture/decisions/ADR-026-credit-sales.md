@@ -33,7 +33,7 @@ Fuente S23 (RS 193-2020, anexo 1, campos 49-A y 64-A): una venta es **al crédit
 - La nota de motivo 13 sigue topada por el importe de la factura (3320), no por lo pendiente tras la entrega inicial; el sistema no la reduce (**P**).
 
 ## Supuestos (P)
-- El monto neto pendiente es el importe total menos la entrega inicial, porque no se soportan detracción ni retención (la norma lo define como el importe menos ellas y otras deducciones). La suma de las cuotas debe igualar ese monto: es más estricto que la regla 3265 (que solo exige que no supere el importe total).
+- El monto neto pendiente es el importe total menos la entrega inicial, la detracción y la retención (ADR-029; la norma lo define como el importe menos ellas y otras deducciones). La suma de las cuotas debe igualar ese monto: es más estricto que la regla 3265 (que solo exige que no supere el importe total).
 - Se exige al menos una cuota siempre; la hoja lo exige cuando el adquirente tiene RUC (3249, 3251, 3254, 3256) y lo deja opcional en otros casos.
 - No se exige orden creciente de los vencimientos (la hoja no lo pide); el número de cuota es la posición en la lista.
 - La impresión de la forma de pago en la representación impresa es una decisión de producto: la norma consultada (S21) no la fija.

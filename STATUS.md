@@ -68,7 +68,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Facturas al crédito con cuotas (`installments` en `POST /api/v1/documents`): Billing valida el plan antes de numerar, el UBL lleva `FormaPago` `Credito` y una `CuotaNNN` por vencimiento, el PDF imprime las cuotas. Aceptada en el beta (ADR-026). Pruebas: 569 pasan (336 unitarias, 6 arquitectura, 6 integración, 221 seguridad/API).
 - Entrega inicial (`initialPayment`): parte pagada al emitir; las cuotas suman lo pendiente (ADR-026, S23); aceptada en el beta.
 - Nota de crédito de motivo 13 (ajuste de cuotas): sin líneas, con las cuotas nuevas e importe total cero; aceptada en el beta. Pruebas: 578 pasan (343 unitarias, 6 arquitectura, 6 integración, 223 seguridad/API).
-- Pendiente: detracción y retención (restan del monto neto pendiente).
+- Detracción y retención del IGV en facturas (ADR-029): porcentajes, montos y cuenta son datos del emisor que la plataforma comprueba; el crédito deja ambas fuera del monto neto pendiente; aceptadas en el beta (que no comprueba el padrón de agentes). Pruebas: 627 pasan (374 unitarias, 6 arquitectura, 6 integración, 241 seguridad/API).
+- Pendiente: tipos 1002–1004, cuenta de detracciones en los datos de la empresa.
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

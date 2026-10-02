@@ -29,6 +29,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Entrega inicial** (R-048): factura de 118.00 al crédito con 18.00 pagados al emitir y dos cuotas de 50.00 (monto neto pendiente 100.00, menor que el importe total): aceptada, código 0, sin observaciones.
 
+- **Detracción y retención** (R-053): factura con detracción (tipo de operación 1001, `PaymentMeans` y `PaymentTerms` «Detraccion», leyenda 2006), la misma al crédito con cuotas sin la detracción, y factura con retención del 3 % (`AllowanceCharge` 62): aceptadas con código 0, sin observaciones. El beta **no comprueba** que el adquirente sea agente de retención.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

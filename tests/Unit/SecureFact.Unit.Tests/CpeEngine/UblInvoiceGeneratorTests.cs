@@ -209,6 +209,89 @@ public class UblInvoiceGeneratorTests
         Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent", Namespaces)); // the document totals do not carry it
     }
 
+    // ---------- detraction and withholding ----------
+
+    private static UblInvoiceData Detracted() =>
+        Data("01", ("10", 2m, 100m)) with { OperationTypeCode = "1001", Detraction = new UblDetraction("037", 12m, 28m, "00012345678") }; // 236.00 x 12 % = 28.32, deposited as 28
+
+    private static UblInvoiceData Retained() =>
+        Data("01", ("10", 2m, 100m)) with { Retention = new UblRetention(3m, 236m, 7.08m) };
+
+    [Fact]
+    public void An_invoice_subject_to_detraction_validates_against_the_schema_and_states_account_code_percentage_amount_and_legend()
+    {
+        var result = _generator.GenerateInvoice(Detracted());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("1001", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        var means = xml.XPathSelectElement("/inv:Invoice/cac:PaymentMeans", Namespaces)!;
+        Assert.Equal("Detraccion", means.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("001", means.XPathSelectElement("cbc:PaymentMeansCode", Namespaces)!.Value);
+        Assert.Equal("00012345678", means.XPathSelectElement("cac:PayeeFinancialAccount/cbc:ID", Namespaces)!.Value);
+        var terms = xml.XPathSelectElements("/inv:Invoice/cac:PaymentTerms", Namespaces).ToList();
+        var detraction = Assert.Single(terms, t => t.XPathSelectElement("cbc:ID", Namespaces)!.Value == "Detraccion");
+        Assert.Equal("037", detraction.XPathSelectElement("cbc:PaymentMeansID", Namespaces)!.Value);
+        Assert.Equal("12.00", detraction.XPathSelectElement("cbc:PaymentPercent", Namespaces)!.Value);
+        Assert.Equal("28.00", detraction.XPathSelectElement("cbc:Amount", Namespaces)!.Value);
+        Assert.Equal("PEN", detraction.XPathSelectElement("cbc:Amount", Namespaces)!.Attribute("currencyID")!.Value);
+        Assert.Contains(terms, t => t.XPathSelectElement("cbc:PaymentMeansID", Namespaces)!.Value == "Contado"); // the payment form is still stated
+        Assert.Equal("2006", xml.XPathSelectElement("/inv:Invoice/cbc:Note", Namespaces)!.Attribute("languageLocaleID")!.Value);
+        Assert.Equal("236.00", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value); // the detraction does not change the total
+    }
+
+    [Fact]
+    public void An_igv_withholding_is_a_global_allowance_of_code_62_that_leaves_the_total_alone()
+    {
+        var result = _generator.GenerateInvoice(Retained());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var allowance = xml.XPathSelectElement("/inv:Invoice/cac:AllowanceCharge", Namespaces)!;
+        Assert.Equal("false", allowance.XPathSelectElement("cbc:ChargeIndicator", Namespaces)!.Value);
+        Assert.Equal("62", allowance.XPathSelectElement("cbc:AllowanceChargeReasonCode", Namespaces)!.Value);
+        Assert.Equal("0.03", allowance.XPathSelectElement("cbc:MultiplierFactorNumeric", Namespaces)!.Value);
+        Assert.Equal("7.08", allowance.XPathSelectElement("cbc:Amount", Namespaces)!.Value);
+        Assert.Equal("236.00", allowance.XPathSelectElement("cbc:BaseAmount", Namespaces)!.Value);
+        Assert.Equal("236.00", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+        Assert.Empty(xml.XPathSelectElements("//cbc:AllowanceTotalAmount", Namespaces)); // rule 3300 counts codes 01, 03 and 63 only
+        Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cbc:Note", Namespaces));
+    }
+
+    [Fact]
+    public void The_net_pending_amount_of_a_credit_sale_leaves_out_the_detraction_and_the_withholding()
+    {
+        var detracted = Detracted() with { PaymentForm = "Credito", Installments = [new(100m, new DateOnly(2026, 10, 30)), new(108m, new DateOnly(2026, 11, 30))] }; // 236 - 28
+        var retained = Retained() with { PaymentForm = "Credito", Installments = [new(228.92m, new DateOnly(2026, 10, 30))] }; // 236 - 7.08
+
+        Assert.True(_generator.GenerateInvoice(detracted).IsSuccess);
+        Assert.True(_generator.GenerateInvoice(retained).IsSuccess);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Installments = [new(236m, new DateOnly(2026, 10, 30))] }).Error.Code); // ignores the detraction
+        var withInitial = detracted with { InitialPayment = 8m, Installments = [new(100m, new DateOnly(2026, 10, 30)), new(100m, new DateOnly(2026, 11, 30))] }; // 236 - 28 - 8
+        Assert.True(_generator.GenerateInvoice(withInitial).IsSuccess);
+    }
+
+    [Fact]
+    public void Detractions_and_withholdings_that_break_the_rules_are_refused()
+    {
+        var detracted = Detracted();
+        var retained = Retained();
+
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { OperationTypeCode = "0101" }).Error.Code); // 1001 and the detraction go together
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = null }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Currency = "USD" }).Error.Code); // the amount is in soles
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { Amount = 0m } }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { Amount = 300m } }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { AccountNumber = " " } }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { GoodsOrServiceCode = "027" } }).Error.Code); // transport has its own operation type
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Retention = new UblRetention(3m, 236m, 7.08m) }).Error.Code); // not both
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(retained with { Retention = retained.Retention! with { Amount = 20m } }).Error.Code); // amount is base x percentage
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(retained with { Retention = retained.Retention! with { BaseAmount = 300m, Amount = 9m } }).Error.Code); // base above the total
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Data("03", ("10", 1m, 1000m)) with { Retention = new UblRetention(3m, 1180m, 35.4m) }).Error.Code); // receipts do not
+    }
+
     // ---------- export of goods ----------
 
     private static UblInvoiceData ExportData(string operation = "0200", string type = "01", string affectation = "40")

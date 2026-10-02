@@ -6,6 +6,12 @@ namespace SecureFact.CpeEngine.Contracts;
 /// <summary>One installment of a credit sale: the amount due and its due date.</summary>
 public sealed record UblInstallment(decimal Amount, DateOnly DueDate);
 
+/// <summary>Detraction of an invoice as stated in the XML: catalogue 54 code, percentage, amount in soles and the issuer's Banco de la Nación account.</summary>
+public sealed record UblDetraction(string GoodsOrServiceCode, decimal Percentage, decimal Amount, string AccountNumber);
+
+/// <summary>IGV withholding as stated in the XML (catalogue 53 code 62): percentage, operation amount and amount withheld, in the document currency.</summary>
+public sealed record UblRetention(decimal Percentage, decimal BaseAmount, decimal Amount);
+
 public sealed record UblParty(string DocumentTypeCode, string DocumentNumber, string LegalName, string? TradeName = null, string? EstablishmentCode = null);
 
 /// <param name="DiscountAffectingBase">Line discount, code 00 of catalogue 53 (the taxable base is reduced).</param>
@@ -34,6 +40,8 @@ public sealed record UblLine(
 /// <param name="PaymentForm">Forma de pago of an invoice: <c>Contado</c>, or <c>Credito</c> together with <paramref name="Installments"/> (SUNAT rules 3244–3267, 3319).</param>
 /// <param name="IvapRate">Rate of the IVAP (rice) as a fraction, for lines with affectation 17; the lines state it in <c>cbc:Percent</c> (rule 3103).</param>
 /// <param name="Installments">The installments of a credit sale: at least one, each due after the issue date, adding up to the payable amount minus <paramref name="InitialPayment"/>.</param>
+/// <param name="Detraction">Detraction of the invoice: the operation type is then 1001, the XML names the account and the amount and carries legend 2006.</param>
+/// <param name="Retention">IGV withholding of the invoice, stated as a global allowance of code 62; it does not change the payable amount.</param>
 /// <param name="InitialPayment">Part of a credit sale paid on the issue date (not stated in the XML: the net pending amount, the sum of the installments, already excludes it).</param>
 /// <param name="Adjustments">Global discounts and charges (catalogue 53 codes 02, 03, 49, 50) exactly as given to the TaxEngine; the generator states them and checks that they agree with <paramref name="Totals"/>.</param>
 public sealed record UblInvoiceData(
@@ -53,7 +61,9 @@ public sealed record UblInvoiceData(
     GlobalAdjustments? Adjustments = null,
     IReadOnlyList<UblInstallment>? Installments = null,
     decimal IvapRate = 0m,
-    decimal InitialPayment = 0m);
+    decimal InitialPayment = 0m,
+    UblDetraction? Detraction = null,
+    UblRetention? Retention = null);
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)

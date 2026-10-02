@@ -20,7 +20,25 @@ public static class OperationTypes
 
     /// <summary>0200 – export of goods (the sale is not taxed: lines with affectation 40, tax 9995).</summary>
     public const string Export = "0200";
+
+    /// <summary>1001 – operation subject to detraction. Implied by a <see cref="Detraction"/> and never given by the client without one.</summary>
+    public const string SaleWithDetraction = "1001";
 }
+
+/// <summary>
+/// Detraction (SPOT) of an invoice: the buyer deposits <paramref name="Amount"/> in the issuer's account at the Banco de la Nación. SUNAT's rules check its structure but not the
+/// percentage or the amount, so both are the issuer's data; the platform only checks that they agree. The amount is always in soles.
+/// </summary>
+/// <param name="GoodsOrServiceCode">Catalogue 54 code (e.g. <c>037</c>, other services taxed with the IGV).</param>
+/// <param name="Percentage">As a percentage, e.g. <c>12</c> for 12 %.</param>
+/// <param name="AccountNumber">Issuer's account number at the Banco de la Nación.</param>
+public sealed record Detraction(string GoodsOrServiceCode, decimal Percentage, decimal Amount, string AccountNumber);
+
+/// <summary>IGV withholding that the buyer, a withholding agent, applies to the invoice: <paramref name="Percentage"/> of the payable amount (e.g. <c>3</c> for 3 %).</summary>
+public sealed record RetentionRequest(decimal Percentage);
+
+/// <summary>The IGV withholding as issued: its percentage, the operation amount it applies to (the payable amount) and the amount withheld.</summary>
+public sealed record IgvRetention(decimal Percentage, decimal BaseAmount, decimal Amount);
 
 public sealed record CreateSeriesRequest(Guid CompanyId, string DocumentTypeCode, string Code, Guid? EstablishmentId = null);
 
@@ -65,6 +83,8 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
 /// <c>0101</c> by default, or <c>0200</c> for the export of goods (invoices only, every line with affectation 40, and a buyer without RUC).
 /// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
+/// An invoice may carry a <paramref name="Detraction"/> (operation type 1001) or an IGV <paramref name="Retention"/>, never both; the net pending amount of a credit sale then
+/// excludes them too.
 /// </summary>
 public sealed record CreateDocumentRequest(
     Guid SeriesId,
@@ -76,7 +96,9 @@ public sealed record CreateDocumentRequest(
     Guid? CustomerId = null,
     IReadOnlyList<Installment>? Installments = null,
     string? OperationTypeCode = null,
-    decimal? InitialPayment = null);
+    decimal? InitialPayment = null,
+    Detraction? Detraction = null,
+    RetentionRequest? Retention = null);
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
@@ -142,7 +164,9 @@ public sealed record DocumentDto(
     GlobalAdjustments? Adjustments = null,
     IReadOnlyList<Installment>? Installments = null,
     string OperationTypeCode = OperationTypes.Sale,
-    decimal? InitialPayment = null)
+    decimal? InitialPayment = null,
+    Detraction? Detraction = null,
+    IgvRetention? Retention = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

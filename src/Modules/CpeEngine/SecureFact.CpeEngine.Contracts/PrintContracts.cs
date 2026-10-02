@@ -35,6 +35,7 @@ public sealed record PrintedInstallment(int Number, DateOnly DueDate, decimal Am
 /// <param name="DigestValue">Base64 <c>ds:DigestValue</c> of the signed XML, printed as the document's summary value.</param>
 /// <param name="Installments">Present for a sale on credit: the payment form is then printed as credit followed by the installments.</param>
 /// <param name="InitialPayment">Part of a credit sale paid on the issue date; printed in the credit block when there is one.</param>
+/// <param name="AdditionalInformation">Extra lines printed before the totals (the detraction and the withholding of the invoice).</param>
 /// <param name="Voided">True when SUNAT accepted the document's voiding: every page then carries the word ANULADO (the content and the QR are not altered).</param>
 public sealed record PrintedDocument(
     string DocumentTypeCode,
@@ -57,7 +58,8 @@ public sealed record PrintedDocument(
     PrintedNote? Note = null,
     bool Voided = false,
     IReadOnlyList<PrintedInstallment>? Installments = null,
-    decimal InitialPayment = 0m);
+    decimal InitialPayment = 0m,
+    IReadOnlyList<string>? AdditionalInformation = null);
 
 /// <summary>Renders the printed representation (PDF, A4) of an invoice or receipt. Pure: the same input gives the same bytes.</summary>
 public interface IPrintedRepresentationRenderer

@@ -101,7 +101,9 @@ internal sealed class ElectronicDocumentService(
             : ubl.GenerateInvoice(new UblInvoiceData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, d.OperationTypeCode, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
-                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, d.InitialPayment ?? 0m));
+                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, d.InitialPayment ?? 0m,
+                d.Detraction is { } detraction ? new UblDetraction(detraction.GoodsOrServiceCode, detraction.Percentage, detraction.Amount, detraction.AccountNumber) : null,
+                d.Retention is { } retention ? new UblRetention(retention.Percentage, retention.BaseAmount, retention.Amount) : null));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -466,8 +468,26 @@ internal sealed class ElectronicDocumentService(
             d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
             await IsVoidedAsync(entity.Id, cancellationToken),
             d.Installments?.Select((i, index) => new PrintedInstallment(index + 1, i.DueDate, i.Amount)).ToList(),
-            d.InitialPayment ?? 0m);
+            d.InitialPayment ?? 0m,
+            AdditionalInformation(d));
         return printer.Render(printed);
+    }
+
+    /// <summary>The detraction and the withholding as lines of the printed form (the annex fixes no layout for them: product decision).</summary>
+    private static List<string>? AdditionalInformation(DocumentDto d)
+    {
+        var lines = new List<string>();
+        if (d.Detraction is { } detraction)
+        {
+            lines.Add($"Operación sujeta a detracción: código {detraction.GoodsOrServiceCode}, {detraction.Percentage:0.##}% = S/ {detraction.Amount:0.00}; cuenta en el Banco de la Nación N.° {detraction.AccountNumber}");
+        }
+
+        if (d.Retention is { } retention)
+        {
+            lines.Add($"Retención del IGV: {retention.Percentage:0.##}% sobre {retention.BaseAmount:0.00} = {retention.Amount:0.00}");
+        }
+
+        return lines.Count == 0 ? null : lines;
     }
 
     private static string DocumentName(string typeCode) => typeCode == DocumentTypes.Invoice ? "Factura electrónica" : "Boleta de venta electrónica";

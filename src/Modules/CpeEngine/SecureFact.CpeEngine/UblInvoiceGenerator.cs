@@ -73,7 +73,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 new XAttribute("listName", "Tipo de Documento"),
                 new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01"),
                 data.DocumentTypeCode),
-            Legends(totals),
+            Legends(totals, data.Detraction is not null),
             new XElement(Cbc + "DocumentCurrencyCode", currency),
             new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
             SignatureInfo(data.Issuer),
@@ -83,12 +83,27 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         // Invoices must state their payment form (error 3244 since 2022-01-01, found against the SUNAT beta service). Receipts do not carry it.
         if (data.DocumentTypeCode == "01")
         {
+            // The account of the detraction goes in the payment means, ahead of the payment terms (UBL order).
+            if (data.Detraction is { } detraction)
+            {
+                root.Add(DetractionMeans(detraction));
+            }
+
             root.Add(PaymentTerms(data.PaymentForm, data.Installments, currency));
+            if (data.Detraction is { } detractionTerms)
+            {
+                root.Add(DetractionTerms(detractionTerms));
+            }
         }
 
         foreach (var allowance in GlobalAllowances(data))
         {
             root.Add(AllowanceElement(allowance, currency));
+        }
+
+        if (data.Retention is { } retention)
+        {
+            root.Add(RetentionElement(retention, currency));
         }
 
         root.Add(
@@ -119,6 +134,99 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
     private const string ExportOperation = "0200";
 
+    private const string SaleWithDetractionOperation = "1001";
+
+    /// <summary>Catalogue 54 codes the generator accepts for a detraction under operation type 1001; the fishing and transport codes have their own operation types (1002–1004).</summary>
+    private static readonly HashSet<string> OtherDetractionCodes = ["004", "027", "028"];
+
+    /// <summary>
+    /// Detraction and withholding (sheet Factura2_0: rules 3127–3129, 3033–3037, 3208, 3262–3264, 4265). Operation type 1001 and a detraction go together (3127, 3128); the amount of the
+    /// detraction is in soles (3208); a withholding is a global allowance of code 62 whose amount is its base × its percentage (3263) and whose base does not exceed the payable amount
+    /// (3264). An operation subject to the detraction is excluded from the withholding (RS 037-2002, art. 5), and neither applies to an export.
+    /// </summary>
+    private static Error? CheckDeductions(UblInvoiceData data)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
+
+        var detraction = data.Detraction;
+        if ((data.OperationTypeCode == SaleWithDetractionOperation) != (detraction is not null))
+        {
+            return Invalid("El tipo de operación 1001 y la detracción van juntos.");
+        }
+
+        if (detraction is not null)
+        {
+            if (data.DocumentTypeCode != "01" || data.Currency != "PEN")
+            {
+                return Invalid("La detracción es de una factura en soles (el monto de la detracción es siempre en soles).");
+            }
+
+            if (string.IsNullOrWhiteSpace(detraction.GoodsOrServiceCode) || OtherDetractionCodes.Contains(detraction.GoodsOrServiceCode)
+                || detraction.Percentage is <= 0 or > 100 || detraction.Amount <= 0 || detraction.Amount > data.Totals.PayableAmount || string.IsNullOrWhiteSpace(detraction.AccountNumber))
+            {
+                return Invalid("La detracción requiere un código del catálogo 54 para el tipo de operación 1001, un porcentaje de 0 a 100, un monto positivo que no supere el importe total y la cuenta del Banco de la Nación.");
+            }
+        }
+
+        if (data.Retention is { } retention)
+        {
+            if (detraction is not null || data.OperationTypeCode == ExportOperation || data.DocumentTypeCode != "01")
+            {
+                return Invalid("La retención del IGV es de una factura de venta interna y no se combina con la detracción.");
+            }
+
+            if (retention.Percentage is <= 0 or >= 100 || retention.BaseAmount <= 0 || retention.BaseAmount > data.Totals.PayableAmount || retention.Amount <= 0
+                || Math.Abs(retention.Amount - (retention.BaseAmount * retention.Percentage / 100m)) > 1m)
+            {
+                return Invalid("La retención requiere un porcentaje entre 0 y 100, una base positiva que no supere el importe total y un monto igual a la base por el porcentaje.");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Payment means of a detraction: the issuer's account at the Banco de la Nación (deposit in account, catalogue 59 code 001).</summary>
+    private static XElement DetractionMeans(UblDetraction detraction) =>
+        new(
+            Cac + "PaymentMeans",
+            new XElement(Cbc + "ID", "Detraccion"),
+            new XElement(
+                Cbc + "PaymentMeansCode",
+                new XAttribute("listAgencyName", "PE:SUNAT"),
+                new XAttribute("listName", "Medio de pago"),
+                new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo59"),
+                "001"),
+            new XElement(Cac + "PayeeFinancialAccount", new XElement(Cbc + "ID", detraction.AccountNumber.Trim())));
+
+    /// <summary>Payment terms of a detraction: the catalogue 54 code, the percentage and the amount in soles (rules 3127, 3033, 3035–3037, 3208).</summary>
+    private static XElement DetractionTerms(UblDetraction detraction) =>
+        new(
+            Cac + "PaymentTerms",
+            new XElement(Cbc + "ID", "Detraccion"),
+            new XElement(
+                Cbc + "PaymentMeansID",
+                new XAttribute("schemeName", "Codigo de detraccion"),
+                new XAttribute("schemeAgencyName", "PE:SUNAT"),
+                new XAttribute("schemeURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo54"),
+                detraction.GoodsOrServiceCode.Trim()),
+            new XElement(Cbc + "PaymentPercent", detraction.Percentage.ToString("0.00###", CultureInfo.InvariantCulture)),
+            Amount("Amount", detraction.Amount, "PEN"));
+
+    /// <summary>IGV withholding: a global discount-type allowance of code 62 with the percentage as a factor, the amount withheld and the operation amount (rules 3114, 3262–3264).</summary>
+    private static XElement RetentionElement(UblRetention retention, string currency) =>
+        new(
+            Cac + "AllowanceCharge",
+            new XElement(Cbc + "ChargeIndicator", "false"),
+            new XElement(
+                Cbc + "AllowanceChargeReasonCode",
+                new XAttribute("listAgencyName", "PE:SUNAT"),
+                new XAttribute("listName", "Cargo/descuento"),
+                new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo53"),
+                "62"),
+            new XElement(Cbc + "MultiplierFactorNumeric", (retention.Percentage / 100m).ToString("0.00###", CultureInfo.InvariantCulture)),
+            Amount("Amount", retention.Amount, currency),
+            Amount("BaseAmount", retention.BaseAmount, currency));
+
     /// <summary>Reason of a credit note that adjusts export operations (catalogue 09, code 11).</summary>
     private const string ExportAdjustmentReason = "11";
 
@@ -129,10 +237,19 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     private static Error? CheckOperationType(UblInvoiceData data)
     {
         var exportLines = data.Totals.Lines.Count(l => l.TaxCode == TaxCodes.Export);
+        if (CheckDeductions(data) is { } badDeduction)
+        {
+            return badDeduction;
+        }
+
         switch (data.OperationTypeCode)
         {
             case SaleOperation:
                 return exportLines == 0 ? null : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Las líneas de exportación requieren el tipo de operación 0200.");
+            case SaleWithDetractionOperation:
+                return exportLines == 0 && data.DocumentTypeCode == "01"
+                    ? null
+                    : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "La operación sujeta a detracción (1001) es una factura de venta, no una exportación.");
             case ExportOperation:
                 if (data.DocumentTypeCode != "01")
                 {
@@ -489,14 +606,16 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 }
 
                 // The net pending amount (the sum of the installments) is the payable amount minus what was paid on the issue date (rules 3265, 3319).
-                if (data.InitialPayment < 0 || data.InitialPayment >= data.Totals.PayableAmount)
+                // It also leaves out what the detraction or the withholding takes (RS 193-2020, annex 1, field 64-A).
+                var pending = data.Totals.PayableAmount - (data.Detraction?.Amount ?? 0m) - (data.Retention?.Amount ?? 0m);
+                if (data.InitialPayment < 0 || data.InitialPayment >= pending)
                 {
-                    return Invalid("La entrega inicial debe ser positiva y menor que el importe total.");
+                    return Invalid("La entrega inicial debe ser positiva y menor que lo pendiente de pago.");
                 }
 
-                return installments.Sum(i => i.Amount) == data.Totals.PayableAmount - data.InitialPayment
+                return installments.Sum(i => i.Amount) == pending - data.InitialPayment
                     ? null
-                    : Invalid("Las cuotas deben sumar el importe total de la venta menos la entrega inicial.");
+                    : Invalid("Las cuotas deben sumar el importe total de la venta menos la detracción o retención y la entrega inicial.");
             default:
                 return Unsupported($"La forma de pago '{data.PaymentForm}' no está soportada (Contado o Credito).");
         }
@@ -622,10 +741,22 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     }
 
     /// <summary>Legend 2007 "Operación sujeta a IVAP" when a line is taxed with the IVAP (observation 4264 otherwise).</summary>
-    private static List<XElement> Legends(TaxCalculationResult totals) =>
-        totals.Lines.Any(l => l.TaxCode == TaxCodes.Ivap && l.LineExtensionAmount > 0)
-            ? [new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "2007"), "Operación sujeta a IVAP")]
-            : [];
+    private static List<XElement> Legends(TaxCalculationResult totals, bool detraction = false)
+    {
+        var legends = new List<XElement>();
+        if (totals.Lines.Any(l => l.TaxCode == TaxCodes.Ivap && l.LineExtensionAmount > 0))
+        {
+            legends.Add(new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "2007"), "Operación sujeta a IVAP"));
+        }
+
+        // Observation 4265: an operation subject to detraction carries legend 2006.
+        if (detraction)
+        {
+            legends.Add(new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "2006"), "Operación sujeta a detracción"));
+        }
+
+        return legends;
+    }
 
     private static XElement SignatureInfo(UblParty issuer) =>
         new(
