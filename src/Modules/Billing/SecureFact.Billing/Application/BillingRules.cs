@@ -59,7 +59,8 @@ internal static partial class BillingRules
             : Error.Validation(ErrorCodes.InvalidDocument, "Moneda inválida", "La moneda debe ser un código de 3 letras mayúsculas (catálogo 02).");
 
     /// <summary>Buyer identification. Invoices require a RUC (S02); receipts accept the catalogue-06 identity types.</summary>
-    public static Error? ValidateBuyer(string documentTypeCode, BuyerSnapshot? buyer)
+    /// <param name="export">An export invoice goes to a buyer abroad: the sheet forbids the RUC there (rule 2800) and takes the other identity types.</param>
+    public static Error? ValidateBuyer(string documentTypeCode, BuyerSnapshot? buyer, bool export = false)
     {
         static Error Bad(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Adquirente inválido", detail);
 
@@ -68,7 +69,14 @@ internal static partial class BillingRules
             return Bad("El nombre o razón social del adquirente es obligatorio (máximo 250 caracteres).");
         }
 
-        if (documentTypeCode == DocumentTypes.Invoice && buyer.DocumentTypeCode?.Trim() != IdentityDocuments.Ruc)
+        if (export)
+        {
+            if (buyer.DocumentTypeCode?.Trim() is not (IdentityDocuments.NoDocument or IdentityDocuments.ForeignerCard or IdentityDocuments.Passport or IdentityDocuments.DiplomaticId))
+            {
+                return Bad("Una factura de exportación se emite a un adquirente del exterior: documento de identidad tipo 0, 4, 7 o A, no RUC (regla 2800).");
+            }
+        }
+        else if (documentTypeCode == DocumentTypes.Invoice && buyer.DocumentTypeCode?.Trim() != IdentityDocuments.Ruc)
         {
             return Bad("Las facturas solo se emiten a adquirentes con RUC.");
         }

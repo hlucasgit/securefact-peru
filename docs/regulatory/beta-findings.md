@@ -25,6 +25,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **IVAP** (R-051): factura con una línea IVAP (afectación 17, tributo 1016, leyenda 2007) y nota de crédito de motivo 12 sobre ella: aceptadas con código 0, sin observaciones. El resumen diario con una boleta IVAP fue aceptado con la **observación 4019** («El calculo del IGV no es correcto … codigo tributo: 1000») pese a declarar el tributo 1016 con su tasa; el beta parece aplicar la comprobación del IGV. No bloquea.
 
+- **Exportación** (R-052): factura de exportación de bienes (0200, línea de afectación 40, tributo 9995, adquirente tipo 0) y nota de crédito de motivo 11 sobre ella: aceptadas con código 0, sin observaciones. Con un adquirente RUC el beta rechaza con **2800** (`cbc:ID/schemeID` valor 6), como dice la regla.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

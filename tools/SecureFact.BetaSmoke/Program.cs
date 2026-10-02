@@ -39,12 +39,18 @@ var number = (long)lima.TimeOfDay.TotalSeconds + 1;
 var discount = args.Contains("discount", StringComparer.Ordinal);
 // "ivap": a line of rice taxed with the IVAP (affectation 17, tax 1016) at 4 %.
 var ivapSale = args.Contains("ivap", StringComparer.Ordinal);
-TaxableLine[] taxLines = ivapSale
+// "export": an export of goods (operation type 0200): affectation 40, tax 9995, a buyer abroad without RUC.
+var exportSale = args.Contains("export", StringComparer.Ordinal);
+TaxableLine[] taxLines = exportSale
+    ? [new TaxableLine(1, 100m, "40")]
+    : ivapSale
     ? [new TaxableLine(1, 100m, "17")]
     : discount
     ? [new TaxableLine(2, 100m, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m), new TaxableLine(1, 50m, "20")]
     : [new TaxableLine(1, 100m, "10")];
-UblLine[] ublLines = ivapSale
+UblLine[] ublLines = exportSale
+    ? [new UblLine(1, "Bien de exportacion de prueba", "NIU", null, 1, 100m, null, "40")]
+    : ivapSale
     ? [new UblLine(1, "Arroz pilado de prueba", "KGM", null, 1, 100m, null, "17")]
     : discount
     ? [new UblLine(1, "Servicio de prueba", "ZZ", null, 2, 100m, null, "10", 20m, 5m, 10m, 3m), new UblLine(2, "Servicio exonerado", "ZZ", null, 1, 50m, null, "20")]
@@ -56,8 +62,10 @@ var receipt = args.Contains("boleta", StringComparer.Ordinal);
 // "credit": an invoice sold on credit with two installments (the sheet's "Forma de pago al crédito").
 var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
 var data = new UblInvoiceData(
-    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", "0101",
-    new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"), receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
+    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : "0101",
+    new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"),
+    exportSale ? new UblParty(Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_TYPE") ?? "0", Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_NUMBER") ?? "-", "CLIENTE DEL EXTERIOR")
+    : receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
     ublLines, totals, 0.18m,
     credit ? "Credito" : "Contado", adjustments,
     credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
@@ -138,15 +146,16 @@ static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certifi
 
     // A document taxed with the IVAP is adjusted with reason 12, whose lines are IVAP lines too.
     var ivapOriginal = original.Totals.TotalIvap > 0;
-    var reason = adjustInstallments ? "13" : ivapOriginal ? "12" : Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
+    var exportOriginal = original.Totals.TotalExport > 0;
+    var reason = adjustInstallments ? "13" : ivapOriginal ? "12" : exportOriginal ? "11" : Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
 
     // Reason 13 (adjustment of the installments): nothing is sold, so the line is worth zero (rule 3315 asks for a payable amount of zero).
     var affectation = Environment.GetEnvironmentVariable("SF_BETA_NC13_AFFECTATION") ?? "10";
-    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : ivapOriginal ? "17" : "10")], new TaxRates(0.18m, 0.04m))).Value;
+    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10")], new TaxRates(0.18m, 0.04m))).Value;
     var note = new UblNoteData(
         credit ? "07" : "08", original.DocumentTypeCode == "03" ? "BC01" : "FC01", number, original.IssueDate, TimeOnly.FromDateTime(lima.DateTime), "PEN", reason,
         credit ? "Anulacion de la operacion" : "Aumento en el valor", original.DocumentTypeCode, original.Series, original.Number, original.Issuer, original.Buyer,
-        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", "ZZ", null, 1, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : ivapOriginal ? "17" : "10")], totals, 0.18m,
+        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", "ZZ", null, 1, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10")], totals, 0.18m,
         adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null, 0.04m);
     var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateNote(note);
     if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL note: {generated.Error.Code} {generated.Error.Detail}"); return 1; }

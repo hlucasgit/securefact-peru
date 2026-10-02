@@ -185,7 +185,7 @@ public class UblInvoiceGeneratorTests
         var baseData = Data("01", ("10", 1m, 100m));
 
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { DocumentTypeCode = "07" }).Error.Code);
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { Totals = export }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(baseData with { Totals = export }).Error.Code); // export lines need operation type 0200
         var rounded = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1, 100m, "10")], Rates, new GlobalAdjustments(PayableRoundingAmount: 0.5m))).Value;
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(baseData with { Totals = rounded }).Error.Code);
 
@@ -207,6 +207,49 @@ public class UblInvoiceGeneratorTests
             .ToArray();
         Assert.Equal(["18.00", "0.00", "0.00", "18.00", "0.00"], percents);
         Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent", Namespaces)); // the document totals do not carry it
+    }
+
+    // ---------- export of goods ----------
+
+    private static UblInvoiceData ExportData(string operation = "0200", string type = "01", string affectation = "40")
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(2m, 50m, affectation)], Rates)).Value;
+        return new UblInvoiceData(
+            type, type == "01" ? "F001" : "B001", 123, new DateOnly(2026, 9, 30), new TimeOnly(13, 25, 51), "USD", operation,
+            new UblParty("6", "20100066603", "EMISORA DEMO SAC", "Emisora Demo"), new UblParty("0", "-", "FOREIGN BUYER LLC"),
+            [new UblLine(1, "Bien de exportación", "NIU", "P001", 2m, 50m, null, affectation)], totals, 0.18m);
+    }
+
+    [Fact]
+    public void An_export_of_goods_validates_against_the_schema_and_states_tax_9995_without_igv()
+    {
+        var result = _generator.GenerateInvoice(ExportData());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("0200", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        var total = xml.XPathSelectElement("/inv:Invoice/cac:TaxTotal", Namespaces)!;
+        Assert.Equal("0.00", total.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value);
+        var subtotal = Assert.Single(total.XPathSelectElements("cac:TaxSubtotal", Namespaces));
+        Assert.Equal("9995", subtotal.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("EXP", subtotal.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:Name", Namespaces)!.Value);
+        Assert.Equal("FRE", subtotal.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:TaxTypeCode", Namespaces)!.Value);
+        Assert.Equal("100.00", subtotal.XPathSelectElement("cbc:TaxableAmount", Namespaces)!.Value);
+        Assert.Equal("0.00", subtotal.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value);
+        var line = xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory", Namespaces)!;
+        Assert.Equal("0.00", line.XPathSelectElement("cbc:Percent", Namespaces)!.Value); // rule 2992: stated, and zero for 9995 (rule 3110)
+        Assert.Equal("40", line.XPathSelectElement("cbc:TaxExemptionReasonCode", Namespaces)!.Value);
+        Assert.Equal("100.00", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void Export_and_sale_lines_do_not_mix_and_only_invoices_with_supported_types_are_exported()
+    {
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData(affectation: "10")).Error.Code); // 0200 with taxed lines
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0101")).Error.Code); // export lines on a sale
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData(type: "03")).Error.Code); // no export receipts yet
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0201")).Error.Code); // services are not supported yet
     }
 
     // ---------- IVAP (rice) ----------

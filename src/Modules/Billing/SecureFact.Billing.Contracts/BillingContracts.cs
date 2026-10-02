@@ -12,6 +12,16 @@ public static class DocumentTypes
     public const string DebitNote = "08";
 }
 
+/// <summary>Catalogue 51 operation types an invoice can be issued with today.</summary>
+public static class OperationTypes
+{
+    /// <summary>0101 – internal sale.</summary>
+    public const string Sale = "0101";
+
+    /// <summary>0200 – export of goods (the sale is not taxed: lines with affectation 40, tax 9995).</summary>
+    public const string Export = "0200";
+}
+
 public sealed record CreateSeriesRequest(Guid CompanyId, string DocumentTypeCode, string Code, Guid? EstablishmentId = null);
 
 public sealed record SeriesDto(
@@ -52,7 +62,8 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// Tax rates are never accepted from the client: the platform resolves them from versioned rules at the issue date.
 /// The buyer is given either inline (<paramref name="Buyer"/>) or by reference (<paramref name="CustomerId"/>), never both; a referenced
 /// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
-/// amounts must add up to the payable amount and every due date must fall after the issue date.
+/// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
+/// <c>0101</c> by default, or <c>0200</c> for the export of goods (invoices only, every line with affectation 40, and a buyer without RUC).
 /// </summary>
 public sealed record CreateDocumentRequest(
     Guid SeriesId,
@@ -62,7 +73,8 @@ public sealed record CreateDocumentRequest(
     IReadOnlyList<DocumentLineRequest> Lines,
     GlobalAdjustments? Adjustments = null,
     Guid? CustomerId = null,
-    IReadOnlyList<Installment>? Installments = null);
+    IReadOnlyList<Installment>? Installments = null,
+    string? OperationTypeCode = null);
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
@@ -126,7 +138,8 @@ public sealed record DocumentDto(
     DateTimeOffset CreatedAt,
     NoteInfo? Note = null,
     GlobalAdjustments? Adjustments = null,
-    IReadOnlyList<Installment>? Installments = null)
+    IReadOnlyList<Installment>? Installments = null,
+    string OperationTypeCode = OperationTypes.Sale)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

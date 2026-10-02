@@ -22,5 +22,5 @@ Hojas `NotaCredito2_0` y `NotaDebito2_0` de las reglas de validación del 26.08.
 Nota de crédito (motivo 01) y nota de débito (motivo 02) de una factura, y nota de crédito (motivo 07) de una boleta, enviadas con `sendBill` tras aceptarse el original: las tres aceptadas con código 0 y sin observaciones. Resúmenes diarios con una boleta y su nota de crédito, o de débito, en el mismo archivo: aceptados (código 0); un resumen con una nota que modifica una boleta inexistente también fue aceptado, de modo que el beta **no valida** la existencia de la boleta (producción sí: regla 2989).
 
 ## Límites
-- El motivo 13 (ajuste de cuotas) está en ADR-026. El motivo 12 (ajuste IVAP) está en ADR-027. Sin motivo 11 (exportación), sin descuentos ni cargos (las hojas de las notas no definen sus nodos; ADR-025), sin compensar notas de débito en el acumulado.
+- El motivo 13 (ajuste de cuotas) está en ADR-026. El motivo 12 (ajuste IVAP) está en ADR-027. El motivo 11 (ajuste de exportación) está en ADR-028. Las notas van sin descuentos ni cargos (las hojas de las notas no definen sus nodos; ADR-025), sin compensar notas de débito en el acumulado.
 - Las bajas (comunicación de baja) y la anulación por nota de crédito de un documento en contingencia no existen aún.

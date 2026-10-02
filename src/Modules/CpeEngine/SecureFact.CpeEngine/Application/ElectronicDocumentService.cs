@@ -36,7 +36,6 @@ internal sealed class ElectronicDocumentService(
     TimeProvider clock,
     IAuditTrail audit) : IElectronicDocumentService
 {
-    private const string OperationTypeSale = "0101";
     private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromHours(1);
     private static readonly TimeSpan PreconditionBackoff = TimeSpan.FromMinutes(5);
@@ -100,7 +99,7 @@ internal sealed class ElectronicDocumentService(
                 note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value))
             : ubl.GenerateInvoice(new UblInvoiceData(
-                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, OperationTypeSale, issuer, buyer, ublLines, d.Totals, igv.Value,
+                d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, d.OperationTypeCode, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
                 d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value));
         if (!generated.IsSuccess)
@@ -464,7 +463,7 @@ internal sealed class ElectronicDocumentService(
             d.Lines.Select(l => new PrintedLine(l.UnitCode, l.Quantity, l.Description, l.UnitValue, l.UnitPriceIncludingTaxes, l.LineExtensionAmount, l.TotalTaxAmount)).ToList(),
             new PrintedTotals(
                 d.Totals.TotalTaxableGravado + d.Totals.TaxSubtotals.Where(t => t.TaxCode == TaxCodes.Ivap).Sum(t => t.TaxableAmount), d.Totals.TotalExempt, d.Totals.TotalUnaffected,
-                d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount, d.Totals.TotalAllowances, d.Totals.TotalCharges, d.Totals.TotalIvap),
+                d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount, d.Totals.TotalAllowances, d.Totals.TotalCharges, d.Totals.TotalIvap, d.Totals.TotalExport),
             payload.Value, entity.DigestValue,
             d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
             await IsVoidedAsync(entity.Id, cancellationToken),

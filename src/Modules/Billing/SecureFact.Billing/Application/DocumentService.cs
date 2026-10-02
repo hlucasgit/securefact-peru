@@ -219,7 +219,7 @@ internal sealed partial class DocumentService(
         return ToDto(document);
     }
 
-    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "12", "13"];
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"];
 
     /// <summary>Catalogue 09 code of the credit note that adjusts the amounts or dates of the installments of a credit invoice.</summary>
     private const string InstallmentAdjustmentReason = "13";
@@ -349,7 +349,8 @@ internal sealed partial class DocumentService(
             || credited.Sum(n => n.TotalUnaffected) > original.TotalUnaffected
             || credited.Sum(n => n.TotalFree) > original.TotalFree
             || credited.Sum(n => n.TotalIgv) > original.TotalIgv
-            || credited.Sum(n => n.TotalIvap) > original.TotalIvap;
+            || credited.Sum(n => n.TotalIvap) > original.TotalIvap
+            || credited.Sum(n => n.TotalExport) > original.TotalExport;
         return exceeds
             ? Error.Validation(
                 ErrorCodes.NoteExceedsOriginal, "Notas acumuladas por encima del original",
@@ -365,7 +366,8 @@ internal sealed partial class DocumentService(
         || note.TotalUnaffected > original.TotalUnaffected
         || note.TotalFree > original.TotalFree
         || note.TotalIgv > original.TotalIgv
-        || note.TotalIvap > original.TotalIvap;
+        || note.TotalIvap > original.TotalIvap
+        || note.TotalExport > original.TotalExport;
 
     private async Task<Error?> ValidateNoteAsync(Series series, Document referenced, CreateNoteRequest request, CancellationToken cancellationToken)
     {
@@ -413,7 +415,7 @@ internal sealed partial class DocumentService(
         var credit = series.DocumentTypeCode == DocumentTypes.CreditNote;
         if (!(credit ? CreditReasons : DebitReasons).Contains(request.ReasonCode?.Trim() ?? string.Empty))
         {
-            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 10, 12 o 13 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
+            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 13 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
         }
 
         if (ValidateNoteInstallments(request, referenced) is { } badInstallments)
@@ -424,6 +426,11 @@ internal sealed partial class DocumentService(
         if (ValidateIvapAdjustment(request, referenced) is { } badIvap)
         {
             return badIvap;
+        }
+
+        if (ValidateExportAdjustment(request, referenced) is { } badExport)
+        {
+            return badExport;
         }
 
         var reason = request.Reason?.Trim() ?? string.Empty;
@@ -567,7 +574,12 @@ internal sealed partial class DocumentService(
             return currency;
         }
 
-        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate) is { } buyerError)
+        if (ValidateOperationType(series, request) is { } operationError)
+        {
+            return operationError;
+        }
+
+        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate, request.OperationTypeCode == OperationTypes.Export) is { } buyerError)
         {
             return buyerError;
         }
@@ -633,7 +645,8 @@ internal sealed partial class DocumentService(
             ? new NoteInfo(d.ReasonCode!, d.Reason!, referencedId, d.ReferencedDocumentTypeCode!, d.ReferencedSeries!, d.ReferencedNumber!.Value)
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
-            stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null);
+            stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
+            stored?.OperationTypeCode ?? OperationTypes.Sale);
     }
 
     /// <summary>Affectation code of the IVAP (catalogue 07).</summary>
@@ -764,9 +777,65 @@ internal sealed partial class DocumentService(
         return sum == payable ? null : Invalid($"Las cuotas suman {sum:0.00} y el importe total es {payable:0.00}: deben coincidir.");
     }
 
+    /// <summary>Affectation code of the export of goods or services (catalogue 07): tax 9995.</summary>
+    private const string ExportAffectation = "40";
+
+    /// <summary>
+    /// Operation type (catalogue 51; sheet Factura2_0, rules 2642, 2800): the sale (0101) or the export of goods (0200). An export is an invoice whose lines all have affectation 40;
+    /// those lines exist only in an export; its buyer is checked with the export rule.
+    /// </summary>
+    private static Error? ValidateOperationType(Series series, CreateDocumentRequest request)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Tipo de operación inválido", detail);
+
+        var operation = request.OperationTypeCode?.Trim();
+        if (operation is not (null or OperationTypes.Sale or OperationTypes.Export))
+        {
+            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna) o 0200 (exportación de bienes).");
+        }
+
+        var exportLines = request.Lines.Count(l => l?.Tax?.IgvAffectationCode == ExportAffectation);
+        if (operation != OperationTypes.Export)
+        {
+            return exportLines > 0 ? Invalid("Las líneas de exportación (afectación 40) requieren el tipo de operación 0200.") : null;
+        }
+
+        if (series.DocumentTypeCode != DocumentTypes.Invoice)
+        {
+            return Invalid("La exportación se factura con una factura: las boletas de exportación aún no están soportadas.");
+        }
+
+        return exportLines == request.Lines.Count ? null : Invalid("Una exportación lleva solo líneas con afectación 40 (regla 2642).");
+    }
+
+    /// <summary>
+    /// Reason 11 (sheet NotaCredito2_0, rules 2642, 3194, 3221, 3107): an adjustment of an export, with export lines only and on an invoice that is one. In any note the lines are all
+    /// export or none: a note does not mix the sale of goods in the country with an export.
+    /// </summary>
+    private static Error? ValidateExportAdjustment(CreateNoteRequest request, Document referenced)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Ajuste de exportación inválido", detail);
+
+        var lines = request.Lines ?? [];
+        var exportLines = lines.Count(l => l?.Tax?.IgvAffectationCode == ExportAffectation);
+        if (request.ReasonCode?.Trim() != "11")
+        {
+            return exportLines is 0 || exportLines == lines.Count ? null : Invalid("Una nota no mezcla líneas de exportación (afectación 40) con otras.");
+        }
+
+        if (exportLines != lines.Count)
+        {
+            return Invalid("La nota de motivo 11 (ajuste de operaciones de exportación) lleva solo líneas con afectación 40.");
+        }
+
+        return referenced.DocumentTypeCode == DocumentTypes.Invoice && JsonSerializer.Deserialize<TaxCalculationResult>(referenced.TotalsJson, Json)!.TotalExport > 0
+            ? null
+            : Invalid("El motivo 11 solo modifica una factura de exportación.");
+    }
+
     private sealed record StoredLine(TaxableLine? Tax);
 
-    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments);
+    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode);
 
     private static StoredRequest? ReadStoredRequest(string json)
     {

@@ -237,6 +237,17 @@ public class PrintedRepresentationTests
     }
 
     [Fact]
+    public void An_export_is_printed_with_its_own_row()
+    {
+        var plain = string.Concat(PageContents(_renderer.Render(Document()).Value));
+        var export = string.Concat(PageContents(_renderer.Render(Document() with { Totals = new PrintedTotals(0m, 0m, 0m, 0m, 0m, 100m, 0m, 0m, 0m, 100m) }).Value));
+
+        Assert.DoesNotContain("Op. exportaci", plain, StringComparison.Ordinal);
+        Assert.Contains("Op. exportaci", export, StringComparison.Ordinal);
+        Assert.DoesNotContain("Op. gravadas", export, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_voided_document_carries_the_word_ANULADO_on_every_page_and_the_rest_is_unchanged()
     {
         var plain = _renderer.Render(Document(lines: 120)).Value;

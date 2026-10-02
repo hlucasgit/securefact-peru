@@ -73,6 +73,23 @@ public class UblNoteGeneratorTests
         };
     }
 
+    /// <summary>A credit note of reason 11: an adjustment of an export, with export lines only.</summary>
+    internal static UblNoteData ExportAdjustment(string reason = "11")
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1m, 100m, "40")], new TaxRates(0.18m))).Value;
+        return Note("07", reason, "01") with { Totals = totals, Lines = [new UblLine(1, "Bien de exportación", "NIU", null, 1m, 100m, null, "40")] };
+    }
+
+    private static UblNoteData ExportMixed()
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1m, 100m, "40"), new TaxableLine(1m, 100m, "10")], new TaxRates(0.18m))).Value;
+        return Note("07", "01", "01") with
+        {
+            Totals = totals,
+            Lines = [new UblLine(1, "Bien de exportación", "NIU", null, 1m, 100m, null, "40"), new UblLine(2, "Bien nacional", "NIU", null, 1m, 100m, null, "10")],
+        };
+    }
+
     private static List<string> SchemaErrors(XDocument document, string type)
     {
         var copy = new XDocument(document);
@@ -261,12 +278,37 @@ public class UblNoteGeneratorTests
         Assert.Equal("104.00", xml.XPathSelectElement("/cn:CreditNote/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
     }
 
+    // ---------- reason 11: adjustment of export operations ----------
+
+    [Fact]
+    public void A_credit_note_of_reason_11_validates_against_the_schema_and_states_tax_9995()
+    {
+        var result = _generator.GenerateNote(ExportAdjustment());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml, "07"));
+        Assert.Equal("11", xml.XPathSelectElement("/cn:CreditNote/cac:DiscrepancyResponse/cbc:ResponseCode", Namespaces)!.Value);
+        var subtotal = xml.XPathSelectElement("/cn:CreditNote/cac:TaxTotal/cac:TaxSubtotal", Namespaces)!;
+        Assert.Equal("9995", subtotal.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("100.00", xml.XPathSelectElement("/cn:CreditNote/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void Another_reason_may_carry_export_lines_when_they_are_all_export_lines()
+    {
+        Assert.True(_generator.GenerateNote(ExportAdjustment("01")).IsSuccess);
+    }
+
     // ---------- refusals ----------
 
     public static TheoryData<string, UblNoteData, string> InvalidData() => new()
     {
         { "invoice type", Note() with { DocumentTypeCode = "01" }, ErrorCodes.CpeInvalidDocument },
-        { "credit reason 11", Note("07", "11"), ErrorCodes.CpeUnsupported },
+        { "credit reason 11 with taxed lines", Note("07", "11"), ErrorCodes.CpeInvalidDocument },
+        { "reason 11 on a debit note", ExportAdjustment() with { DocumentTypeCode = "08" }, ErrorCodes.CpeUnsupported },
+        { "reason 11 on a receipt", ExportAdjustment() with { ReferencedDocumentTypeCode = "03", ReferencedSeries = "B001" }, ErrorCodes.CpeInvalidDocument },
+        { "export lines mixed with others", ExportMixed(), ErrorCodes.CpeInvalidDocument },
         { "credit reason 13 without installments", Note("07", "13"), ErrorCodes.CpeInvalidDocument },
         { "credit reason 13 with a payable amount", Note("07", "13") with { Installments = [new(118m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },
         { "installments on another reason", Note("07", "01") with { Installments = [new(118m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },

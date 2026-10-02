@@ -44,11 +44,15 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Emisión, UBL, documento electrónico (espera a que el original esté aceptado), PDF y envío de notas de facturas; aceptadas en el beta (crédito 01, débito 02, crédito 07 de boleta). Pruebas: 491 pasan.
 - Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
 - Acumulado de notas de crédito (control propio): las notas vigentes de un documento no acreditan más que él; no cuentan las rechazadas ni las anuladas (ADR-023). Pruebas: 582 pasan (343 unitarias, 6 arquitectura, 6 integración, 227 seguridad/API).
-- Pendiente: motivo 11 (ajuste de exportación; exige antes facturas de exportación).
+- Motivo 11 (ajuste de exportación): ver ADR-028.
 
 ## IVAP
 - Facturas, boletas y notas con líneas IVAP (afectación 17, tributo 1016, tasa 4 % verificada contra SUNAT, leyenda 2007), resumen diario con el tributo 1016, PDF con fila «IVAP» y nota de crédito de motivo 12. Aceptados en el beta (el resumen con observación 4019); ADR-027. Pruebas: 596 pasan (353 unitarias, 6 arquitectura, 6 integración, 231 seguridad/API).
-- Pendiente: monto del QR en un comprobante IVAP; exportación.
+- Pendiente: monto del QR en un comprobante IVAP.
+
+## Exportación
+- Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 608 pasan (361 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
+- Pendiente: servicios de exportación (0201–0208), boletas de exportación, leyenda 2008.
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).

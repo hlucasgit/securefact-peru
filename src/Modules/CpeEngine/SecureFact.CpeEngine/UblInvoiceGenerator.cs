@@ -31,6 +31,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     {
         [TaxCodes.Igv] = ("S", "IGV", "VAT"),
         [TaxCodes.Ivap] = ("S", "IVAP", "VAT"),
+        [TaxCodes.Export] = ("G", "EXP", "FRE"),
         [TaxCodes.Exempt] = ("E", "EXO", "VAT"),
         [TaxCodes.Unaffected] = ("O", "INA", "FRE"),
         [TaxCodes.Free] = ("Z", "GRA", "FRE"),
@@ -111,7 +112,56 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     }
 
     /// <summary>Reasons whose structure is supported today: credit 01-10 and debit 01-03. Export (11), IVAP (12) and credit-installment (13) adjustments are not.</summary>
-    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "12", "13"];
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"];
+
+    /// <summary>Catalogue 51 types the generator supports: the internal sale and the export of goods.</summary>
+    private const string SaleOperation = "0101";
+
+    private const string ExportOperation = "0200";
+
+    /// <summary>Reason of a credit note that adjusts export operations (catalogue 09, code 11).</summary>
+    private const string ExportAdjustmentReason = "11";
+
+    /// <summary>
+    /// The operation type decides the nature of the lines (sheet Factura2_0, rules 2642, 3107, 3223): an export (0200, goods) is an invoice whose lines are all export lines
+    /// (tax 9995); the internal sale carries none.
+    /// </summary>
+    private static Error? CheckOperationType(UblInvoiceData data)
+    {
+        var exportLines = data.Totals.Lines.Count(l => l.TaxCode == TaxCodes.Export);
+        switch (data.OperationTypeCode)
+        {
+            case SaleOperation:
+                return exportLines == 0 ? null : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Las líneas de exportación requieren el tipo de operación 0200.");
+            case ExportOperation:
+                if (data.DocumentTypeCode != "01")
+                {
+                    return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", "La exportación solo se emite con facturas.");
+                }
+
+                return exportLines == data.Totals.Lines.Count
+                    ? null
+                    : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Una exportación lleva solo líneas de exportación (afectación 40).");
+            default:
+                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101 o 0200).");
+        }
+    }
+
+    /// <summary>A credit note of reason 11 (adjustment of an export) carries only export lines and modifies an invoice (rules 2642, 3194, 3221, 3107).</summary>
+    private static Error? CheckNoteExport(UblNoteData data)
+    {
+        var exportLines = data.Totals.Lines.Count(l => l.TaxCode == TaxCodes.Export);
+        if (data.ReasonCode == ExportAdjustmentReason)
+        {
+            return exportLines == data.Totals.Lines.Count && data.ReferencedDocumentTypeCode == "01"
+                ? null
+                : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de nota inválidos", "La nota de motivo 11 (ajuste de exportación) lleva solo líneas de exportación y modifica una factura.");
+        }
+
+        return exportLines == 0 || exportLines == data.Totals.Lines.Count
+            ? null
+            : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de nota inválidos", "Una nota no mezcla líneas de exportación con otras.");
+    }
 
     /// <summary>Reason of a credit note that adjusts operations taxed with the IVAP (catalogue 09, code 12).</summary>
     private const string IvapAdjustmentReason = "12";
@@ -313,9 +363,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return badInstallments;
         }
 
-        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
+        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0)
         {
-            return Unsupported("ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+            return Unsupported("ISC e ICBPER aún no están soportados por el generador UBL.");
+        }
+
+        if (CheckNoteExport(data) is { } badExport)
+        {
+            return badExport;
         }
 
         if (CheckIvap(data.Totals, data.IvapRate, data.ReasonCode == IvapAdjustmentReason, isNote: true) is { } badIvap)
@@ -354,9 +409,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return Unsupported($"El tipo de documento '{data.DocumentTypeCode}' no está soportado (solo 01 y 03).");
         }
 
-        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
+        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0)
         {
-            return Unsupported("ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+            return Unsupported("ISC e ICBPER aún no están soportados por el generador UBL.");
+        }
+
+        if (CheckOperationType(data) is { } badOperation)
+        {
+            return badOperation;
         }
 
         if (CheckIvap(data.Totals, data.IvapRate, adjustment: false, isNote: false) is { } badIvap)

@@ -231,6 +231,11 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             rows.Add(("Op. exoneradas", totals.ExemptAmount, false));
         }
 
+        if (totals.ExportAmount != 0)
+        {
+            rows.Add(("Op. exportación", totals.ExportAmount, false));
+        }
+
         if (totals.UnaffectedAmount != 0)
         {
             rows.Add(("Op. inafectas", totals.UnaffectedAmount, false));
