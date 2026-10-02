@@ -219,7 +219,7 @@ internal sealed partial class DocumentService(
         return ToDto(document);
     }
 
-    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "13"];
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "12", "13"];
 
     /// <summary>Catalogue 09 code of the credit note that adjusts the amounts or dates of the installments of a credit invoice.</summary>
     private const string InstallmentAdjustmentReason = "13";
@@ -348,7 +348,8 @@ internal sealed partial class DocumentService(
             || credited.Sum(n => n.TotalExempt) > original.TotalExempt
             || credited.Sum(n => n.TotalUnaffected) > original.TotalUnaffected
             || credited.Sum(n => n.TotalFree) > original.TotalFree
-            || credited.Sum(n => n.TotalIgv) > original.TotalIgv;
+            || credited.Sum(n => n.TotalIgv) > original.TotalIgv
+            || credited.Sum(n => n.TotalIvap) > original.TotalIvap;
         return exceeds
             ? Error.Validation(
                 ErrorCodes.NoteExceedsOriginal, "Notas acumuladas por encima del original",
@@ -363,7 +364,8 @@ internal sealed partial class DocumentService(
         || note.TotalExempt > original.TotalExempt
         || note.TotalUnaffected > original.TotalUnaffected
         || note.TotalFree > original.TotalFree
-        || note.TotalIgv > original.TotalIgv;
+        || note.TotalIgv > original.TotalIgv
+        || note.TotalIvap > original.TotalIvap;
 
     private async Task<Error?> ValidateNoteAsync(Series series, Document referenced, CreateNoteRequest request, CancellationToken cancellationToken)
     {
@@ -411,12 +413,17 @@ internal sealed partial class DocumentService(
         var credit = series.DocumentTypeCode == DocumentTypes.CreditNote;
         if (!(credit ? CreditReasons : DebitReasons).Contains(request.ReasonCode?.Trim() ?? string.Empty))
         {
-            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 10 o 13 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
+            return Invalid("Motivo no soportado", credit ? "El motivo de la nota de crédito debe ser un código 01 a 10, 12 o 13 del catálogo 09." : "El motivo de la nota de débito debe ser un código 01 a 03 del catálogo 10.");
         }
 
         if (ValidateNoteInstallments(request, referenced) is { } badInstallments)
         {
             return badInstallments;
+        }
+
+        if (ValidateIvapAdjustment(request, referenced) is { } badIvap)
+        {
+            return badIvap;
         }
 
         var reason = request.Reason?.Trim() ?? string.Empty;
@@ -627,6 +634,37 @@ internal sealed partial class DocumentService(
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null);
+    }
+
+    /// <summary>Affectation code of the IVAP (catalogue 07).</summary>
+    private const string IvapAffectation = "17";
+
+    /// <summary>Catalogue 09 code of the credit note that adjusts operations taxed with the IVAP.</summary>
+    private const string IvapAdjustmentReason = "12";
+
+    /// <summary>
+    /// Reason 12 (sheet NotaCredito2_0, rules 2644, 3221, 3230): the note adjusts a document that carries the IVAP and has only IVAP lines (affectation 17); the IVAP is
+    /// reserved to this reason among notes.
+    /// </summary>
+    private static Error? ValidateIvapAdjustment(CreateNoteRequest request, Document referenced)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Ajuste IVAP inválido", detail);
+
+        var lines = request.Lines ?? [];
+        var ivapLines = lines.Count(l => l?.Tax?.IgvAffectationCode == IvapAffectation);
+        if (request.ReasonCode?.Trim() != IvapAdjustmentReason)
+        {
+            return ivapLines > 0 ? Invalid("Las líneas afectas al IVAP (afectación 17) son solo de la nota de crédito de motivo 12.") : null;
+        }
+
+        if (ivapLines != lines.Count)
+        {
+            return Invalid("La nota de motivo 12 (ajustes afectos al IVAP) lleva solo líneas con afectación 17.");
+        }
+
+        return JsonSerializer.Deserialize<TaxCalculationResult>(referenced.TotalsJson, Json)!.TotalIvap > 0
+            ? null
+            : Invalid("El motivo 12 solo modifica un documento afecto al IVAP.");
     }
 
     /// <summary>

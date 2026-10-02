@@ -37,15 +37,21 @@ var lima = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSyst
 var number = (long)lima.TimeOfDay.TotalSeconds + 1;
 // "discount": a taxed line with the four line adjustments (catalogue 53: 00, 47, 01, 48), an exempt line and the four global ones (02, 49, 03, 50).
 var discount = args.Contains("discount", StringComparer.Ordinal);
-TaxableLine[] taxLines = discount
+// "ivap": a line of rice taxed with the IVAP (affectation 17, tax 1016) at 4 %.
+var ivapSale = args.Contains("ivap", StringComparer.Ordinal);
+TaxableLine[] taxLines = ivapSale
+    ? [new TaxableLine(1, 100m, "17")]
+    : discount
     ? [new TaxableLine(2, 100m, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m), new TaxableLine(1, 50m, "20")]
     : [new TaxableLine(1, 100m, "10")];
-UblLine[] ublLines = discount
+UblLine[] ublLines = ivapSale
+    ? [new UblLine(1, "Arroz pilado de prueba", "KGM", null, 1, 100m, null, "17")]
+    : discount
     ? [new UblLine(1, "Servicio de prueba", "ZZ", null, 2, 100m, null, "10", 20m, 5m, 10m, 3m), new UblLine(2, "Servicio exonerado", "ZZ", null, 1, 50m, null, "20")]
     : [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")];
 GlobalAdjustments? adjustments = discount ? new GlobalAdjustments(DiscountAffectingBase: 12m, ChargeAffectingBase: 4m, DiscountNotAffectingBase: 7m, ChargeNotAffectingBase: 2m) : null;
 var totals = provider.GetRequiredService<ITaxCalculator>()
-    .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m), adjustments)).Value;
+    .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m, 0.04m), adjustments)).Value;
 var receipt = args.Contains("boleta", StringComparer.Ordinal);
 // "credit": an invoice sold on credit with two installments (the sheet's "Forma de pago al crédito").
 var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
@@ -54,7 +60,8 @@ var data = new UblInvoiceData(
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"), receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
     ublLines, totals, 0.18m,
     credit ? "Credito" : "Contado", adjustments,
-    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null);
+    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
+    0.04m);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {
@@ -126,16 +133,21 @@ return 0;
 
 static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certificate2 certificate, SignatureHashAlgorithm algorithm, string ruc, string user, string password, DateTimeOffset lima, long number, UblInvoiceData original, bool credit, bool adjustInstallments = false)
 {
-    var reason = adjustInstallments ? "13" : Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
+    // The beta answers 401 to a call made within seconds of the previous one (see docs/regulatory/beta-findings.md): wait before the second call.
+    await Task.Delay(TimeSpan.FromSeconds(20));
+
+    // A document taxed with the IVAP is adjusted with reason 12, whose lines are IVAP lines too.
+    var ivapOriginal = original.Totals.TotalIvap > 0;
+    var reason = adjustInstallments ? "13" : ivapOriginal ? "12" : Environment.GetEnvironmentVariable("SF_BETA_REASON") ?? (credit ? "01" : "02");
 
     // Reason 13 (adjustment of the installments): nothing is sold, so the line is worth zero (rule 3315 asks for a payable amount of zero).
     var affectation = Environment.GetEnvironmentVariable("SF_BETA_NC13_AFFECTATION") ?? "10";
-    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : "10")], new TaxRates(0.18m))).Value;
+    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : ivapOriginal ? "17" : "10")], new TaxRates(0.18m, 0.04m))).Value;
     var note = new UblNoteData(
         credit ? "07" : "08", original.DocumentTypeCode == "03" ? "BC01" : "FC01", number, original.IssueDate, TimeOnly.FromDateTime(lima.DateTime), "PEN", reason,
         credit ? "Anulacion de la operacion" : "Aumento en el valor", original.DocumentTypeCode, original.Series, original.Number, original.Issuer, original.Buyer,
-        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", "ZZ", null, 1, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : "10")], totals, 0.18m,
-        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null);
+        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", "ZZ", null, 1, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : ivapOriginal ? "17" : "10")], totals, 0.18m,
+        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null, 0.04m);
     var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateNote(note);
     if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL note: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
     var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);
@@ -176,6 +188,12 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
     {
         // A receipt of 100 with a 10 discount over the base, a charge of 5 and a discount of 3 that leave it alone: 90 + 16.20 IGV + 5 - 3.
         line = line with { TotalAmount = 108.2m, TaxedAmount = 90m, IgvAmount = 16.2m, OtherCharges = 5m, OtherDiscounts = 3m };
+    }
+
+    if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_IVAP") is not null)
+    {
+        // A receipt of rice: 100 taxed with the IVAP at 4 % (tax 1016).
+        line = line with { TotalAmount = 104m, TaxedAmount = 100m, IgvAmount = 4m, IgvRate = 0.04m, IsIvap = true };
     }
 
     var lines = new List<SummaryLineData> { line };

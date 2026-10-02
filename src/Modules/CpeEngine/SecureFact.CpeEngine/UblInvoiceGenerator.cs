@@ -30,6 +30,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     private static readonly Dictionary<string, (string Letter, string Name, string TypeCode)> Schemes = new(StringComparer.Ordinal)
     {
         [TaxCodes.Igv] = ("S", "IGV", "VAT"),
+        [TaxCodes.Ivap] = ("S", "IVAP", "VAT"),
         [TaxCodes.Exempt] = ("E", "EXO", "VAT"),
         [TaxCodes.Unaffected] = ("O", "INA", "FRE"),
         [TaxCodes.Free] = ("Z", "GRA", "FRE"),
@@ -71,6 +72,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 new XAttribute("listName", "Tipo de Documento"),
                 new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01"),
                 data.DocumentTypeCode),
+            Legends(totals),
             new XElement(Cbc + "DocumentCurrencyCode", currency),
             new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
             SignatureInfo(data.Issuer),
@@ -94,7 +96,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         for (var i = 0; i < data.Lines.Count; i++)
         {
-            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, currency));
+            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, data.IvapRate, currency));
         }
 
         var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
@@ -109,7 +111,37 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     }
 
     /// <summary>Reasons whose structure is supported today: credit 01-10 and debit 01-03. Export (11), IVAP (12) and credit-installment (13) adjustments are not.</summary>
-    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "13"];
+    private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "12", "13"];
+
+    /// <summary>Reason of a credit note that adjusts operations taxed with the IVAP (catalogue 09, code 12).</summary>
+    private const string IvapAdjustmentReason = "12";
+
+    /// <summary>
+    /// IVAP lines (affectation 17, tax 1016) need the IVAP rate to state it (rule 3103). A credit note of reason 12 carries only IVAP lines (rules 2644, 3221, 3107) and
+    /// IVAP lines are reserved to it among notes (rule 3230); invoices and receipts may carry them freely.
+    /// </summary>
+    private static Error? CheckIvap(TaxCalculationResult totals, decimal ivapRate, bool adjustment, bool isNote)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
+
+        var ivapLines = totals.Lines.Count(l => l.TaxCode == TaxCodes.Ivap);
+        if (ivapLines > 0 && ivapRate is <= 0 or >= 1)
+        {
+            return Invalid("Las líneas con IVAP requieren la tasa del IVAP, expresada como fracción (por ejemplo 0.04).");
+        }
+
+        if (adjustment && ivapLines != totals.Lines.Count)
+        {
+            return Invalid("La nota de crédito de motivo 12 (ajuste IVAP) lleva solo líneas afectas al IVAP.");
+        }
+
+        if (isNote && !adjustment && ivapLines > 0)
+        {
+            return Invalid("Solo la nota de crédito de motivo 12 lleva líneas afectas al IVAP.");
+        }
+
+        return null;
+    }
 
     /// <summary>Reason of a credit note that adjusts the installments of a credit invoice (catalogue 09, code 13).</summary>
     private const string InstallmentAdjustmentReason = "13";
@@ -169,6 +201,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         }
 
         root.Add(
+            Legends(totals),
             new XElement(Cbc + "DocumentCurrencyCode", currency),
             new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
             new XElement(
@@ -205,7 +238,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         for (var i = 0; i < data.Lines.Count; i++)
         {
-            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, currency, credit ? "CreditNoteLine" : "DebitNoteLine", credit ? "CreditedQuantity" : "DebitedQuantity"));
+            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, data.IvapRate, currency, credit ? "CreditNoteLine" : "DebitNoteLine", credit ? "CreditedQuantity" : "DebitedQuantity"));
         }
 
         var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
@@ -280,9 +313,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return badInstallments;
         }
 
-        if (data.Totals.TotalIvap != 0 || data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
+        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
         {
-            return Unsupported("IVAP, ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+            return Unsupported("ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+        }
+
+        if (CheckIvap(data.Totals, data.IvapRate, data.ReasonCode == IvapAdjustmentReason, isNote: true) is { } badIvap)
+        {
+            return badIvap;
         }
 
         if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0 || data.Lines.Any(HasLineAdjustments))
@@ -316,9 +354,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return Unsupported($"El tipo de documento '{data.DocumentTypeCode}' no está soportado (solo 01 y 03).");
         }
 
-        if (data.Totals.TotalIvap != 0 || data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
+        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0 || data.Totals.TotalExport != 0)
         {
-            return Unsupported("IVAP, ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+            return Unsupported("ISC, ICBPER y exportaciones aún no están soportados por el generador UBL.");
+        }
+
+        if (CheckIvap(data.Totals, data.IvapRate, adjustment: false, isNote: false) is { } badIvap)
+        {
+            return badIvap;
         }
 
         if (data.Totals.PayableRoundingAmount != 0)
@@ -510,6 +553,12 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         return element;
     }
 
+    /// <summary>Legend 2007 "Operación sujeta a IVAP" when a line is taxed with the IVAP (observation 4264 otherwise).</summary>
+    private static List<XElement> Legends(TaxCalculationResult totals) =>
+        totals.Lines.Any(l => l.TaxCode == TaxCodes.Ivap && l.LineExtensionAmount > 0)
+            ? [new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "2007"), "Operación sujeta a IVAP")]
+            : [];
+
     private static XElement SignatureInfo(UblParty issuer) =>
         new(
             Cac + "Signature",
@@ -562,6 +611,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         return element;
     }
 
+    /// <param name="igvRate">The rate to state when the category carries one: the IGV rate for IGV and informational-IGV lines, the IVAP rate for IVAP lines.</param>
     private static XElement Category(string taxCode, decimal igvRate, string? exemptionReasonCode)
     {
         var (letter, name, typeCode) = Schemes[taxCode];
@@ -578,8 +628,8 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         {
             // Every line category states its rate (rule 2992, found against the SUNAT beta on an exempt line): the IGV rate for taxed lines and for free ones that
             // report an informational IGV (11-16; rule 2993 forbids 0 there), and 0.00 for the rest.
-            var carriesIgv = taxCode == TaxCodes.Igv || (taxCode == TaxCodes.Free && exemptionReasonCode is "11" or "12" or "13" or "14" or "15" or "16");
-            category.Add(new XElement(Cbc + "Percent", (carriesIgv ? igvRate * 100m : 0m).ToString("0.00", CultureInfo.InvariantCulture)));
+            var carriesRate = taxCode is TaxCodes.Igv or TaxCodes.Ivap || (taxCode == TaxCodes.Free && exemptionReasonCode is "11" or "12" or "13" or "14" or "15" or "16");
+            category.Add(new XElement(Cbc + "Percent", (carriesRate ? igvRate * 100m : 0m).ToString("0.00", CultureInfo.InvariantCulture)));
 
             category.Add(new XElement(
                 Cbc + "TaxExemptionReasonCode",
@@ -612,8 +662,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             totals.TotalCharges > 0 ? Amount("ChargeTotalAmount", totals.TotalCharges, currency) : null,
             Amount("PayableAmount", totals.PayableAmount, currency));
 
-    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, string currency, string lineName = "InvoiceLine", string quantityName = "InvoicedQuantity")
+    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, decimal ivapRate, string currency, string lineName = "InvoiceLine", string quantityName = "InvoicedQuantity")
     {
+        var rate = result.TaxCode == TaxCodes.Ivap ? ivapRate : igvRate;
         var isFree = result.TaxCode == TaxCodes.Free;
         var element = new XElement(
             Cac + lineName,
@@ -648,7 +699,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 Cac + "TaxSubtotal",
                 Amount("TaxableAmount", result.LineExtensionAmount, currency),
                 Amount("TaxAmount", lineTax, currency),
-                Category(result.TaxCode, igvRate, line.IgvAffectationCode))));
+                Category(result.TaxCode, rate, line.IgvAffectationCode))));
 
         var item = new XElement(Cac + "Item", new XElement(Cbc + "Description", line.Description));
         if (!string.IsNullOrWhiteSpace(line.ProductCode))

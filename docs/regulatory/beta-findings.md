@@ -23,6 +23,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Nota de crédito de motivo 13** (R-049): sobre una factura al crédito aceptada, con dos cuotas nuevas, una línea gravada de valor cero e importe total cero: aceptada, código 0, sin observaciones.
 
+- **IVAP** (R-051): factura con una línea IVAP (afectación 17, tributo 1016, leyenda 2007) y nota de crédito de motivo 12 sobre ella: aceptadas con código 0, sin observaciones. El resumen diario con una boleta IVAP fue aceptado con la **observación 4019** («El calculo del IGV no es correcto … codigo tributo: 1000») pese a declarar el tributo 1016 con su tasa; el beta parece aplicar la comprobación del IGV. No bloquea.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

@@ -61,6 +61,18 @@ public class UblNoteGeneratorTests
     internal static UblNoteData Adjustment() =>
         Note("07", "13", "01", ("10", 1m, 0m)) with { Installments = [new(40m, new DateOnly(2026, 11, 15)), new(78m, new DateOnly(2026, 12, 15))] };
 
+    /// <summary>A credit note of reason 12: an adjustment of an operation taxed with the IVAP, whose lines are IVAP lines too.</summary>
+    internal static UblNoteData IvapAdjustment(string reason = "12", string affectation = "17", decimal ivapRate = 0.04m)
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1m, 100m, affectation)], new TaxRates(0.18m, 0.04m))).Value;
+        return Note("07", reason, "01") with
+        {
+            Totals = totals,
+            Lines = [new UblLine(1, "Arroz pilado", "KGM", null, 1m, 100m, null, affectation)],
+            IvapRate = ivapRate,
+        };
+    }
+
     private static List<string> SchemaErrors(XDocument document, string type)
     {
         var copy = new XDocument(document);
@@ -231,6 +243,24 @@ public class UblNoteGeneratorTests
         Assert.Empty(xml.XPathSelectElements("//cac:PaymentTerms", Namespaces));
     }
 
+    // ---------- reason 12: adjustment of IVAP operations ----------
+
+    [Fact]
+    public void A_credit_note_of_reason_12_validates_against_the_schema_and_states_the_ivap()
+    {
+        var result = _generator.GenerateNote(IvapAdjustment());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml, "07"));
+        Assert.Equal("12", xml.XPathSelectElement("/cn:CreditNote/cac:DiscrepancyResponse/cbc:ResponseCode", Namespaces)!.Value);
+        Assert.Equal("2007", xml.XPathSelectElement("/cn:CreditNote/cbc:Note", Namespaces)!.Attribute("languageLocaleID")!.Value);
+        var line = xml.XPathSelectElement("/cn:CreditNote/cac:CreditNoteLine/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory", Namespaces)!;
+        Assert.Equal("1016", line.XPathSelectElement("cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("4.00", line.XPathSelectElement("cbc:Percent", Namespaces)!.Value);
+        Assert.Equal("104.00", xml.XPathSelectElement("/cn:CreditNote/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+    }
+
     // ---------- refusals ----------
 
     public static TheoryData<string, UblNoteData, string> InvalidData() => new()
@@ -243,6 +273,10 @@ public class UblNoteGeneratorTests
         { "reason 13 on a receipt", Adjustment() with { ReferencedDocumentTypeCode = "03", ReferencedSeries = "B001" }, ErrorCodes.CpeInvalidDocument },
         { "reason 13 with a zero installment", Adjustment() with { Installments = [new(0m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },
         { "reason 13 on a debit note", Adjustment() with { DocumentTypeCode = "08" }, ErrorCodes.CpeUnsupported },
+        { "reason 12 with IGV lines", IvapAdjustment("12", "10"), ErrorCodes.CpeInvalidDocument },
+        { "IVAP lines on another reason", IvapAdjustment("01"), ErrorCodes.CpeInvalidDocument },
+        { "reason 12 without the ivap rate", IvapAdjustment() with { IvapRate = 0m }, ErrorCodes.CpeInvalidDocument },
+        { "reason 12 on a debit note", IvapAdjustment() with { DocumentTypeCode = "08" }, ErrorCodes.CpeUnsupported },
         { "debit reason 10", Note("08", "10"), ErrorCodes.CpeUnsupported },
         { "no reason text", Note() with { ReasonDescription = " " }, ErrorCodes.CpeInvalidDocument },
         { "long reason", Note() with { ReasonDescription = new string('x', 501) }, ErrorCodes.CpeInvalidDocument },

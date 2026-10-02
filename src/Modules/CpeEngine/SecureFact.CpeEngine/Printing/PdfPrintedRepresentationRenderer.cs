@@ -241,7 +241,16 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             rows.Add(("Op. gratuitas", totals.FreeAmount, false));
         }
 
-        rows.Add(("IGV", totals.IgvAmount, false));
+        if (totals.IgvAmount != 0 || totals.IvapAmount == 0)
+        {
+            rows.Add(("IGV", totals.IgvAmount, false));
+        }
+
+        if (totals.IvapAmount != 0)
+        {
+            rows.Add(("IVAP", totals.IvapAmount, false));
+        }
+
         if (totals.OtherCharges != 0)
         {
             rows.Add(("Otros cargos", totals.OtherCharges, false));

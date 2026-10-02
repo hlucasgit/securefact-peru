@@ -209,6 +209,54 @@ public class UblInvoiceGeneratorTests
         Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent", Namespaces)); // the document totals do not carry it
     }
 
+    // ---------- IVAP (rice) ----------
+
+    private static readonly TaxRates IvapRates = new(0.18m, 0.04m);
+
+    private static UblInvoiceData IvapData(string type = "01", decimal ivapRate = 0.04m)
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1m, 100m, "17")], IvapRates)).Value;
+        return new UblInvoiceData(
+            type, type == "01" ? "F001" : "B001", 123, new DateOnly(2026, 9, 30), new TimeOnly(13, 25, 51), "PEN", "0101",
+            new UblParty("6", "20100066603", "EMISORA DEMO SAC", "Emisora Demo"),
+            type == "01" ? new UblParty("6", "20100070970", "CLIENTE DEMO SAC") : new UblParty("1", "12345678", "JUAN PEREZ"),
+            [new UblLine(1, "Arroz pilado", "KGM", null, 1m, 100m, null, "17")], totals, 0.18m, IvapRate: ivapRate);
+    }
+
+    [Theory]
+    [InlineData("01")]
+    [InlineData("03")]
+    public void An_invoice_or_receipt_taxed_with_the_ivap_validates_against_the_schema_and_states_tax_1016_at_its_rate(string type)
+    {
+        var result = _generator.GenerateInvoice(IvapData(type));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var line = xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal", Namespaces)!;
+        Assert.Equal("1016", line.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("IVAP", line.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:Name", Namespaces)!.Value);
+        Assert.Equal("4.00", line.XPathSelectElement("cac:TaxCategory/cbc:Percent", Namespaces)!.Value);
+        Assert.Equal("17", line.XPathSelectElement("cac:TaxCategory/cbc:TaxExemptionReasonCode", Namespaces)!.Value);
+        var total = xml.XPathSelectElement("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal", Namespaces)!;
+        Assert.Equal("1016", total.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("100.00", total.XPathSelectElement("cbc:TaxableAmount", Namespaces)!.Value);
+        Assert.Equal("4.00", total.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Equal("104.00", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+
+        // Observation 4264: a line taxed with the IVAP needs legend 2007.
+        var legend = xml.XPathSelectElement("/inv:Invoice/cbc:Note", Namespaces)!;
+        Assert.Equal("2007", legend.Attribute("languageLocaleID")!.Value);
+        Assert.Equal("Operación sujeta a IVAP", legend.Value);
+    }
+
+    [Fact]
+    public void An_ivap_line_without_the_ivap_rate_is_refused_and_other_documents_carry_no_legend()
+    {
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(IvapData() with { IvapRate = 0m }).Error.Code);
+        Assert.Empty(Parse(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m))).Value).XPathSelectElements("//cbc:Note", Namespaces));
+    }
+
     // ---------- sale on credit ----------
 
     private static readonly UblInstallment[] TwoInstallments = [new(100m, new DateOnly(2026, 10, 30)), new(136m, new DateOnly(2026, 11, 30))];

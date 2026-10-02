@@ -20,7 +20,8 @@ public sealed record PrintedTotals(
     decimal IgvAmount,
     decimal TotalAmount,
     decimal OtherDiscounts = 0m,
-    decimal OtherCharges = 0m);
+    decimal OtherCharges = 0m,
+    decimal IvapAmount = 0m);
 
 /// <summary>What a printed credit or debit note modifies: the denomination and number of the document, and the reason.</summary>
 public sealed record PrintedNote(string ReferencedDocument, string Reason);

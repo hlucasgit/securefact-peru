@@ -178,6 +178,12 @@ internal sealed class VoidService(
             return igv.Error;
         }
 
+        var ivap = await rules.ResolveDecimalAsync(RuleCodes.IvapRate, "rate", referenceDate, cancellationToken);
+        if (!ivap.IsSuccess)
+        {
+            return ivap.Error;
+        }
+
         // The summary line repeats the amounts of the document it voids (the sheet makes them mandatory); the reason stays in our own record.
         var lines = new List<SummaryLineData>();
         foreach (var (document, _) in block)
@@ -188,13 +194,7 @@ internal sealed class VoidService(
                 return original.Error;
             }
 
-            var d = original.Value;
-            var identified = d.Buyer.DocumentTypeCode != SecureFact.SharedKernel.Domain.IdentityDocuments.NoDocument;
-            lines.Add(new SummaryLineData(
-                lines.Count + 1, d.Series, d.Number, identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null, d.Currency,
-                d.Totals.PayableAmount, d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalIgv, igv.Value,
-                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber, Status: "3",
-                OtherCharges: d.Totals.TotalCharges, OtherDiscounts: d.Totals.TotalAllowances));
+            lines.Add(SummaryLines.From(original.Value, lines.Count + 1, igv.Value, ivap.Value, "3"));
         }
 
         for (var attempt = 0; attempt < CorrelativeRetries; attempt++)

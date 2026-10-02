@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- IVAP (arroz pilado): líneas con afectación 17 y tributo 1016 en facturas, boletas, notas y resumen diario, leyenda 2007, fila en el PDF y nota de crédito de motivo 12; tasa 4 % verificada; aceptado en el beta (ADR-027).
 - Acumulado de notas de crédito: las notas de crédito vigentes de un documento no pueden acreditar más que el documento (`SF-BIL-010`); no cuentan las rechazadas ni las anuladas; comprobación atómica con bloqueo consultivo (ADR-023).
 - Nota de crédito de motivo 13 (ajuste de montos y/o fechas de cuotas) sobre facturas al crédito: sin líneas, con las cuotas nuevas e importe total cero; aceptada en el beta (ADR-026).
 - Venta al crédito con cuotas en facturas: validación del plan en Billing, UBL con `Credito` y `CuotaNNN`, PDF con las cuotas; aceptada en el beta (ADR-026).

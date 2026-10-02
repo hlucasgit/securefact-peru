@@ -44,7 +44,11 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Emisión, UBL, documento electrónico (espera a que el original esté aceptado), PDF y envío de notas de facturas; aceptadas en el beta (crédito 01, débito 02, crédito 07 de boleta). Pruebas: 491 pasan.
 - Notas de boletas: por resumen diario (esperan a que la boleta esté informada); aceptadas en el beta.
 - Acumulado de notas de crédito (control propio): las notas vigentes de un documento no acreditan más que él; no cuentan las rechazadas ni las anuladas (ADR-023). Pruebas: 582 pasan (343 unitarias, 6 arquitectura, 6 integración, 227 seguridad/API).
-- Pendiente: motivos 11–12.
+- Pendiente: motivo 11 (ajuste de exportación; exige antes facturas de exportación).
+
+## IVAP
+- Facturas, boletas y notas con líneas IVAP (afectación 17, tributo 1016, tasa 4 % verificada contra SUNAT, leyenda 2007), resumen diario con el tributo 1016, PDF con fila «IVAP» y nota de crédito de motivo 12. Aceptados en el beta (el resumen con observación 4019); ADR-027. Pruebas: 596 pasan (353 unitarias, 6 arquitectura, 6 integración, 231 seguridad/API).
+- Pendiente: monto del QR en un comprobante IVAP; exportación.
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).
@@ -62,7 +66,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Pendiente: entrega inicial, detracción y retención; motivos 11–12 de notas.
 
 ## Riesgos y deuda (resumen actual)
-- Valores `Pending` en reglas: IVAP 4 %, ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
+- Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
 - Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; CI sin ejecutar en GitHub; cobertura sin medir.
 - ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.

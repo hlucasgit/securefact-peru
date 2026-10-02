@@ -254,7 +254,8 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 new XElement(Cbc + "Amount", new XAttribute("currencyID", line.Currency), Money(line.OtherCharges))));
         }
 
-        // IGV is mandatory in every line (rule 2278), also when it is zero; the rate is mandatory for code 1000 (rule 2992).
+        // The tax is mandatory in every line (rule 2278), also when it is zero; the rate is mandatory (rule 2992). It is the IVAP (1016) for receipts of rice and the IGV (1000) for the rest.
+        var (taxCode, taxName) = line.IsIvap ? ("1016", "IVAP") : ("1000", "IGV");
         element.Add(new XElement(
             Cac + "TaxTotal",
             new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", line.Currency), Money(line.IgvAmount)),
@@ -266,8 +267,8 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                     new XElement(Cbc + "Percent", (line.IgvRate * 100m).ToString("0.00", CultureInfo.InvariantCulture)),
                     new XElement(
                         Cac + "TaxScheme",
-                        new XElement(Cbc + "ID", "1000"),
-                        new XElement(Cbc + "Name", "IGV"),
+                        new XElement(Cbc + "ID", taxCode),
+                        new XElement(Cbc + "Name", taxName),
                         new XElement(Cbc + "TaxTypeCode", "VAT"))))));
         return element;
     }

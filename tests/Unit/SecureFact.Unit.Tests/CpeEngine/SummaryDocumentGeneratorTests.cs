@@ -192,6 +192,22 @@ public class SummaryDocumentGeneratorTests
     }
 
     [Fact]
+    public void A_receipt_taxed_with_the_ivap_states_tax_1016_with_its_own_rate_and_validates_against_the_schema()
+    {
+        var ivap = Taxed(1, "B001", 1) with { TotalAmount = 104m, TaxedAmount = 100m, IgvAmount = 4m, IgvRate = 0.04m, IsIvap = true };
+
+        var result = _generator.Generate(Data(ivap, Taxed(2, "B001", 2)));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml));
+        var schemes = xml.XPathSelectElements("//sac:SummaryDocumentsLine/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory", Namespaces).ToList();
+        Assert.Equal(["1016", "1000"], schemes.Select(c => c.XPathSelectElement("cac:TaxScheme/cbc:ID", Namespaces)!.Value).ToArray());
+        Assert.Equal(["IVAP", "IGV"], schemes.Select(c => c.XPathSelectElement("cac:TaxScheme/cbc:Name", Namespaces)!.Value).ToArray());
+        Assert.Equal(["4.00", "18.00"], schemes.Select(c => c.XPathSelectElement("cbc:Percent", Namespaces)!.Value).ToArray());
+    }
+
+    [Fact]
     public void A_line_with_status_3_voids_a_document_and_validates_against_the_schema()
     {
         var result = _generator.Generate(Data(Taxed(1, "B001", 1) with { Status = "3" }, NoteLine(2, "07", "BC01", 1) with { Status = "3" }));

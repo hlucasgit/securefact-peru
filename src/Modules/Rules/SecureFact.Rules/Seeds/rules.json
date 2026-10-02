@@ -22,8 +22,8 @@
       "code": "tax.ivap.rate",
       "version": 1,
       "effectiveFrom": "1900-01-01",
-      "source": "S16 Parámetro 024 'Tasa vigente del IVAP' defines the parameter but not its value; 4 % taken from general knowledge. PENDING: confirm in the official parameter table.",
-      "verification": "Pending",
+      "source": "S22 SUNAT Orientación, IVAP 'Contribuyentes, base imponible y tasa del impuesto': 'cuatro por ciento (4%) sobre la base imponible' (Ley 28211, art. 3). S16 Parámetro 024 defines the parameter by date; no change of the rate is known, check the parameter when it is read.",
+      "verification": "Verified",
       "configuration": { "rate": 0.04 }
     },
     {

@@ -80,6 +80,12 @@ internal sealed class SummaryService(
             return igv.Error;
         }
 
+        var ivap = await rules.ResolveDecimalAsync(RuleCodes.IvapRate, "rate", referenceDate, cancellationToken);
+        if (!ivap.IsSuccess)
+        {
+            return ivap.Error;
+        }
+
         // Every receipt needs its electronic document (and with it a valid certificate) before it can be reported.
         var pending = new List<(DocumentDto Receipt, ElectronicDocument Document)>();
         foreach (var receipt in receipts)
@@ -123,7 +129,7 @@ internal sealed class SummaryService(
         {
             foreach (var block in candidates.Chunk(ISummaryDocumentGenerator.MaxLines))
             {
-                var summary = await CreateBlockAsync(tenant.Value, company.Value, referenceDate, today, igv.Value, block, certificate.Value, cancellationToken);
+                var summary = await CreateBlockAsync(tenant.Value, company.Value, referenceDate, today, igv.Value, ivap.Value, block, certificate.Value, cancellationToken);
                 if (!summary.IsSuccess)
                 {
                     return summary.Error;
@@ -155,21 +161,12 @@ internal sealed class SummaryService(
         DateOnly referenceDate,
         DateOnly generationDate,
         decimal igvRate,
+        decimal ivapRate,
         (DocumentDto Receipt, ElectronicDocument Document)[] block,
         System.Security.Cryptography.X509Certificates.X509Certificate2 certificate,
         CancellationToken cancellationToken)
     {
-        var lines = block.Select((b, i) =>
-        {
-            var d = b.Receipt;
-            var identified = d.Buyer.DocumentTypeCode != IdentityDocuments.NoDocument;
-            return new SummaryLineData(
-                i + 1, d.Series, d.Number,
-                identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null,
-                d.Currency, d.Totals.PayableAmount, d.Totals.TotalTaxableGravado, d.Totals.TotalExempt, d.Totals.TotalUnaffected, d.Totals.TotalIgv, igvRate,
-                d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber,
-                OtherCharges: d.Totals.TotalCharges, OtherDiscounts: d.Totals.TotalAllowances);
-        }).ToList();
+        var lines = block.Select((b, i) => SummaryLines.From(b.Receipt, i + 1, igvRate, ivapRate)).ToList();
 
         for (var attempt = 0; attempt < CorrelativeRetries; attempt++)
         {
