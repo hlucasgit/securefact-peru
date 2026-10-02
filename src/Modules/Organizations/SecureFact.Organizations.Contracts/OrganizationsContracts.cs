@@ -9,6 +9,7 @@ public enum CompanyStatus
 }
 
 /// <summary>Editable company data. The RUC is fixed at creation: a different RUC is a different company.</summary>
+/// <param name="DetractionAccount">Account of the issuer at the Banco de la Nación where its customers deposit the detractions; invoices subject to detraction use it unless they name another.</param>
 public sealed record CompanyDetails(
     string LegalName,
     string? TradeName,
@@ -17,7 +18,8 @@ public sealed record CompanyDetails(
     string? TaxRegime,
     string? ContactEmail,
     string TimeZone = "America/Lima",
-    string DefaultCurrency = "PEN");
+    string DefaultCurrency = "PEN",
+    string? DetractionAccount = null);
 
 public sealed record CreateCompanyRequest(string Ruc, CompanyDetails Details);
 
@@ -34,7 +36,8 @@ public sealed record CompanyDto(
     string TimeZone,
     string DefaultCurrency,
     CompanyStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? DetractionAccount = null);
 
 public sealed record EstablishmentDetails(string Name, string Address, string Ubigeo);
 

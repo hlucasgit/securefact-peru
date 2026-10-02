@@ -112,7 +112,20 @@ internal sealed partial class DocumentService(
             return calculated.Error;
         }
 
-        if (ValidateDeductions(series, request, calculated.Value.PayableAmount, out var deducted) is { } badDeduction)
+        // A detraction without its own account uses the one registered in the company; the issued document keeps the account that was used.
+        var effective = request;
+        if (request.Detraction is { } named && string.IsNullOrWhiteSpace(named.AccountNumber))
+        {
+            var company = await companies.GetAsync(series.CompanyId, cancellationToken);
+            if (!company.IsSuccess)
+            {
+                return company.Error;
+            }
+
+            effective = request with { Detraction = named with { AccountNumber = company.Value.DetractionAccount } };
+        }
+
+        if (ValidateDeductions(series, effective, calculated.Value.PayableAmount, out var deducted) is { } badDeduction)
         {
             return badDeduction;
         }
@@ -123,7 +136,8 @@ internal sealed partial class DocumentService(
         }
 
         return await IssueAsync(
-            tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, request.Currency, buyer!, request.Lines, calculated.Value, null, cancellationToken);
+            tenant.Value, idempotencyKey, ReferenceEquals(effective, request) ? requestJson : JsonSerializer.Serialize(effective, Json), requestHash, series, request.IssueDate, request.Currency, buyer!, request.Lines,
+            calculated.Value, null, cancellationToken);
     }
 
     private async Task<Result<DocumentDto>> IssueAsync(
@@ -865,7 +879,7 @@ internal sealed partial class DocumentService(
 
             if (detraction.AccountNumber is null || !AccountNumberPattern().IsMatch(detraction.AccountNumber.Trim()))
             {
-                return Invalid("Indique el número de cuenta de detracciones en el Banco de la Nación (alfanumérico, hasta 100 caracteres).");
+                return Invalid("Indique el número de cuenta de detracciones en el Banco de la Nación, en la solicitud o en los datos de la empresa (alfanumérico, hasta 100 caracteres).");
             }
 
             deducted = detraction.Amount;

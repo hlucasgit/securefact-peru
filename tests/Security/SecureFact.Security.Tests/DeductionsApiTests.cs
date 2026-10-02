@@ -204,6 +204,58 @@ public sealed class DeductionsApiTests(ApiFixture api)
         Assert.Equal("208.00", credit.Element(Cbc + "Amount")!.Value);
     }
 
+    private static Task<HttpResponseMessage> SetDetractionAccountAsync(Setup setup, string? account) =>
+        setup.Owner.PutAsJsonAsync($"/api/v1/companies/{setup.Company.Id}", new
+        {
+            legalName = "Emisora SAC",
+            fiscalAddress = "Av. Larco 123",
+            ubigeo = "150122",
+            detractionAccount = account,
+        });
+
+    [Fact]
+    public async Task A_detraction_without_an_account_uses_the_one_registered_in_the_company_and_the_issued_document_keeps_it()
+    {
+        var setup = await NewTenantAsync("Detraction Account SAC");
+        object noAccount = new { goodsOrServiceCode = "037", percentage = 12m, amount = 28m };
+
+        // No account in the request or in the company: refused, and nothing is numbered.
+        var refused = await PostAsync(setup.Owner, Body(setup, detraction: noAccount));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Equal("SF-BIL-006", ProblemCode(await refused.Content.ReadAsStringAsync()));
+
+        var updated = await SetDetractionAccountAsync(setup, "00098765432");
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal("00098765432", (await updated.Content.ReadFromJsonAsync<CompanyDto>(ApiFixture.JsonOptions))!.DetractionAccount);
+        var first = (await (await PostAsync(setup.Owner, Body(setup, detraction: noAccount))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, first.Number);
+        Assert.Equal("00098765432", first.Detraction!.AccountNumber);
+
+        // The request may name another account, and a later change of the company leaves the issued document alone.
+        var named = (await (await PostAsync(setup.Owner, Body(setup, detraction: Detraction(account: "11111111111")))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal("11111111111", named.Detraction!.AccountNumber);
+        Assert.Equal(HttpStatusCode.OK, (await SetDetractionAccountAsync(setup, "22222222222")).StatusCode);
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{first.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal("00098765432", read.Detraction!.AccountNumber);
+
+        var electronic = (await (await setup.Owner.PostAsync($"/api/v1/documents/{first.Id}/electronic", null)).Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        var xml = XDocument.Parse(await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml")).Root!;
+        Assert.Equal("00098765432", xml.Element(Cac + "PaymentMeans")!.Element(Cac + "PayeeFinancialAccount")!.Element(Cbc + "ID")!.Value);
+    }
+
+    [Fact]
+    public async Task The_detraction_account_of_a_company_is_validated_and_can_be_cleared()
+    {
+        var setup = await NewTenantAsync("Detraction Account Rules SAC");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await SetDetractionAccountAsync(setup, "00 12!")).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await SetDetractionAccountAsync(setup, new string('1', 101))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await SetDetractionAccountAsync(setup, "  00012345678  ")).StatusCode);
+        Assert.Equal("00012345678", (await setup.Owner.GetFromJsonAsync<CompanyDto>($"/api/v1/companies/{setup.Company.Id}", ApiFixture.JsonOptions))!.DetractionAccount);
+        var cleared = await SetDetractionAccountAsync(setup, null);
+        Assert.Null((await cleared.Content.ReadFromJsonAsync<CompanyDto>(ApiFixture.JsonOptions))!.DetractionAccount);
+    }
+
     [Fact]
     public async Task Detractions_and_withholdings_that_break_the_rules_are_refused_before_numbering()
     {

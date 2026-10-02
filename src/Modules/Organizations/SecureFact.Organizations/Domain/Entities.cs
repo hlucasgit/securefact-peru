@@ -33,6 +33,8 @@ internal sealed class Company : ITenantOwned
 
     public string DefaultCurrency { get; private set; } = string.Empty;
 
+    public string? DetractionAccount { get; private set; }
+
     public CompanyStatus Status { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -60,6 +62,7 @@ internal sealed class Company : ITenantOwned
         ContactEmail = string.IsNullOrWhiteSpace(details.ContactEmail) ? null : details.ContactEmail.Trim();
         TimeZone = details.TimeZone.Trim();
         DefaultCurrency = details.DefaultCurrency.Trim().ToUpperInvariant();
+        DetractionAccount = string.IsNullOrWhiteSpace(details.DetractionAccount) ? null : details.DetractionAccount.Trim();
         UpdatedAt = now;
     }
 

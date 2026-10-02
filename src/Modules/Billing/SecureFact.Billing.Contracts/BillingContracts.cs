@@ -31,8 +31,8 @@ public static class OperationTypes
 /// </summary>
 /// <param name="GoodsOrServiceCode">Catalogue 54 code (e.g. <c>037</c>, other services taxed with the IGV).</param>
 /// <param name="Percentage">As a percentage, e.g. <c>12</c> for 12 %.</param>
-/// <param name="AccountNumber">Issuer's account number at the Banco de la Nación.</param>
-public sealed record Detraction(string GoodsOrServiceCode, decimal Percentage, decimal Amount, string AccountNumber);
+/// <param name="AccountNumber">Issuer's account number at the Banco de la Nación; when absent the one registered in the company is used (and kept in the issued document).</param>
+public sealed record Detraction(string GoodsOrServiceCode, decimal Percentage, decimal Amount, string? AccountNumber = null);
 
 /// <summary>IGV withholding that the buyer, a withholding agent, applies to the invoice: <paramref name="Percentage"/> of the payable amount (e.g. <c>3</c> for 3 %).</summary>
 public sealed record RetentionRequest(decimal Percentage);

@@ -102,7 +102,7 @@ internal sealed class ElectronicDocumentService(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, d.OperationTypeCode, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
                 d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, d.InitialPayment ?? 0m,
-                d.Detraction is { } detraction ? new UblDetraction(detraction.GoodsOrServiceCode, detraction.Percentage, detraction.Amount, detraction.AccountNumber) : null,
+                d.Detraction is { } detraction ? new UblDetraction(detraction.GoodsOrServiceCode, detraction.Percentage, detraction.Amount, detraction.AccountNumber ?? string.Empty) : null,
                 d.Retention is { } retention ? new UblRetention(retention.Percentage, retention.BaseAmount, retention.Amount) : null));
         if (!generated.IsSuccess)
         {

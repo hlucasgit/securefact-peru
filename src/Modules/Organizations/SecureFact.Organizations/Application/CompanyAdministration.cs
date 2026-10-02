@@ -232,6 +232,11 @@ internal sealed partial class CompanyAdministration(OrganizationsDbContext db, I
             return Bad("El régimen admite máximo 60 caracteres.");
         }
 
+        if (!string.IsNullOrWhiteSpace(d.DetractionAccount) && !DetractionAccountPattern().IsMatch(d.DetractionAccount.Trim()))
+        {
+            return Bad("La cuenta de detracciones debe ser alfanumérica (con guiones) de hasta 100 caracteres.");
+        }
+
         if (!TimeZoneInfo.TryFindSystemTimeZoneById(d.TimeZone?.Trim() ?? string.Empty, out _))
         {
             return Bad("La zona horaria no es válida.");
@@ -262,6 +267,9 @@ internal sealed partial class CompanyAdministration(OrganizationsDbContext db, I
         return UbigeoPattern().IsMatch(d.Ubigeo?.Trim() ?? string.Empty) ? null : Bad("El ubigeo debe tener 6 dígitos.");
     }
 
+    [GeneratedRegex("^[0-9A-Za-z-]{1,100}$")]
+    private static partial Regex DetractionAccountPattern();
+
     private static bool IsEmail(string value) =>
         value.Length <= 254 && MailAddress.TryCreate(value, out var parsed) && string.Equals(parsed.Address, value, StringComparison.OrdinalIgnoreCase);
 
@@ -276,6 +284,7 @@ internal sealed partial class CompanyAdministration(OrganizationsDbContext db, I
         ["contactEmail"] = c.ContactEmail,
         ["timeZone"] = c.TimeZone,
         ["defaultCurrency"] = c.DefaultCurrency,
+        ["detractionAccount"] = c.DetractionAccount,
     };
 
     private static Dictionary<string, object?> EstablishmentValues(Establishment e) => new()
@@ -290,7 +299,7 @@ internal sealed partial class CompanyAdministration(OrganizationsDbContext db, I
 
     private static CompanyDto ToDto(Company c) => new(
         c.Id, c.TenantId, c.Ruc, c.LegalName, c.TradeName, c.FiscalAddress, c.Ubigeo, c.TaxRegime, c.ContactEmail,
-        c.TimeZone, c.DefaultCurrency, c.Status, c.CreatedAt);
+        c.TimeZone, c.DefaultCurrency, c.Status, c.CreatedAt, c.DetractionAccount);
 
     private static EstablishmentDto ToDto(Establishment e) => new(e.Id, e.CompanyId, e.Code, e.Name, e.Address, e.Ubigeo, e.IsActive, e.CreatedAt);
 }

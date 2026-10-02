@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Cuenta de detracciones en los datos de la empresa: una detracción sin cuenta propia usa la de la empresa y la factura emitida conserva la cuenta usada (ADR-029; migración `AddDetractionAccount`).
 - Detracción (tipo de operación 1001) y retención del IGV en facturas, con el monto neto pendiente del crédito sin ellas; aceptadas en el beta (ADR-029, S24).
 - Entrega inicial en ventas al crédito (`initialPayment`): las cuotas suman el importe total menos lo pagado al emitir; aceptada en el beta (ADR-026, S23).
 - QR: el contenido sale de `QrFields.From` y el campo IGV lleva solo el IGV (0.00 en comprobantes IVAP, exonerados, inafectos o de exportación), según el texto del Anexo N.° 6 §6.4.3 d); con pruebas por tipo de comprobante.

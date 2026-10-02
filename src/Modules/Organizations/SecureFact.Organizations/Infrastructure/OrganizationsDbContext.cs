@@ -32,6 +32,7 @@ internal sealed class OrganizationsDbContext(DbContextOptions<OrganizationsDbCon
             b.Property(c => c.ContactEmail).HasColumnName("contact_email").HasMaxLength(254);
             b.Property(c => c.TimeZone).HasColumnName("time_zone").HasMaxLength(60).IsRequired();
             b.Property(c => c.DefaultCurrency).HasColumnName("default_currency").HasMaxLength(3).IsFixedLength().IsRequired();
+            b.Property(c => c.DetractionAccount).HasColumnName("detraction_account").HasMaxLength(100);
             b.Property(c => c.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(c => c.CreatedAt).HasColumnName("created_at");
             b.Property(c => c.UpdatedAt).HasColumnName("updated_at");
