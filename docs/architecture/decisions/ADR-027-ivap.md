@@ -18,6 +18,6 @@ Hojas `Factura2_0`, `Boleta2_0`, `NotaCredito2_0` y `Resumen Diario1_1` de las r
 - Resumen diario con una boleta IVAP: **aceptado con observación 4019** («El calculo del IGV no es correcto - Error en la linea: 1. codigo tributo: 1000»), aunque la línea declara el tributo 1016 con su tasa 4.00 y la hoja pide la comprobación 4302 para ese tributo. Parece que el beta aplica a la línea la comprobación del IGV. No bloquea (código 0). Se deja el XML como lo define la hoja y se anota el hallazgo; queda por ver si producción lo trata igual.
 
 ## Límites
-- El código QR sigue usando el IGV del comprobante (cero en un comprobante IVAP): falta confirmar en S19 qué monto va (**P**).
+- **Código QR**: el campo del Anexo N.° 6 §6.4.3 d) es «Sumatoria IGV, de ser el caso» y el anexo no menciona el IVAP (texto releído el 2026-10-02): un comprobante IVAP lleva 0.00 en ese campo y el importe total en el siguiente; el IVAP nunca ocupa el lugar del IGV. `QrFields.From` lo fija y las pruebas lo cubren. Si SUNAT publicara otra indicación, es un cambio de esa función.
 - Sin ISC, ICBPER ni exportación; los motivos 11 (exportación) siguen pendientes.
 - Los comprobantes IVAP no se han probado en producción ni con descuentos o crédito combinados en el beta.

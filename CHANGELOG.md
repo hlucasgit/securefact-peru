@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- QR: el contenido sale de `QrFields.From` y el campo IGV lleva solo el IGV (0.00 en comprobantes IVAP, exonerados, inafectos o de exportación), según el texto del Anexo N.° 6 §6.4.3 d); con pruebas por tipo de comprobante.
 - Facturas de exportación de bienes (tipo de operación 0200, afectación 40, tributo 9995) y nota de crédito de motivo 11; aceptadas en el beta (ADR-028).
 - IVAP (arroz pilado): líneas con afectación 17 y tributo 1016 en facturas, boletas, notas y resumen diario, leyenda 2007, fila en el PDF y nota de crédito de motivo 12; tasa 4 % verificada; aceptado en el beta (ADR-027).
 - Acumulado de notas de crédito: las notas de crédito vigentes de un documento no pueden acreditar más que el documento (`SF-BIL-010`); no cuentan las rechazadas ni las anuladas; comprobación atómica con bloqueo consultivo (ADR-023).

@@ -449,9 +449,7 @@ internal sealed class ElectronicDocumentService(
 
         var d = document.Value;
         var identified = d.Buyer.DocumentTypeCode != IdentityDocuments.NoDocument;
-        var payload = qr.Build(new QrData(
-            company.Value.Ruc, d.DocumentTypeCode, d.Series, d.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), d.Totals.TotalIgv, d.Totals.PayableAmount,
-            d.IssueDate, identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null, entity.DigestValue));
+        var payload = qr.Build(QrFields.From(d, company.Value.Ruc, entity.DigestValue));
         if (!payload.IsSuccess)
         {
             return payload.Error;

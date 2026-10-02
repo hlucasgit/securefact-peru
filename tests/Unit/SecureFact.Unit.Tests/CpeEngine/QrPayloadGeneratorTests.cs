@@ -1,6 +1,10 @@
+using SecureFact.Billing.Contracts;
 using SecureFact.CpeEngine;
+using SecureFact.CpeEngine.Application;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.SharedKernel;
+using SecureFact.TaxEngine;
+using SecureFact.TaxEngine.Contracts;
 
 namespace SecureFact.Unit.Tests.CpeEngine;
 
@@ -66,5 +70,36 @@ public class QrPayloadGeneratorTests
         Assert.False(_generator.Build(Sample() with { DigestValue = "" }).IsSuccess);
         Assert.False(_generator.Build(Sample() with { TotalAmount = -1m }).IsSuccess);
         Assert.False(_generator.Build(Sample() with { Series = "" }).IsSuccess);
+    }
+
+    // ---------- what the document gives the QR ----------
+
+    private static DocumentDto Issued(string affectation, string buyerType = "6", string buyerNumber = "20100070970")
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(1m, 100m, affectation)], new TaxRates(0.18m, 0.04m))).Value;
+        return new DocumentDto(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "01", "F001", 123, new DateOnly(2026, 9, 30), "PEN", new BuyerSnapshot(buyerType, buyerNumber, "CLIENTE"),
+            DocumentStatus.Validated, [], totals, DateTimeOffset.UtcNow);
+    }
+
+    [Theory]
+    [InlineData("10", "18.00", "118.00")]  // IGV: the sum of the IGV
+    [InlineData("17", "0.00", "104.00")]   // IVAP: another tax, no IGV (S19 6.4.3 d names only the IGV)
+    [InlineData("20", "0.00", "100.00")]   // exempt: no tax
+    [InlineData("40", "0.00", "100.00")]   // export: no tax
+    public void The_igv_field_carries_only_the_igv_and_the_total_is_the_payable_amount(string affectation, string igv, string total)
+    {
+        var result = _generator.Build(QrFields.From(Issued(affectation), "20100066603", Digest));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal($"20100066603|01|F001|123|{igv}|{total}|2026-09-30|6|20100070970|{Digest}", result.Value);
+    }
+
+    [Fact]
+    public void A_buyer_without_document_leaves_its_fields_empty()
+    {
+        var result = _generator.Build(QrFields.From(Issued("10", "0", "-"), "20100066603", Digest));
+
+        Assert.Equal($"20100066603|01|F001|123|18.00|118.00|2026-09-30|||{Digest}", result.Value);
     }
 }

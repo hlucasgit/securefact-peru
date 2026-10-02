@@ -48,7 +48,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 
 ## IVAP
 - Facturas, boletas y notas con líneas IVAP (afectación 17, tributo 1016, tasa 4 % verificada contra SUNAT, leyenda 2007), resumen diario con el tributo 1016, PDF con fila «IVAP» y nota de crédito de motivo 12. Aceptados en el beta (el resumen con observación 4019); ADR-027. Pruebas: 596 pasan (353 unitarias, 6 arquitectura, 6 integración, 231 seguridad/API).
-- Pendiente: monto del QR en un comprobante IVAP.
+- QR de un comprobante IVAP: 0.00 en el campo IGV (el anexo pide solo la «sumatoria IGV»); ver ADR-027.
 
 ## Exportación
 - Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 608 pasan (361 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
