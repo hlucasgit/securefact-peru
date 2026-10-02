@@ -471,7 +471,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         switch (data.PaymentForm)
         {
             case "Contado":
-                return installments.Count == 0 ? null : Invalid("Una venta al contado no lleva cuotas.");
+                return installments.Count == 0 && data.InitialPayment == 0 ? null : Invalid("Una venta al contado no lleva cuotas ni entrega inicial.");
             case "Credito":
                 if (data.DocumentTypeCode != "01")
                 {
@@ -488,7 +488,15 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                     return Invalid("Cada cuota debe tener un monto mayor que cero y vencer después de la fecha de emisión.");
                 }
 
-                return installments.Sum(i => i.Amount) == data.Totals.PayableAmount ? null : Invalid("Las cuotas deben sumar el importe total de la venta.");
+                // The net pending amount (the sum of the installments) is the payable amount minus what was paid on the issue date (rules 3265, 3319).
+                if (data.InitialPayment < 0 || data.InitialPayment >= data.Totals.PayableAmount)
+                {
+                    return Invalid("La entrega inicial debe ser positiva y menor que el importe total.");
+                }
+
+                return installments.Sum(i => i.Amount) == data.Totals.PayableAmount - data.InitialPayment
+                    ? null
+                    : Invalid("Las cuotas deben sumar el importe total de la venta menos la entrega inicial.");
             default:
                 return Unsupported($"La forma de pago '{data.PaymentForm}' no está soportada (Contado o Credito).");
         }

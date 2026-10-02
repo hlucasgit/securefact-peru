@@ -66,7 +66,7 @@ public sealed class CreditSaleApiTests(ApiFixture api)
 
     private static object Cuota(decimal amount, string dueDate) => new { amount, dueDate };
 
-    private static object Body(SeriesDto series, bool receipt, object[]? installments) => new
+    private static object Body(SeriesDto series, bool receipt, object[]? installments, decimal? initialPayment = null) => new
     {
         seriesId = series.Id,
         issueDate = Iso(TodayInLima()),
@@ -76,6 +76,7 @@ public sealed class CreditSaleApiTests(ApiFixture api)
             : new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" },
         lines = OneLine,
         installments,
+        initialPayment,
     };
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, object body, string? key = null)
@@ -175,6 +176,62 @@ public sealed class CreditSaleApiTests(ApiFixture api)
         }
 
         Assert.Equal(before, await LastNumberAsync()); // nothing was numbered: no gap in the series
+    }
+
+    // ---------- initial payment ----------
+
+    [Fact]
+    public async Task An_initial_payment_lowers_what_the_installments_must_add_up_to_and_is_kept_stated_and_printed()
+    {
+        var setup = await NewTenantAsync("Credit Initial SAC");
+
+        var response = await PostAsync(setup.Owner, Body(setup.Invoice, false, [Cuota(100m, Day(30)), Cuota(100m, Day(60))], initialPayment: 36m));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(236m, invoice.Totals.PayableAmount);
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{invoice.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal(36m, read.InitialPayment);
+
+        var prepared = await setup.Owner.PostAsync($"/api/v1/documents/{invoice.Id}/electronic", null);
+        var electronic = (await prepared.Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        XNamespace cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
+        XNamespace cbc = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
+        var root = XDocument.Parse(await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml")).Root!;
+        Assert.Equal(["200.00", "100.00", "100.00"], root.Elements(cac + "PaymentTerms").Select(t => t.Element(cbc + "Amount")!.Value).ToArray());
+        Assert.Equal("236.00", root.Element(cac + "LegalMonetaryTotal")!.Element(cbc + "PayableAmount")!.Value);
+
+        var pdf = PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")).Replace(@"\(", "(").Replace(@"\)", ")");
+        Assert.Contains("Entrega inicial (pagada a la emisión): S/ 36.00", pdf, StringComparison.Ordinal);
+        Assert.Contains("Monto neto pendiente de pago: S/ 200.00", pdf, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_initial_payment_that_breaks_the_rules_is_refused_before_numbering()
+    {
+        var setup = await NewTenantAsync("Credit Initial Rules SAC");
+        object[] two = [Cuota(100m, Day(30)), Cuota(100m, Day(60))];
+
+        var cases = new (string Name, object Body)[]
+        {
+            ("installments that ignore it", Body(setup.Invoice, false, [Cuota(236m, Day(30))], initialPayment: 36m)),
+            ("installments that exceed what is left", Body(setup.Invoice, false, [Cuota(100m, Day(30)), Cuota(136m, Day(60))], initialPayment: 36m)),
+            ("the whole amount", Body(setup.Invoice, false, [Cuota(1m, Day(30))], initialPayment: 236m)),
+            ("more than the amount", Body(setup.Invoice, false, [Cuota(1m, Day(30))], initialPayment: 300m)),
+            ("zero", Body(setup.Invoice, false, two, initialPayment: 0m)),
+            ("negative", Body(setup.Invoice, false, two, initialPayment: -36m)),
+            ("three decimals", Body(setup.Invoice, false, [Cuota(199.999m, Day(30)), Cuota(0.001m, Day(60))], initialPayment: 36.001m)),
+            ("without installments", Body(setup.Invoice, false, null, initialPayment: 36m)),
+        };
+        foreach (var (name, body) in cases)
+        {
+            var response = await PostAsync(setup.Owner, body);
+            Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
+            Assert.Equal("SF-BIL-006", ProblemCode(await response.Content.ReadAsStringAsync()));
+        }
+
+        var valid = (await (await PostAsync(setup.Owner, Body(setup.Invoice, false, two, initialPayment: 36m))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, valid.Number); // nothing refused took a number
     }
 
     // ---------- credit note of reason 13: adjustment of the installments ----------

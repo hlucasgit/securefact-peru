@@ -358,6 +358,33 @@ public class UblInvoiceGeneratorTests
     }
 
     [Fact]
+    public void An_initial_payment_lowers_the_net_pending_amount_and_is_not_stated_in_the_xml()
+    {
+        var data = OnCredit(new UblInstallment(100m, new DateOnly(2026, 10, 30)), new UblInstallment(100m, new DateOnly(2026, 11, 30))) with { InitialPayment = 36m };
+
+        var result = _generator.GenerateInvoice(data);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var terms = xml.XPathSelectElements("/inv:Invoice/cac:PaymentTerms", Namespaces).ToList();
+        Assert.Equal(["200.00", "100.00", "100.00"], terms.Select(t => t.XPathSelectElement("cbc:Amount", Namespaces)!.Value).ToArray()); // net pending = 236 - 36
+        Assert.Equal("236.00", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void An_initial_payment_that_does_not_fit_the_installments_is_refused()
+    {
+        var two = new[] { new UblInstallment(100m, new DateOnly(2026, 10, 30)), new UblInstallment(100m, new DateOnly(2026, 11, 30)) };
+        var data = OnCredit(two);
+
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data with { InitialPayment = 30m }).Error.Code); // 200 + 30 is not 236
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data with { InitialPayment = 236m }).Error.Code); // nothing left to pay later
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data with { InitialPayment = -36m }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Data("01", ("10", 2m, 100m)) with { InitialPayment = 36m }).Error.Code); // cash sale
+    }
+
+    [Fact]
     public void A_receipt_and_a_cash_invoice_state_no_installments()
     {
         var cash = Parse(_generator.GenerateInvoice(Data("01", ("10", 1m, 100m))).Value);

@@ -51,7 +51,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - QR de un comprobante IVAP: 0.00 en el campo IGV (el anexo pide solo la «sumatoria IGV»); ver ADR-027.
 
 ## Exportación
-- Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 613 pasan (366 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
+- Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 618 pasan (369 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
 - Pendiente: servicios de exportación (0201–0208), boletas de exportación, leyenda 2008.
 
 ## Comunicación de baja
@@ -66,8 +66,9 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 
 ## Venta al crédito
 - Facturas al crédito con cuotas (`installments` en `POST /api/v1/documents`): Billing valida el plan antes de numerar, el UBL lleva `FormaPago` `Credito` y una `CuotaNNN` por vencimiento, el PDF imprime las cuotas. Aceptada en el beta (ADR-026). Pruebas: 569 pasan (336 unitarias, 6 arquitectura, 6 integración, 221 seguridad/API).
+- Entrega inicial (`initialPayment`): parte pagada al emitir; las cuotas suman lo pendiente (ADR-026, S23); aceptada en el beta.
 - Nota de crédito de motivo 13 (ajuste de cuotas): sin líneas, con las cuotas nuevas e importe total cero; aceptada en el beta. Pruebas: 578 pasan (343 unitarias, 6 arquitectura, 6 integración, 223 seguridad/API).
-- Pendiente: entrega inicial, detracción y retención; motivos 11–12 de notas.
+- Pendiente: detracción y retención (restan del monto neto pendiente).
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

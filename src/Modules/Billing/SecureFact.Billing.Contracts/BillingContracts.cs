@@ -64,6 +64,7 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
 /// <c>0101</c> by default, or <c>0200</c> for the export of goods (invoices only, every line with affectation 40, and a buyer without RUC).
+/// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
 /// </summary>
 public sealed record CreateDocumentRequest(
     Guid SeriesId,
@@ -74,7 +75,8 @@ public sealed record CreateDocumentRequest(
     GlobalAdjustments? Adjustments = null,
     Guid? CustomerId = null,
     IReadOnlyList<Installment>? Installments = null,
-    string? OperationTypeCode = null);
+    string? OperationTypeCode = null,
+    decimal? InitialPayment = null);
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
@@ -139,7 +141,8 @@ public sealed record DocumentDto(
     NoteInfo? Note = null,
     GlobalAdjustments? Adjustments = null,
     IReadOnlyList<Installment>? Installments = null,
-    string OperationTypeCode = OperationTypes.Sale)
+    string OperationTypeCode = OperationTypes.Sale,
+    decimal? InitialPayment = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

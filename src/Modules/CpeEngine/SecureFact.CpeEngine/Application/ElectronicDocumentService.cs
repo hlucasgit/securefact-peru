@@ -101,7 +101,7 @@ internal sealed class ElectronicDocumentService(
             : ubl.GenerateInvoice(new UblInvoiceData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, d.OperationTypeCode, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
-                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value));
+                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, d.InitialPayment ?? 0m));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -465,7 +465,8 @@ internal sealed class ElectronicDocumentService(
             payload.Value, entity.DigestValue,
             d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
             await IsVoidedAsync(entity.Id, cancellationToken),
-            d.Installments?.Select((i, index) => new PrintedInstallment(index + 1, i.DueDate, i.Amount)).ToList());
+            d.Installments?.Select((i, index) => new PrintedInstallment(index + 1, i.DueDate, i.Amount)).ToList(),
+            d.InitialPayment ?? 0m);
         return printer.Render(printed);
     }
 

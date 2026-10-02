@@ -27,6 +27,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Exportación** (R-052): factura de exportación de bienes (0200, línea de afectación 40, tributo 9995, adquirente tipo 0) y nota de crédito de motivo 11 sobre ella: aceptadas con código 0, sin observaciones. Con un adquirente RUC el beta rechaza con **2800** (`cbc:ID/schemeID` valor 6), como dice la regla.
 
+- **Entrega inicial** (R-048): factura de 118.00 al crédito con 18.00 pagados al emitir y dos cuotas de 50.00 (monto neto pendiente 100.00, menor que el importe total): aceptada, código 0, sin observaciones.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

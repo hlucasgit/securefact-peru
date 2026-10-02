@@ -211,6 +211,18 @@ public class PrintedRepresentationTests
     }
 
     [Fact]
+    public void The_initial_payment_is_printed_in_the_credit_block_only_when_there_is_one()
+    {
+        var installments = new[] { new PrintedInstallment(1, new DateOnly(2026, 10, 30), 200m) };
+
+        var with = string.Concat(PageContents(_renderer.Render(Document() with { Installments = installments, InitialPayment = 36m }).Value));
+        var without = string.Concat(PageContents(_renderer.Render(Document() with { Installments = installments }).Value));
+
+        Assert.Contains("(Entrega inicial (pagada a la emisión): S/ 36.00)", with.Replace(@"\(", "(").Replace(@"\)", ")"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Entrega inicial", without, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Many_installments_paginate_and_the_totals_stay_on_the_last_page()
     {
         var installments = Enumerable.Range(1, 90).Select(i => new PrintedInstallment(i, new DateOnly(2026, 10, 1).AddDays(i), 2m)).ToList();

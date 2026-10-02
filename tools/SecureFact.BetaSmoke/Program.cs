@@ -61,6 +61,8 @@ var totals = provider.GetRequiredService<ITaxCalculator>()
 var receipt = args.Contains("boleta", StringComparer.Ordinal);
 // "credit": an invoice sold on credit with two installments (the sheet's "Forma de pago al crédito").
 var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
+// SF_BETA_INITIAL: part of the credit sale paid on the issue date; the installments add up to what is left.
+var initialPayment = credit && decimal.TryParse(Environment.GetEnvironmentVariable("SF_BETA_INITIAL"), NumberStyles.Number, CultureInfo.InvariantCulture, out var initial) ? initial : 0m;
 var data = new UblInvoiceData(
     receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : "0101",
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"),
@@ -68,8 +70,8 @@ var data = new UblInvoiceData(
     : receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
     ublLines, totals, 0.18m,
     credit ? "Credito" : "Contado", adjustments,
-    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
-    0.04m);
+    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - initialPayment - 50m, DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
+    0.04m, initialPayment);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {

@@ -87,6 +87,12 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             page.Text(PdfFont.Bold, 8, Left, y, "Forma de pago: Crédito");
             page.Text(PdfFont.Regular, 8, Left + 130, y, $"Monto neto pendiente de pago: {symbol} {Money(installments.Sum(i => i.Amount))}");
             y -= 11;
+            if (document.InitialPayment > 0)
+            {
+                page.Text(PdfFont.Regular, 8, Left + 130, y, $"Entrega inicial (pagada a la emisión): {symbol} {Money(document.InitialPayment)}");
+                y -= 11;
+            }
+
             foreach (var installment in installments)
             {
                 if (y - 11 < Margin + FooterHeight)

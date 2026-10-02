@@ -112,7 +112,7 @@ internal sealed partial class DocumentService(
             return calculated.Error;
         }
 
-        if (ValidateInstallments(series, request.IssueDate, request.Installments, calculated.Value.PayableAmount) is { } badInstallments)
+        if (ValidateInstallments(series, request.IssueDate, request.Installments, request.InitialPayment, calculated.Value.PayableAmount) is { } badInstallments)
         {
             return badInstallments;
         }
@@ -646,7 +646,7 @@ internal sealed partial class DocumentService(
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
-            stored?.OperationTypeCode ?? OperationTypes.Sale);
+            stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment);
     }
 
     /// <summary>Affectation code of the IVAP (catalogue 07).</summary>
@@ -738,14 +738,23 @@ internal sealed partial class DocumentService(
     /// issue date (3267); the net pending amount is the sum of the installments (3319) and cannot exceed the payable amount (3265). With no detraction or withholding supported,
     /// the net pending amount is the whole payable amount, so the installments must add up to it.
     /// </summary>
-    private static Error? ValidateInstallments(Series series, DateOnly issueDate, IReadOnlyList<Installment>? installments, decimal payable)
+    private static Error? ValidateInstallments(Series series, DateOnly issueDate, IReadOnlyList<Installment>? installments, decimal? initialPayment, decimal payable)
     {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Cuotas inválidas", detail);
+
         if (installments is null)
         {
-            return null;
+            return initialPayment is null ? null : Invalid("La entrega inicial es de una venta al crédito: indique también las cuotas.");
         }
 
-        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Cuotas inválidas", detail);
+        // The part paid on the issue date (RS 193-2020, annex 1, fields 49-A and 64-A: a credit sale is paid "total o parcialmente en fecha posterior"; the net pending
+        // amount is the pending balance): the installments add up to what is left. Without it they add up to the whole payable amount.
+        if (initialPayment is { } initial && (initial <= 0 || decimal.Round(initial, 2) != initial || initial >= payable))
+        {
+            return Invalid("La entrega inicial debe ser mayor que cero, tener hasta 2 decimales y ser menor que el importe total.");
+        }
+
+        var pending = payable - (initialPayment ?? 0m);
 
         if (series.DocumentTypeCode != DocumentTypes.Invoice)
         {
@@ -774,7 +783,11 @@ internal sealed partial class DocumentService(
             sum += installment.Amount;
         }
 
-        return sum == payable ? null : Invalid($"Las cuotas suman {sum:0.00} y el importe total es {payable:0.00}: deben coincidir.");
+        return sum == pending
+            ? null
+            : Invalid(initialPayment is null
+                ? $"Las cuotas suman {sum:0.00} y el importe total es {payable:0.00}: deben coincidir."
+                : $"Las cuotas suman {sum:0.00} y lo pendiente tras la entrega inicial es {pending:0.00} (importe total {payable:0.00} menos {initialPayment:0.00}): deben coincidir.");
     }
 
     /// <summary>Affectation code of the export of goods or services (catalogue 07): tax 9995.</summary>
@@ -835,7 +848,7 @@ internal sealed partial class DocumentService(
 
     private sealed record StoredLine(TaxableLine? Tax);
 
-    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode);
+    private sealed record StoredRequest(List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment);
 
     private static StoredRequest? ReadStoredRequest(string json)
     {

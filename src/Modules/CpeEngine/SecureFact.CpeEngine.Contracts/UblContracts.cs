@@ -33,7 +33,8 @@ public sealed record UblLine(
 /// <param name="OperationTypeCode">Catalogue 51 code, e.g. <c>0101</c> internal sale.</param>
 /// <param name="PaymentForm">Forma de pago of an invoice: <c>Contado</c>, or <c>Credito</c> together with <paramref name="Installments"/> (SUNAT rules 3244–3267, 3319).</param>
 /// <param name="IvapRate">Rate of the IVAP (rice) as a fraction, for lines with affectation 17; the lines state it in <c>cbc:Percent</c> (rule 3103).</param>
-/// <param name="Installments">The installments of a credit sale: at least one, their amounts adding up to the payable amount, each due after the issue date.</param>
+/// <param name="Installments">The installments of a credit sale: at least one, each due after the issue date, adding up to the payable amount minus <paramref name="InitialPayment"/>.</param>
+/// <param name="InitialPayment">Part of a credit sale paid on the issue date (not stated in the XML: the net pending amount, the sum of the installments, already excludes it).</param>
 /// <param name="Adjustments">Global discounts and charges (catalogue 53 codes 02, 03, 49, 50) exactly as given to the TaxEngine; the generator states them and checks that they agree with <paramref name="Totals"/>.</param>
 public sealed record UblInvoiceData(
     string DocumentTypeCode,
@@ -51,7 +52,8 @@ public sealed record UblInvoiceData(
     string PaymentForm = "Contado",
     GlobalAdjustments? Adjustments = null,
     IReadOnlyList<UblInstallment>? Installments = null,
-    decimal IvapRate = 0m);
+    decimal IvapRate = 0m,
+    decimal InitialPayment = 0m);
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)

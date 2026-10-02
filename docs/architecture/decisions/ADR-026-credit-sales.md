@@ -23,8 +23,17 @@ Fuentes: hoja `NotaCredito2_0` (reglas 3257, 3259–3261, 3315, 3319–3321, 108
 - **Beta**: nota 13 con dos cuotas nuevas sobre una factura al crédito aceptada: aceptada, código 0, sin observaciones, con una línea gravada (10) de valor cero.
 - **Regla 1080** («Debe enviar su comprobante por el SEE-Empresas supervisadas»): el emisor afiliado a ese sistema no puede usar esta vía. No hay dato de afiliación en el sistema; no se comprueba (**P**).
 
+## Entrega inicial
+Fuente S23 (RS 193-2020, anexo 1, campos 49-A y 64-A): una venta es **al crédito** si se paga «total o parcialmente en fecha posterior a la de su emisión», y el monto neto pendiente es el «saldo pendiente de pago» del importe total, menos retenciones, detracciones y otras deducciones. Una parte pagada al emitir es, pues, compatible con la venta al crédito, y lo pendiente es lo que queda.
+- **Entrada**: `initialPayment` en `POST /api/v1/documents`, solo con `installments`. Debe ser mayor que cero, con hasta 2 decimales y menor que el importe total; las cuotas suman el importe total menos la entrega inicial (`SF-BIL-006`, antes de numerar). Sin ella, las cuotas suman el importe total, como antes.
+- **UBL**: la entrega inicial no se declara; el monto neto pendiente (`Credito`) y las cuotas ya la excluyen, y el importe total sigue siendo el de la factura (regla 3265: el pendiente no supera el importe total). El generador la recibe (`InitialPayment`) para comprobar que las cuotas suman lo que queda.
+- **Persistencia y PDF**: como las cuotas, vive en la solicitud original (`DocumentDto.InitialPayment`); el PDF imprime «Entrega inicial (pagada a la emisión)» junto al monto neto pendiente.
+- **Beta**: factura de 118.00 con 18.00 pagados al emitir y dos cuotas de 50.00 (monto neto pendiente 100.00): aceptada, código 0, sin observaciones.
+- **No es un cobro**: el sistema no registra ni concilia pagos; la entrega inicial es un dato del plan de pago de la factura.
+- La nota de motivo 13 sigue topada por el importe de la factura (3320), no por lo pendiente tras la entrega inicial; el sistema no la reduce (**P**).
+
 ## Supuestos (P)
-- El monto neto pendiente es el importe total, porque no se soportan detracción ni retención (la hoja lo define como el importe menos ellas). La suma de las cuotas debe igualar el importe total: es más estricto que la regla 3265 (que solo exige que no lo supere). Una entrega inicial pagada al emitir no se puede modelar todavía.
+- El monto neto pendiente es el importe total menos la entrega inicial, porque no se soportan detracción ni retención (la norma lo define como el importe menos ellas y otras deducciones). La suma de las cuotas debe igualar ese monto: es más estricto que la regla 3265 (que solo exige que no supere el importe total).
 - Se exige al menos una cuota siempre; la hoja lo exige cuando el adquirente tiene RUC (3249, 3251, 3254, 3256) y lo deja opcional en otros casos.
 - No se exige orden creciente de los vencimientos (la hoja no lo pide); el número de cuota es la posición en la lista.
 - La impresión de la forma de pago en la representación impresa es una decisión de producto: la norma consultada (S21) no la fija.
