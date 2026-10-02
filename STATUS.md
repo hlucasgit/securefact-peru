@@ -51,7 +51,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - QR de un comprobante IVAP: 0.00 en el campo IGV (el anexo pide solo la «sumatoria IGV»); ver ADR-027.
 
 ## Exportación
-- Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 608 pasan (361 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
+- Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 613 pasan (366 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
 - Pendiente: servicios de exportación (0201–0208), boletas de exportación, leyenda 2008.
 
 ## Comunicación de baja
