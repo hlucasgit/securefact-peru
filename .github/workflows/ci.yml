@@ -32,7 +32,7 @@ jobs:
         run: |
           dotnet tool install --global Microsoft.Sbom.DotNetTool
           sbom-tool generate -b ./src -bc . -pn SecureFact -pv 0.0.0-${{ github.sha }} -ps SecureFact -nsb https://securefact.invalid -V Error || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sbom
