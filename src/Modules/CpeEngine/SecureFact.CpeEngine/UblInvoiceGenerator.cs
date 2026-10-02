@@ -136,11 +136,29 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
     private const string SaleWithDetractionOperation = "1001";
 
-    /// <summary>Catalogue 54 codes the generator accepts for a detraction under operation type 1001; the fishing and transport codes have their own operation types (1002–1004).</summary>
-    private static readonly HashSet<string> OtherDetractionCodes = ["004", "027", "028"];
+    private const string FishingOperation = "1002";
+
+    private const string PassengerTransportOperation = "1003";
+
+    private const string CargoTransportOperation = "1004";
+
+    private static bool IsDetractionOperation(string? operation) =>
+        operation is SaleWithDetractionOperation or FishingOperation or PassengerTransportOperation or CargoTransportOperation;
 
     /// <summary>
-    /// Detraction and withholding (sheet Factura2_0: rules 3127–3129, 3033–3037, 3208, 3262–3264, 4265). Operation type 1001 and a detraction go together (3127, 3128); the amount of the
+    /// The catalogue 54 code of a detraction agrees with its operation type (sheet Factura2_0, rule 3129): 004 (fishing) under 1002, 028 (passenger transport) under 1003 and
+    /// 027 (cargo transport) under 1004; the other codes go with 1001.
+    /// </summary>
+    private static bool DetractionMatchesOperation(string operation, string code) => operation switch
+    {
+        FishingOperation => code == "004",
+        PassengerTransportOperation => code == "028",
+        CargoTransportOperation => code == "027",
+        _ => code is not ("004" or "027" or "028"),
+    };
+
+    /// <summary>
+    /// Detraction and withholding (sheet Factura2_0: rules 3127–3129, 3033–3037, 3208, 3262–3264, 4265). The operation types 1001–1004 and a detraction go together (3127, 3128); the amount of the
     /// detraction is in soles (3208); a withholding is a global allowance of code 62 whose amount is its base × its percentage (3263) and whose base does not exceed the payable amount
     /// (3264). An operation subject to the detraction is excluded from the withholding (RS 037-2002, art. 5), and neither applies to an export.
     /// </summary>
@@ -149,9 +167,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
 
         var detraction = data.Detraction;
-        if ((data.OperationTypeCode == SaleWithDetractionOperation) != (detraction is not null))
+        if (IsDetractionOperation(data.OperationTypeCode) != (detraction is not null))
         {
-            return Invalid("El tipo de operación 1001 y la detracción van juntos.");
+            return Invalid("Los tipos de operación 1001 a 1004 y la detracción van juntos.");
         }
 
         if (detraction is not null)
@@ -161,10 +179,10 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 return Invalid("La detracción es de una factura en soles (el monto de la detracción es siempre en soles).");
             }
 
-            if (string.IsNullOrWhiteSpace(detraction.GoodsOrServiceCode) || OtherDetractionCodes.Contains(detraction.GoodsOrServiceCode)
+            if (string.IsNullOrWhiteSpace(detraction.GoodsOrServiceCode) || !DetractionMatchesOperation(data.OperationTypeCode, detraction.GoodsOrServiceCode.Trim())
                 || detraction.Percentage is <= 0 or > 100 || detraction.Amount <= 0 || detraction.Amount > data.Totals.PayableAmount || string.IsNullOrWhiteSpace(detraction.AccountNumber))
             {
-                return Invalid("La detracción requiere un código del catálogo 54 para el tipo de operación 1001, un porcentaje de 0 a 100, un monto positivo que no supere el importe total y la cuenta del Banco de la Nación.");
+                return Invalid("La detracción requiere un código del catálogo 54 que corresponda al tipo de operación (004 en 1002, 028 en 1003, 027 en 1004 y los demás en 1001), un porcentaje de 0 a 100, un monto positivo que no supere el importe total y la cuenta del Banco de la Nación.");
             }
         }
 
@@ -242,14 +260,19 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return badDeduction;
         }
 
+        if (CheckLineDetails(data) is { } badDetails)
+        {
+            return badDetails;
+        }
+
         switch (data.OperationTypeCode)
         {
             case SaleOperation:
                 return exportLines == 0 ? null : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Las líneas de exportación requieren el tipo de operación 0200.");
-            case SaleWithDetractionOperation:
+            case SaleWithDetractionOperation or FishingOperation or PassengerTransportOperation or CargoTransportOperation:
                 return exportLines == 0 && data.DocumentTypeCode == "01"
                     ? null
-                    : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "La operación sujeta a detracción (1001) es una factura de venta, no una exportación.");
+                    : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", $"La operación sujeta a detracción ({data.OperationTypeCode}) es una factura de venta, no una exportación.");
             case ExportOperation:
                 if (data.DocumentTypeCode != "01")
                 {
@@ -260,8 +283,115 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                     ? null
                     : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Una exportación lleva solo líneas de exportación (afectación 40).");
             default:
-                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101 o 0200).");
+                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101, 0200 o 1001 a 1004).");
         }
+    }
+
+    /// <summary>
+    /// Data of the line that two operation types demand (sheet Factura2_0): every line of a fishing sale (1002) states vessel, species, place and date of unloading and quantity
+    /// (rules 3063, 3130–3135, 3115, 4280, 4281) and every line of a cargo transport (1004) its origin, destination, trip detail and reference values (3116–3126, 4200, 4236, 4270);
+    /// the other operation types carry neither.
+    /// </summary>
+    private static Error? CheckLineDetails(UblInvoiceData data)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
+
+        var fishing = data.OperationTypeCode == FishingOperation;
+        var cargo = data.OperationTypeCode == CargoTransportOperation;
+        foreach (var line in data.Lines)
+        {
+            if (fishing && line.Fishing is null)
+            {
+                return Invalid($"La línea {line.LineNumber} requiere los datos de recursos hidrobiológicos (tipo de operación 1002).");
+            }
+
+            if (!fishing && line.Fishing is not null)
+            {
+                return Invalid($"La línea {line.LineNumber} lleva datos de recursos hidrobiológicos, que son solo del tipo de operación 1002.");
+            }
+
+            if (cargo && line.Transport is null)
+            {
+                return Invalid($"La línea {line.LineNumber} requiere los datos del transporte de carga (tipo de operación 1004).");
+            }
+
+            if (!cargo && line.Transport is not null)
+            {
+                return Invalid($"La línea {line.LineNumber} lleva datos del transporte de carga, que son solo del tipo de operación 1004.");
+            }
+
+            if (line.Fishing is { } f
+                && !(IsText(f.VesselRegistration, 1, 15) && IsText(f.VesselName, 1, 100) && IsText(f.SpeciesType, 1, 150) && IsText(f.UnloadingPlace, 1, 100) && IsAmount(f.SpeciesQuantity)))
+            {
+                return Invalid($"Línea {line.LineNumber}: la matrícula (hasta 15 caracteres), el nombre de la embarcación (100), la especie (150), el lugar de descarga (100) y una cantidad mayor que cero son obligatorios.");
+            }
+
+            if (line.Transport is { } t
+                && !(IsUbigeo(t.OriginUbigeo) && IsUbigeo(t.DestinationUbigeo) && IsText(t.OriginAddress, 3, 200) && IsText(t.DestinationAddress, 3, 200) && IsText(t.TripDetail, 3, 500)
+                    && IsAmount(t.ServiceReferenceValue) && IsAmount(t.EffectiveLoadReferenceValue) && IsAmount(t.NominalLoadReferenceValue)))
+            {
+                return Invalid($"Línea {line.LineNumber}: el origen y el destino requieren ubigeo de 6 dígitos y dirección de 3 a 200 caracteres, el detalle del viaje de 3 a 500 y los tres valores referenciales deben ser mayores que cero.");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Text of the length the rules ask for, without line breaks, tabs or other control characters.</summary>
+    private static bool IsText(string? value, int minLength, int maxLength) =>
+        value is not null && value.Trim().Length >= minLength && value.Trim().Length <= maxLength && !value.Any(char.IsControl);
+
+    private static bool IsUbigeo(string? value) => value is { Length: 6 } && value.All(char.IsAsciiDigit);
+
+    /// <summary>Decimal greater than zero of up to 12 integer digits and 2 decimals, n(12,2).</summary>
+    private static bool IsAmount(decimal value) => value > 0 && value < 1_000_000_000_000m && decimal.Round(value, 2) == value;
+
+    /// <summary>The properties of a fishing line (catalogue 55 codes 3001–3006): the Name is the description of the concept in the catalogue.</summary>
+    private static IEnumerable<XElement> FishingProperties(UblFishing fishing)
+    {
+        static XElement Property(string code, string name, params object[] content) =>
+            new(
+                Cac + "AdditionalItemProperty",
+                new XElement(Cbc + "Name", $"Detracciones: Recursos Hidrobiológicos-{name}"),
+                new XElement(
+                    Cbc + "NameCode",
+                    new XAttribute("listName", "Propiedad del item"),
+                    new XAttribute("listAgencyName", "PE:SUNAT"),
+                    new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo55"),
+                    code),
+                content);
+
+        yield return Property("3001", "Matrícula de la embarcación", new XElement(Cbc + "Value", fishing.VesselRegistration.Trim()));
+        yield return Property("3002", "Nombre de la embarcación", new XElement(Cbc + "Value", fishing.VesselName.Trim()));
+        yield return Property("3003", "Tipo de especie vendida", new XElement(Cbc + "Value", fishing.SpeciesType.Trim()));
+        yield return Property("3004", "Lugar de descarga", new XElement(Cbc + "Value", fishing.UnloadingPlace.Trim()));
+        yield return Property(
+            "3005", "Fecha de descarga",
+            new XElement(Cac + "UsabilityPeriod", new XElement(Cbc + "StartDate", fishing.UnloadingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
+        yield return Property(
+            "3006", "Cantidad de especie vendida",
+            new XElement(Cbc + "ValueQuantity", new XAttribute("unitCode", "TNE"), fishing.SpeciesQuantity.ToString("0.00", CultureInfo.InvariantCulture)));
+    }
+
+    /// <summary>The delivery of a cargo transport line: origin, destination, trip detail and the three reference values (types 01, 02 and 03), all in soles.</summary>
+    private static XElement TransportDelivery(UblCargoTransport transport)
+    {
+        static XElement Address(string name, string ubigeo, string line) =>
+            new(
+                Cac + name,
+                new XElement(Cbc + "ID", new XAttribute("schemeAgencyName", "PE:INEI"), new XAttribute("schemeName", "Ubigeos"), ubigeo),
+                new XElement(Cac + "AddressLine", new XElement(Cbc + "Line", line.Trim())));
+
+        static XElement Terms(string type, decimal amount) =>
+            new(Cac + "DeliveryTerms", new XElement(Cbc + "ID", type), Amount("Amount", amount, "PEN"));
+
+        return new XElement(
+            Cac + "Delivery",
+            new XElement(Cac + "DeliveryLocation", Address("Address", transport.DestinationUbigeo, transport.DestinationAddress)),
+            new XElement(Cac + "Despatch", new XElement(Cbc + "Instructions", transport.TripDetail.Trim()), Address("DespatchAddress", transport.OriginUbigeo, transport.OriginAddress)),
+            Terms("01", transport.ServiceReferenceValue),
+            Terms("02", transport.EffectiveLoadReferenceValue),
+            Terms("03", transport.NominalLoadReferenceValue));
     }
 
     /// <summary>A credit note of reason 11 (adjustment of an export) carries only export lines and modifies an invoice (rules 2642, 3194, 3221, 3107).</summary>
@@ -493,6 +623,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         if (CheckIvap(data.Totals, data.IvapRate, data.ReasonCode == IvapAdjustmentReason, isNote: true) is { } badIvap)
         {
             return badIvap;
+        }
+
+        if (data.Lines.Any(l => l.Fishing is not null || l.Transport is not null))
+        {
+            return Invalid("Una nota no lleva datos de recursos hidrobiológicos ni de transporte de carga.");
         }
 
         if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0 || data.Lines.Any(HasLineAdjustments))
@@ -884,6 +1019,12 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", currency), Decimal(referencePrice)),
                 new XElement(Cbc + "PriceTypeCode", isFree ? "02" : "01"))));
 
+        // UBL order: the delivery of a cargo transport goes after the pricing reference and before the allowances.
+        if (line.Transport is { } transport)
+        {
+            element.Add(TransportDelivery(transport));
+        }
+
         foreach (var allowance in LineAllowances(line, result))
         {
             element.Add(AllowanceElement(allowance, currency));
@@ -904,6 +1045,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         if (!string.IsNullOrWhiteSpace(line.ProductCode))
         {
             item.Add(new XElement(Cac + "SellersItemIdentification", new XElement(Cbc + "ID", line.ProductCode)));
+        }
+
+        if (line.Fishing is { } fishing)
+        {
+            item.Add(FishingProperties(fishing));
         }
 
         element.Add(item);

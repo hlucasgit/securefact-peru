@@ -23,7 +23,54 @@ public static class OperationTypes
 
     /// <summary>1001 – operation subject to detraction. Implied by a <see cref="Detraction"/> and never given by the client without one.</summary>
     public const string SaleWithDetraction = "1001";
+
+    /// <summary>1002 – operation subject to detraction, fishing resources (catalogue 54 code 004). Every line carries a <see cref="FishingDetail"/>.</summary>
+    public const string FishingDetraction = "1002";
+
+    /// <summary>1003 – operation subject to detraction, passenger transport (catalogue 54 code 028).</summary>
+    public const string PassengerTransportDetraction = "1003";
+
+    /// <summary>1004 – operation subject to detraction, cargo transport (catalogue 54 code 027). Every line carries a <see cref="CargoTransportDetail"/>.</summary>
+    public const string CargoTransportDetraction = "1004";
+
+    /// <summary>The operation type that goes with a detraction of the given catalogue 54 code: 1002 for fishing (004), 1003 for passenger transport (028), 1004 for cargo transport (027) and 1001 for the rest.</summary>
+    public static string ForDetraction(string? goodsOrServiceCode) => goodsOrServiceCode?.Trim() switch
+    {
+        "004" => FishingDetraction,
+        "028" => PassengerTransportDetraction,
+        "027" => CargoTransportDetraction,
+        _ => SaleWithDetraction,
+    };
+
+    /// <summary>True for the four operation types subject to detraction (1001–1004).</summary>
+    public static bool IsDetraction(string? operationTypeCode) => operationTypeCode is SaleWithDetraction or FishingDetraction or PassengerTransportDetraction or CargoTransportDetraction;
 }
+
+/// <summary>
+/// Data of the fishing resource a line sells, required on every line of an operation 1002 (catalogue 55 codes 3001–3006). The quantity is in metric tonnes.
+/// </summary>
+/// <param name="VesselRegistration">Registration of the fishing vessel (1–15 characters).</param>
+/// <param name="VesselName">Name of the fishing vessel (1–100).</param>
+/// <param name="SpeciesType">Description of the species sold (1–150).</param>
+/// <param name="UnloadingPlace">Place of unloading (1–100).</param>
+/// <param name="UnloadingDate">Date of unloading.</param>
+/// <param name="SpeciesQuantity">Quantity of the species sold, in metric tonnes (greater than zero, up to 2 decimals).</param>
+public sealed record FishingDetail(string VesselRegistration, string VesselName, string SpeciesType, string UnloadingPlace, DateOnly UnloadingDate, decimal SpeciesQuantity);
+
+/// <summary>
+/// Data of the cargo transport a line sells, required on every line of an operation 1004. The origin and destination come with their ubigeo (6 digits) and an
+/// address of 3–200 characters, the trip detail has 3–500; the three reference values are in soles. The routes and the vehicles of the trip, which SUNAT's rules
+/// leave optional, are not supported yet.
+/// </summary>
+public sealed record CargoTransportDetail(
+    string OriginUbigeo,
+    string OriginAddress,
+    string DestinationUbigeo,
+    string DestinationAddress,
+    string TripDetail,
+    decimal ServiceReferenceValue,
+    decimal EffectiveLoadReferenceValue,
+    decimal NominalLoadReferenceValue);
 
 /// <summary>
 /// Detraction (SPOT) of an invoice: the buyer deposits <paramref name="Amount"/> in the issuer's account at the Banco de la Nación. SUNAT's rules check its structure but not the
@@ -71,7 +118,9 @@ public sealed record DocumentLineRequest(
     string Description,
     string UnitCode,
     TaxableLine Tax,
-    string? ProductCode = null);
+    string? ProductCode = null,
+    FishingDetail? Fishing = null,
+    CargoTransportDetail? Transport = null);
 
 /// <summary>One installment (cuota) of an invoice sold on credit: the amount due and the day it falls due.</summary>
 public sealed record Installment(decimal Amount, DateOnly DueDate);
@@ -83,8 +132,9 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
 /// <c>0101</c> by default, or <c>0200</c> for the export of goods (invoices only, every line with affectation 40, and a buyer without RUC).
 /// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
-/// An invoice may carry a <paramref name="Detraction"/> (operation type 1001) or an IGV <paramref name="Retention"/>, never both; the net pending amount of a credit sale then
-/// excludes them too.
+/// An invoice may carry a <paramref name="Detraction"/> or an IGV <paramref name="Retention"/>, never both; the net pending amount of a credit sale then
+/// excludes them too. The operation type of a detraction follows its catalogue 54 code (see <see cref="OperationTypes.ForDetraction"/>): 1002 (fishing) requires
+/// <see cref="DocumentLineRequest.Fishing"/> on every line and 1004 (cargo transport) <see cref="DocumentLineRequest.Transport"/>.
 /// </summary>
 public sealed record CreateDocumentRequest(
     Guid SeriesId,
@@ -144,7 +194,9 @@ public sealed record DocumentLineDto(
     decimal DiscountAffectingBase = 0m,
     decimal ChargeAffectingBase = 0m,
     decimal DiscountNotAffectingBase = 0m,
-    decimal ChargeNotAffectingBase = 0m);
+    decimal ChargeNotAffectingBase = 0m,
+    FishingDetail? Fishing = null,
+    CargoTransportDetail? Transport = null);
 
 public sealed record DocumentDto(
     Guid Id,

@@ -309,6 +309,8 @@ public class UblNoteGeneratorTests
         { "reason 11 on a debit note", ExportAdjustment() with { DocumentTypeCode = "08" }, ErrorCodes.CpeUnsupported },
         { "reason 11 on a receipt", ExportAdjustment() with { ReferencedDocumentTypeCode = "03", ReferencedSeries = "B001" }, ErrorCodes.CpeInvalidDocument },
         { "export lines mixed with others", ExportMixed(), ErrorCodes.CpeInvalidDocument },
+        { "fishing data in a note", Note() with { Lines = [Note().Lines[0] with { Fishing = new UblFishing("CO-1", "LUANA II", "Anchoveta", "Mollendo", new DateOnly(2026, 9, 28), 10m) }] }, ErrorCodes.CpeInvalidDocument },
+        { "cargo transport data in a note", Note() with { Lines = [Note().Lines[0] with { Transport = new UblCargoTransport("150101", "Lima", "040101", "Arequipa", "Viaje", 1m, 1m, 1m) }] }, ErrorCodes.CpeInvalidDocument },
         { "credit reason 13 without installments", Note("07", "13"), ErrorCodes.CpeInvalidDocument },
         { "credit reason 13 with a payable amount", Note("07", "13") with { Installments = [new(118m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },
         { "installments on another reason", Note("07", "01") with { Installments = [new(118m, new DateOnly(2026, 11, 1))] }, ErrorCodes.CpeInvalidDocument },

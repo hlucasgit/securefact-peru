@@ -409,6 +409,11 @@ internal sealed partial class DocumentService(
             return Invalid("Notas sin descuentos ni cargos", "Una nota no lleva descuentos ni cargos (ni de línea ni globales): indique los valores netos.");
         }
 
+        if (request.Lines!.Any(l => l is { Fishing: not null } or { Transport: not null }))
+        {
+            return Invalid("Notas sin datos de pesca ni de transporte", "Una nota no lleva datos de recursos hidrobiológicos ni de transporte de carga: son de la factura que modifica.");
+        }
+
         if (referenced.CompanyId != series.CompanyId)
         {
             return Invalid("Documento de otra empresa", "La nota y el documento que modifica deben ser de la misma empresa.");
@@ -598,6 +603,11 @@ internal sealed partial class DocumentService(
             return operationError;
         }
 
+        if (ValidateLineDetails(request) is { } detailsError)
+        {
+            return detailsError;
+        }
+
         if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate, request.OperationTypeCode == OperationTypes.Export) is { } buyerError)
         {
             return buyerError;
@@ -654,10 +664,11 @@ internal sealed partial class DocumentService(
         var stored = ReadStoredRequest(d.OriginalRequestJson);
         var lines = d.Lines.OrderBy(l => l.LineNumber).Select(l =>
         {
-            var tax = stored?.Lines is { } storedLines && l.LineNumber >= 1 && l.LineNumber <= storedLines.Count ? storedLines[l.LineNumber - 1]?.Tax : null;
+            var storedLine = stored?.Lines is { } storedLines && l.LineNumber >= 1 && l.LineNumber <= storedLines.Count ? storedLines[l.LineNumber - 1] : null;
+            var tax = storedLine?.Tax;
             return new DocumentLineDto(
                 l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.LineExtensionAmount, l.TaxCode, l.TotalTaxAmount, l.UnitPriceIncludingTaxes, l.UnitValue, l.AffectationCode,
-                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m);
+                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m, storedLine?.Fishing, storedLine?.Transport);
         }).ToList();
         var buyer = new BuyerSnapshot(d.BuyerDocumentTypeCode, d.BuyerDocumentNumber, d.BuyerName, d.BuyerAddress, d.BuyerEmail);
         var note = d.ReferencedDocumentId is { } referencedId
@@ -665,7 +676,7 @@ internal sealed partial class DocumentService(
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
-            stored?.Detraction is not null ? OperationTypes.SaleWithDetraction : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
+            stored?.Detraction is { } storedDetraction ? OperationTypes.ForDetraction(storedDetraction.GoodsOrServiceCode) : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
             stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null);
     }
 
@@ -811,10 +822,10 @@ internal sealed partial class DocumentService(
                 : $"Las cuotas suman {sum:0.00} y lo pendiente tras la entrega inicial es {pending:0.00}: deben coincidir.");
     }
 
-    /// <summary>Catalogue 54 codes (goods and services subject to detraction) accepted for an ordinary operation of type 1001. The fishing (004) and transport (027, 028) codes belong to the operation types 1002–1004, which are not supported.</summary>
+    /// <summary>Catalogue 54 codes (goods and services subject to detraction). The fishing (004) and transport (027, 028) codes go with the operation types 1002–1004 (<see cref="OperationTypes.ForDetraction"/>).</summary>
     private static readonly HashSet<string> DetractionCodes =
     [
-        "001", "002", "003", "005", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "019", "020", "021", "022", "023", "024", "025", "026",
+        "001", "002", "003", "004", "005", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "019", "020", "021", "022", "023", "024", "025", "026", "027", "028",
         "030", "031", "032", "034", "035", "036", "037", "038", "039", "040", "041", "042", "043", "044", "045", "046", "047", "099",
     ];
 
@@ -863,7 +874,7 @@ internal sealed partial class DocumentService(
 
             if (detraction.GoodsOrServiceCode is null || !DetractionCodes.Contains(detraction.GoodsOrServiceCode.Trim()))
             {
-                return Invalid("El código del bien o servicio debe ser del catálogo 54 y de una operación ordinaria (no 004, 027 ni 028, que tienen su propio tipo de operación).");
+                return Invalid("El código del bien o servicio debe ser del catálogo 54.");
             }
 
             if (detraction.Percentage is <= 0 or > 100 || decimal.Round(detraction.Percentage, 5) != detraction.Percentage)
@@ -911,15 +922,24 @@ internal sealed partial class DocumentService(
         static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Tipo de operación inválido", detail);
 
         var operation = request.OperationTypeCode?.Trim();
-        if (operation is not (null or OperationTypes.Sale or OperationTypes.Export or OperationTypes.SaleWithDetraction))
+        if (operation is not (null or OperationTypes.Sale or OperationTypes.Export) && !OperationTypes.IsDetraction(operation))
         {
-            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200 (exportación de bienes) o 1001 (sujeta a detracción).");
+            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200 (exportación de bienes) o 1001 a 1004 (sujetas a detracción).");
         }
 
         var exportLines = request.Lines.Count(l => l?.Tax?.IgvAffectationCode == ExportAffectation);
-        if (operation == OperationTypes.SaleWithDetraction && request.Detraction is null)
+        if (OperationTypes.IsDetraction(operation))
         {
-            return Invalid("El tipo de operación 1001 (sujeta a detracción) requiere los datos de la detracción.");
+            if (request.Detraction is null)
+            {
+                return Invalid($"El tipo de operación {operation} (sujeta a detracción) requiere los datos de la detracción.");
+            }
+
+            var expected = OperationTypes.ForDetraction(request.Detraction.GoodsOrServiceCode);
+            if (operation != expected)
+            {
+                return Invalid($"El código '{request.Detraction.GoodsOrServiceCode?.Trim()}' de la detracción corresponde al tipo de operación {expected}, no a {operation}.");
+            }
         }
 
         if (operation != OperationTypes.Export)
@@ -934,6 +954,67 @@ internal sealed partial class DocumentService(
 
         return exportLines == request.Lines.Count ? null : Invalid("Una exportación lleva solo líneas con afectación 40 (regla 2642).");
     }
+
+    /// <summary>
+    /// Data of the line that two operation types demand (sheet Factura2_0): every line of a fishing sale (1002) states vessel, species, place and date of unloading and the quantity
+    /// (rules 3063, 3130–3135, 3115, 4280, 4281); every line of a cargo transport (1004) states origin, destination, trip detail and the reference values (3116–3126, 4236, 4270). The
+    /// other operation types carry neither. The operation type follows the code of the detraction.
+    /// </summary>
+    private static Error? ValidateLineDetails(CreateDocumentRequest request)
+    {
+        static Error Invalid(int number, string detail) => Error.Validation(ErrorCodes.InvalidDocument, $"Línea {number} inválida", detail);
+
+        var operation = request.Detraction is { } detraction ? OperationTypes.ForDetraction(detraction.GoodsOrServiceCode) : request.OperationTypeCode?.Trim() ?? OperationTypes.Sale;
+        var fishing = operation == OperationTypes.FishingDetraction;
+        var cargo = operation == OperationTypes.CargoTransportDetraction;
+        for (var i = 0; i < request.Lines.Count; i++)
+        {
+            var line = request.Lines[i];
+            var number = i + 1;
+            if (line is null)
+            {
+                continue;
+            }
+
+            if (fishing != (line.Fishing is not null))
+            {
+                return Invalid(number, fishing
+                    ? "Cada línea de una operación de recursos hidrobiológicos (detracción 004, tipo de operación 1002) requiere los datos de la embarcación y de la especie vendida."
+                    : "Los datos de recursos hidrobiológicos son solo del tipo de operación 1002 (detracción con el código 004).");
+            }
+
+            if (cargo != (line.Transport is not null))
+            {
+                return Invalid(number, cargo
+                    ? "Cada línea de un servicio de transporte de carga (detracción 027, tipo de operación 1004) requiere los datos del transporte."
+                    : "Los datos del transporte de carga son solo del tipo de operación 1004 (detracción con el código 027).");
+            }
+
+            if (line.Fishing is { } f
+                && !(IsText(f.VesselRegistration, 1, 15) && IsText(f.VesselName, 1, 100) && IsText(f.SpeciesType, 1, 150) && IsText(f.UnloadingPlace, 1, 100) && IsAmount(f.SpeciesQuantity)))
+            {
+                return Invalid(number, "La matrícula (hasta 15 caracteres), el nombre de la embarcación (100), la especie (150) y el lugar de descarga (100) son obligatorios, sin saltos de línea, y la cantidad en toneladas debe ser mayor que cero, con hasta 2 decimales.");
+            }
+
+            if (line.Transport is { } t
+                && !(IsUbigeo(t.OriginUbigeo) && IsUbigeo(t.DestinationUbigeo) && IsText(t.OriginAddress, 3, 200) && IsText(t.DestinationAddress, 3, 200) && IsText(t.TripDetail, 3, 500)
+                    && IsAmount(t.ServiceReferenceValue) && IsAmount(t.EffectiveLoadReferenceValue) && IsAmount(t.NominalLoadReferenceValue)))
+            {
+                return Invalid(number, "El origen y el destino requieren ubigeo de 6 dígitos y dirección de 3 a 200 caracteres, el detalle del viaje de 3 a 500 y los tres valores referenciales deben ser mayores que cero, con hasta 2 decimales.");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Text of the length the rules ask for, without line breaks, tabs or other control characters.</summary>
+    private static bool IsText(string? value, int minLength, int maxLength) =>
+        value is not null && value.Trim().Length >= minLength && value.Trim().Length <= maxLength && !value.Any(char.IsControl);
+
+    private static bool IsUbigeo(string? value) => value is { Length: 6 } && value.All(char.IsAsciiDigit);
+
+    /// <summary>Decimal greater than zero of up to 12 integer digits and 2 decimals, n(12,2).</summary>
+    private static bool IsAmount(decimal value) => value > 0 && value < 1_000_000_000_000m && decimal.Round(value, 2) == value;
 
     /// <summary>
     /// Reason 11 (sheet NotaCredito2_0, rules 2642, 3194, 3221, 3107): an adjustment of an export, with export lines only and on an invoice that is one. In any note the lines are all
@@ -960,7 +1041,7 @@ internal sealed partial class DocumentService(
             : Invalid("El motivo 11 solo modifica una factura de exportación.");
     }
 
-    private sealed record StoredLine(TaxableLine? Tax);
+    private sealed record StoredLine(TaxableLine? Tax, FishingDetail? Fishing, CargoTransportDetail? Transport);
 
     private sealed record StoredRequest(
         List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment, Detraction? Detraction, RetentionRequest? Retention);

@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Tipos de operación de detracción 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte de pasajeros y de carga): el tipo sigue al código 004, 028 o 027, con los datos de pesca (3001–3006) o del viaje en cada línea, en el UBL y en el PDF; una factura de cada tipo aceptada en el beta (ADR-030, R-054).
 - Cuenta de detracciones en los datos de la empresa: una detracción sin cuenta propia usa la de la empresa y la factura emitida conserva la cuenta usada (ADR-029; migración `AddDetractionAccount`).
 - Detracción (tipo de operación 1001) y retención del IGV en facturas, con el monto neto pendiente del crédito sin ellas; aceptadas en el beta (ADR-029, S24).
 - Entrega inicial en ventas al crédito (`initialPayment`): las cuotas suman el importe total menos lo pagado al emitir; aceptada en el beta (ADR-026, S23).

@@ -70,7 +70,8 @@ public sealed class DeductionsApiTests(ApiFixture api)
 
     private static object Cuota(decimal amount, string dueDate) => new { amount, dueDate };
 
-    private static object Body(Setup setup, string currency = "PEN", object? detraction = null, object? retention = null, object[]? installments = null, string? operationType = null, bool receipt = false) => new
+    private static object Body(
+        Setup setup, string currency = "PEN", object? detraction = null, object? retention = null, object[]? installments = null, string? operationType = null, bool receipt = false, object[]? lines = null) => new
     {
         seriesId = receipt ? setup.Receipt.Id : setup.Invoice.Id,
         issueDate = Iso(TodayInLima()),
@@ -78,7 +79,7 @@ public sealed class DeductionsApiTests(ApiFixture api)
         buyer = receipt
             ? new { documentTypeCode = "1", documentNumber = "12345678", name = "Persona Natural" }
             : new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" },
-        lines = Lines,
+        lines = lines ?? Lines,
         detraction,
         retention,
         installments,
@@ -204,6 +205,142 @@ public sealed class DeductionsApiTests(ApiFixture api)
         Assert.Equal("208.00", credit.Element(Cbc + "Amount")!.Value);
     }
 
+    private static object FishingData(string registration = "CO-10955-PM", decimal quantity = 185.85m) =>
+        new { vesselRegistration = registration, vesselName = "LUANA II", speciesType = "Anchoveta", unloadingPlace = "Planta pesquera, Puerto Mollendo", unloadingDate = Day(-1), speciesQuantity = quantity };
+
+    private static object TransportData(string origin = "150101", decimal service = 1500m) =>
+        new
+        {
+            originUbigeo = origin,
+            originAddress = "Av. Argentina 123, Lima",
+            destinationUbigeo = "040101",
+            destinationAddress = "Calle Mercaderes 45, Arequipa",
+            tripDetail = "Transporte de cemento en bolsas",
+            serviceReferenceValue = service,
+            effectiveLoadReferenceValue = 1200m,
+            nominalLoadReferenceValue = 1000m,
+        };
+
+    private static object[] LineWith(object? fishing = null, object? transport = null) =>
+        [new { description = "Servicio", unitCode = "ZZ", tax = new { quantity = 2m, unitValue = 100m, igvAffectationCode = "10" }, fishing, transport }]; // 236.00
+
+    [Fact]
+    public async Task A_fishing_sale_is_issued_as_operation_1002_with_the_catch_of_every_line_stated_and_printed()
+    {
+        var setup = await NewTenantAsync("Fishing Detraction SAC");
+
+        var response = await PostAsync(setup.Owner, Body(setup, detraction: Detraction(amount: 9m, percentage: 4m, code: "004"), lines: LineWith(fishing: FishingData())));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{invoice.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal("1002", read.OperationTypeCode);
+        Assert.Equal("CO-10955-PM", read.Lines[0].Fishing!.VesselRegistration);
+        Assert.Equal(185.85m, read.Lines[0].Fishing!.SpeciesQuantity);
+
+        var electronic = await AcceptAsync(setup, invoice);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var root = XDocument.Parse(xml).Root!;
+        Assert.Equal("1002", root.Element(Cbc + "InvoiceTypeCode")!.Attribute("listID")!.Value);
+        Assert.Contains(root.Elements(Cac + "PaymentTerms"), t => t.Element(Cbc + "ID")!.Value == "Detraccion" && t.Element(Cbc + "PaymentMeansID")!.Value == "004");
+        var properties = root.Element(Cac + "InvoiceLine")!.Element(Cac + "Item")!.Elements(Cac + "AdditionalItemProperty").ToList();
+        Assert.Equal(["3001", "3002", "3003", "3004", "3005", "3006"], properties.Select(p => p.Element(Cbc + "NameCode")!.Value));
+        Assert.Equal("CO-10955-PM", properties[0].Element(Cbc + "Value")!.Value);
+
+        var pdf = PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf"));
+        Assert.Contains("recursos hidrobiológicos", pdf, StringComparison.Ordinal);
+        Assert.Contains("CO-10955-PM", pdf, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_cargo_transport_sale_is_issued_as_operation_1004_with_the_trip_of_every_line_stated_and_printed()
+    {
+        var setup = await NewTenantAsync("Cargo Detraction SAC");
+
+        var response = await PostAsync(setup.Owner, Body(setup, detraction: Detraction(amount: 9m, percentage: 4m, code: "027"), lines: LineWith(transport: TransportData())));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{invoice.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal("1004", read.OperationTypeCode);
+        Assert.Equal("040101", read.Lines[0].Transport!.DestinationUbigeo);
+
+        var electronic = await AcceptAsync(setup, invoice);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var root = XDocument.Parse(xml).Root!;
+        Assert.Equal("1004", root.Element(Cbc + "InvoiceTypeCode")!.Attribute("listID")!.Value);
+        var delivery = root.Element(Cac + "InvoiceLine")!.Element(Cac + "Delivery")!;
+        Assert.Equal("150101", delivery.Element(Cac + "Despatch")!.Element(Cac + "DespatchAddress")!.Element(Cbc + "ID")!.Value);
+        Assert.Equal(["01", "02", "03"], delivery.Elements(Cac + "DeliveryTerms").Select(t => t.Element(Cbc + "ID")!.Value));
+
+        Assert.Contains("transporte de carga", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_passenger_transport_sale_is_issued_as_operation_1003_without_line_data()
+    {
+        var setup = await NewTenantAsync("Passenger Detraction SAC");
+
+        var response = await PostAsync(setup.Owner, Body(setup, detraction: Detraction(amount: 9m, percentage: 4m, code: "028")));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal("1003", invoice.OperationTypeCode);
+        var electronic = await AcceptAsync(setup, invoice);
+        var root = XDocument.Parse(await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml")).Root!;
+        Assert.Equal("1003", root.Element(Cbc + "InvoiceTypeCode")!.Attribute("listID")!.Value);
+    }
+
+    [Fact]
+    public async Task The_line_data_of_the_detraction_types_is_required_where_it_belongs_and_refused_elsewhere()
+    {
+        var setup = await NewTenantAsync("Detraction Types Rules SAC");
+        var fishing = Detraction(amount: 9m, percentage: 4m, code: "004");
+        var cargo = Detraction(amount: 9m, percentage: 4m, code: "027");
+        var passenger = Detraction(amount: 9m, percentage: 4m, code: "028");
+
+        var cases = new (string Name, object Body)[]
+        {
+            ("fishing without the catch", Body(setup, detraction: fishing)),
+            ("cargo without the trip", Body(setup, detraction: cargo)),
+            ("a catch under cargo", Body(setup, detraction: cargo, lines: LineWith(fishing: FishingData()))),
+            ("a trip under fishing", Body(setup, detraction: fishing, lines: LineWith(transport: TransportData()))),
+            ("a catch under passengers", Body(setup, detraction: passenger, lines: LineWith(fishing: FishingData()))),
+            ("a trip under passengers", Body(setup, detraction: passenger, lines: LineWith(transport: TransportData()))),
+            ("a catch under another service", Body(setup, detraction: Detraction(), lines: LineWith(fishing: FishingData()))),
+            ("a catch without detraction", Body(setup, lines: LineWith(fishing: FishingData()))),
+            ("a trip without detraction", Body(setup, lines: LineWith(transport: TransportData()))),
+            ("operation 1002 with another code", Body(setup, detraction: Detraction(), operationType: "1002", lines: LineWith(fishing: FishingData()))),
+            ("operation 1001 with the fishing code", Body(setup, detraction: fishing, operationType: "1001", lines: LineWith(fishing: FishingData()))),
+            ("operation 1004 with the passenger code", Body(setup, detraction: passenger, operationType: "1004")),
+            ("a catch without a registration", Body(setup, detraction: fishing, lines: LineWith(fishing: FishingData(registration: " ")))),
+            ("a catch of zero tonnes", Body(setup, detraction: fishing, lines: LineWith(fishing: FishingData(quantity: 0m)))),
+            ("a trip with a short ubigeo", Body(setup, detraction: cargo, lines: LineWith(transport: TransportData(origin: "1501")))),
+            ("a trip without service value", Body(setup, detraction: cargo, lines: LineWith(transport: TransportData(service: 0m)))),
+        };
+        foreach (var (name, body) in cases)
+        {
+            var response = await PostAsync(setup.Owner, body);
+            Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
+            Assert.Equal("SF-BIL-006", ProblemCode(await response.Content.ReadAsStringAsync()));
+        }
+
+        // Nothing refused took a number, and a note does not carry the data: it belongs to the invoice it modifies.
+        var invoice = (await (await PostAsync(setup.Owner, Body(setup, detraction: fishing, lines: LineWith(fishing: FishingData())))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, invoice.Number);
+        var noteSeries = (await (await setup.Owner.PostAsJsonAsync("/api/v1/series", new { companyId = setup.Company.Id, documentTypeCode = "07", code = "FC01" })).Content.ReadFromJsonAsync<SeriesDto>(ApiFixture.JsonOptions))!;
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/notes")
+        {
+            Content = JsonContent.Create(new { seriesId = noteSeries.Id, referencedDocumentId = invoice.Id, issueDate = Iso(TodayInLima()), reasonCode = "01", reason = "Anulación", lines = LineWith(fishing: FishingData()) }),
+        };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+        var note = await setup.Owner.SendAsync(request);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, note.StatusCode);
+        Assert.Contains("Notas sin datos de pesca ni de transporte", await note.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     private static Task<HttpResponseMessage> SetDetractionAccountAsync(Setup setup, string? account) =>
         setup.Owner.PutAsJsonAsync($"/api/v1/companies/{setup.Company.Id}", new
         {
@@ -266,7 +403,8 @@ public sealed class DeductionsApiTests(ApiFixture api)
         {
             ("a detraction in dollars", Body(setup, "USD", Detraction())),
             ("an unknown goods code", Body(setup, detraction: Detraction(code: "999"))),
-            ("a transport code", Body(setup, detraction: Detraction(code: "027"))),
+            ("a cargo transport code without its trip data", Body(setup, detraction: Detraction(code: "027"))),
+            ("a fishing code without its catch data", Body(setup, detraction: Detraction(code: "004"))),
             ("percentage zero", Body(setup, detraction: Detraction(percentage: 0m))),
             ("percentage above 100", Body(setup, detraction: Detraction(amount: 236m, percentage: 101m))),
             ("an amount that does not match", Body(setup, detraction: Detraction(amount: 50m))),

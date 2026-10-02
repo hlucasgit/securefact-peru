@@ -285,11 +285,156 @@ public class UblInvoiceGeneratorTests
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { Amount = 0m } }).Error.Code);
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { Amount = 300m } }).Error.Code);
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { AccountNumber = " " } }).Error.Code);
-        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { GoodsOrServiceCode = "027" } }).Error.Code); // transport has its own operation type
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Detraction = detracted.Detraction! with { GoodsOrServiceCode = "027" } }).Error.Code); // transport goes with 1004
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(detracted with { Retention = new UblRetention(3m, 236m, 7.08m) }).Error.Code); // not both
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(retained with { Retention = retained.Retention! with { Amount = 20m } }).Error.Code); // amount is base x percentage
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(retained with { Retention = retained.Retention! with { BaseAmount = 300m, Amount = 9m } }).Error.Code); // base above the total
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Data("03", ("10", 1m, 1000m)) with { Retention = new UblRetention(3m, 1180m, 35.4m) }).Error.Code); // receipts do not
+    }
+
+    // ---------- detraction types 1002-1004 ----------
+
+    private static readonly UblFishing Catch = new("CO-10955-PM", "LUANA II", "Anchoveta", "Planta pesquera, Puerto Mollendo", new DateOnly(2026, 9, 28), 185.85m);
+
+    private static readonly UblCargoTransport Trip = new("150101", "Av. Argentina 123, Lima", "040101", "Calle Mercaderes 45, Arequipa", "Transporte de cemento en bolsas", 1500m, 1200m, 1000m);
+
+    private static UblInvoiceData WithLine(UblInvoiceData data, Func<UblLine, UblLine> change) => data with { Lines = data.Lines.Select(change).ToList() };
+
+    private static UblInvoiceData FishingSale() =>
+        WithLine(Detracted() with { OperationTypeCode = "1002", Detraction = new UblDetraction("004", 4m, 9m, "00012345678") }, l => l with { Fishing = Catch }); // 236.00 x 4 % = 9.44, deposited as 9
+
+    private static UblInvoiceData PassengerSale() =>
+        Detracted() with { OperationTypeCode = "1003", Detraction = new UblDetraction("028", 4m, 9m, "00012345678") };
+
+    private static UblInvoiceData CargoSale() =>
+        WithLine(Detracted() with { OperationTypeCode = "1004", Detraction = new UblDetraction("027", 4m, 9m, "00012345678") }, l => l with { Transport = Trip });
+
+    [Fact]
+    public void A_fishing_sale_states_the_vessel_species_unloading_and_quantity_of_every_line()
+    {
+        var result = _generator.GenerateInvoice(FishingSale());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("1002", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        Assert.Equal("004", xml.XPathSelectElement("/inv:Invoice/cac:PaymentTerms[cbc:ID='Detraccion']/cbc:PaymentMeansID", Namespaces)!.Value);
+        Assert.Equal("2006", xml.XPathSelectElement("/inv:Invoice/cbc:Note", Namespaces)!.Attribute("languageLocaleID")!.Value);
+
+        var properties = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:Item/cac:AdditionalItemProperty", Namespaces).ToList();
+        Assert.Equal(["3001", "3002", "3003", "3004", "3005", "3006"], properties.Select(p => p.XPathSelectElement("cbc:NameCode", Namespaces)!.Value));
+        string Value(string code) => properties.Single(p => p.XPathSelectElement("cbc:NameCode", Namespaces)!.Value == code).XPathSelectElement("cbc:Value", Namespaces)!.Value;
+        Assert.Equal("CO-10955-PM", Value("3001"));
+        Assert.Equal("LUANA II", Value("3002"));
+        Assert.Equal("Anchoveta", Value("3003"));
+        Assert.Equal("Planta pesquera, Puerto Mollendo", Value("3004"));
+        Assert.Equal("2026-09-28", properties[4].XPathSelectElement("cac:UsabilityPeriod/cbc:StartDate", Namespaces)!.Value);
+        var quantity = properties[5].XPathSelectElement("cbc:ValueQuantity", Namespaces)!;
+        Assert.Equal("185.85", quantity.Value);
+        Assert.Equal("TNE", quantity.Attribute("unitCode")!.Value);
+        Assert.All(properties, p => Assert.Equal("PE:SUNAT", p.XPathSelectElement("cbc:NameCode", Namespaces)!.Attribute("listAgencyName")!.Value));
+    }
+
+    [Fact]
+    public void A_passenger_transport_sale_needs_only_the_operation_type_and_its_code()
+    {
+        var result = _generator.GenerateInvoice(PassengerSale());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("1003", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        Assert.Equal("028", xml.XPathSelectElement("/inv:Invoice/cac:PaymentTerms[cbc:ID='Detraccion']/cbc:PaymentMeansID", Namespaces)!.Value);
+        Assert.Empty(xml.XPathSelectElements("//cac:AdditionalItemProperty", Namespaces));
+        Assert.Empty(xml.XPathSelectElements("//cac:Delivery", Namespaces));
+    }
+
+    [Fact]
+    public void A_cargo_transport_sale_states_origin_destination_trip_and_the_three_reference_values_of_every_line()
+    {
+        var result = _generator.GenerateInvoice(CargoSale());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("1004", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        Assert.Equal("027", xml.XPathSelectElement("/inv:Invoice/cac:PaymentTerms[cbc:ID='Detraccion']/cbc:PaymentMeansID", Namespaces)!.Value);
+
+        var delivery = xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:Delivery", Namespaces)!;
+        var origin = delivery.XPathSelectElement("cac:Despatch/cac:DespatchAddress", Namespaces)!;
+        Assert.Equal("150101", origin.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("PE:INEI", origin.XPathSelectElement("cbc:ID", Namespaces)!.Attribute("schemeAgencyName")!.Value);
+        Assert.Equal("Ubigeos", origin.XPathSelectElement("cbc:ID", Namespaces)!.Attribute("schemeName")!.Value);
+        Assert.Equal("Av. Argentina 123, Lima", origin.XPathSelectElement("cac:AddressLine/cbc:Line", Namespaces)!.Value);
+        Assert.Equal("Transporte de cemento en bolsas", delivery.XPathSelectElement("cac:Despatch/cbc:Instructions", Namespaces)!.Value);
+        var destination = delivery.XPathSelectElement("cac:DeliveryLocation/cac:Address", Namespaces)!;
+        Assert.Equal("040101", destination.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("Calle Mercaderes 45, Arequipa", destination.XPathSelectElement("cac:AddressLine/cbc:Line", Namespaces)!.Value);
+        var terms = delivery.XPathSelectElements("cac:DeliveryTerms", Namespaces).ToDictionary(t => t.XPathSelectElement("cbc:ID", Namespaces)!.Value, t => t.XPathSelectElement("cbc:Amount", Namespaces)!);
+        Assert.Equal(["01", "02", "03"], terms.Keys.Order());
+        Assert.Equal(("1500.00", "1200.00", "1000.00"), (terms["01"].Value, terms["02"].Value, terms["03"].Value));
+        Assert.All(terms.Values, a => Assert.Equal("PEN", a.Attribute("currencyID")!.Value));
+        Assert.Empty(xml.XPathSelectElements("//cac:AdditionalItemProperty", Namespaces));
+    }
+
+    [Fact]
+    public void The_detraction_types_demand_their_code_and_their_line_data()
+    {
+        var fishing = FishingSale();
+        var passenger = PassengerSale();
+        var cargo = CargoSale();
+
+        // Rule 3129: the code of the detraction follows the operation type, and 1001 takes none of the three.
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(fishing with { Detraction = fishing.Detraction! with { GoodsOrServiceCode = "037" } }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(passenger with { Detraction = passenger.Detraction! with { GoodsOrServiceCode = "027" } }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(cargo with { Detraction = cargo.Detraction! with { GoodsOrServiceCode = "028" } }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Detracted() with { Detraction = new UblDetraction("004", 4m, 9m, "00012345678") }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(fishing with { Detraction = null }).Error.Code);
+
+        // Rules 3063, 3130–3135, 3116–3126: every line carries the data of its type, and only that type does.
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(fishing, l => l with { Fishing = null })).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(cargo, l => l with { Transport = null })).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(Detracted(), l => l with { Fishing = Catch })).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(Detracted(), l => l with { Transport = Trip })).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(passenger, l => l with { Transport = Trip })).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(fishing, l => l with { Transport = Trip })).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(WithLine(Data("01", ("10", 2m, 100m)), l => l with { Fishing = Catch })).Error.Code);
+    }
+
+    [Fact]
+    public void The_line_data_of_a_fishing_or_cargo_transport_sale_keeps_the_formats_of_the_rules()
+    {
+        UblInvoiceData Fishing(Func<UblFishing, UblFishing> change) => WithLine(FishingSale(), l => l with { Fishing = change(Catch) });
+        UblInvoiceData Cargo(Func<UblCargoTransport, UblCargoTransport> change) => WithLine(CargoSale(), l => l with { Transport = change(Trip) });
+
+        UblInvoiceData[] refused =
+        [
+            Fishing(f => f with { VesselRegistration = new string('A', 16) }), // 3001: up to 15 characters
+            Fishing(f => f with { VesselRegistration = " " }),
+            Fishing(f => f with { VesselName = new string('A', 101) }), // 3002: up to 100
+            Fishing(f => f with { SpeciesType = new string('A', 151) }), // 3003: up to 150
+            Fishing(f => f with { UnloadingPlace = new string('A', 101) }), // 3004: up to 100
+            Fishing(f => f with { SpeciesType = "Anchoveta\ncongelada" }), // no line breaks
+            Fishing(f => f with { SpeciesQuantity = 0m }),
+            Fishing(f => f with { SpeciesQuantity = 1.234m }),
+            Cargo(t => t with { OriginUbigeo = "1501" }),
+            Cargo(t => t with { DestinationUbigeo = "04010A" }),
+            Cargo(t => t with { OriginAddress = "ab" }), // 3 to 200 characters
+            Cargo(t => t with { DestinationAddress = new string('A', 201) }),
+            Cargo(t => t with { TripDetail = "ab" }), // 3 to 500
+            Cargo(t => t with { TripDetail = new string('A', 501) }),
+            Cargo(t => t with { TripDetail = "Lima\tArequipa" }),
+            Cargo(t => t with { ServiceReferenceValue = 0m }),
+            Cargo(t => t with { EffectiveLoadReferenceValue = -1m }),
+            Cargo(t => t with { NominalLoadReferenceValue = 10.001m }),
+        ];
+        foreach (var data in refused)
+        {
+            Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data).Error.Code);
+        }
+
+        var edge = WithLine(FishingSale(), l => l with { Fishing = Catch with { VesselRegistration = new string('A', 15), VesselName = new string('B', 100), SpeciesType = new string('C', 150), UnloadingPlace = new string('D', 100) } });
+        Assert.True(_generator.GenerateInvoice(edge).IsSuccess);
     }
 
     // ---------- export of goods ----------

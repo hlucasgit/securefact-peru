@@ -70,7 +70,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Nota de crédito de motivo 13 (ajuste de cuotas): sin líneas, con las cuotas nuevas e importe total cero; aceptada en el beta. Pruebas: 578 pasan (343 unitarias, 6 arquitectura, 6 integración, 223 seguridad/API).
 - Detracción y retención del IGV en facturas (ADR-029): porcentajes, montos y cuenta son datos del emisor que la plataforma comprueba; el crédito deja ambas fuera del monto neto pendiente; aceptadas en el beta (que no comprueba el padrón de agentes). Pruebas: 627 pasan (374 unitarias, 6 arquitectura, 6 integración, 241 seguridad/API).
 - La empresa guarda su cuenta de detracciones (`detractionAccount`); una detracción sin cuenta propia usa la de la empresa y la factura conserva la usada. Pruebas: 629 pasan (374 unitarias, 6 arquitectura, 6 integración, 243 seguridad/API).
-- Pendiente: tipos 1002–1004.
+- Tipos de operación de detracción 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte): el tipo sigue al código de la detracción, con datos de pesca o de viaje por línea (ADR-030); una factura de cada tipo aceptada en el beta. Pruebas: 640 pasan (381 unitarias, 6 arquitectura, 6 integración, 247 seguridad/API).
+- Pendiente: tramos y vehículos del transporte de carga (opcionales).
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

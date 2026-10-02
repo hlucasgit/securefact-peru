@@ -42,6 +42,14 @@ var ivapSale = args.Contains("ivap", StringComparer.Ordinal);
 // "detraction": an invoice of services taxed with the IGV subject to detraction (operation type 1001); "retention": the buyer withholds 3 % of the IGV.
 var detractionSale = args.Contains("detraction", StringComparer.Ordinal);
 var retentionSale = args.Contains("retention", StringComparer.Ordinal);
+// "fishing" (1002, code 004), "passengers" (1003, code 028) and "cargo" (1004, code 027): the other types subject to detraction. SUNAT does not check the percentage, so the ones used here are arbitrary.
+var fishingSale = args.Contains("fishing", StringComparer.Ordinal);
+var passengerSale = args.Contains("passengers", StringComparer.Ordinal);
+var cargoSale = args.Contains("cargo", StringComparer.Ordinal);
+detractionSale |= fishingSale || passengerSale || cargoSale;
+var detractionOperation = fishingSale ? "1002" : passengerSale ? "1003" : cargoSale ? "1004" : "1001";
+var detractionCode = fishingSale ? "004" : passengerSale ? "028" : cargoSale ? "027" : "037";
+var detractionPercentage = detractionOperation == "1001" ? 12m : 4m;
 // "export": an export of goods (operation type 0200): affectation 40, tax 9995, a buyer abroad without RUC.
 var exportSale = args.Contains("export", StringComparer.Ordinal);
 TaxableLine[] taxLines = exportSale
@@ -57,7 +65,10 @@ UblLine[] ublLines = exportSale
     ? [new UblLine(1, "Arroz pilado de prueba", "KGM", null, 1, 100m, null, "17")]
     : discount
     ? [new UblLine(1, "Servicio de prueba", "ZZ", null, 2, 100m, null, "10", 20m, 5m, 10m, 3m), new UblLine(2, "Servicio exonerado", "ZZ", null, 1, 50m, null, "20")]
-    : [new UblLine(1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10")];
+    : [new UblLine(
+        1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10",
+        Fishing: fishingSale ? new UblFishing("CO-10955-PM", "LUANA II", "Anchoveta", "Planta pesquera, Puerto Mollendo", DateOnly.FromDateTime(lima.DateTime).AddDays(-1), 185.85m) : null,
+        Transport: cargoSale ? new UblCargoTransport("150101", "Av. Argentina 123, Lima", "040101", "Calle Mercaderes 45, Arequipa", "Transporte de cemento en bolsas", 1500m, 1200m, 1000m) : null)];
 GlobalAdjustments? adjustments = discount ? new GlobalAdjustments(DiscountAffectingBase: 12m, ChargeAffectingBase: 4m, DiscountNotAffectingBase: 7m, ChargeNotAffectingBase: 2m) : null;
 var totals = provider.GetRequiredService<ITaxCalculator>()
     .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m, 0.04m), adjustments)).Value;
@@ -67,15 +78,15 @@ var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
 // SF_BETA_INITIAL: part of the credit sale paid on the issue date; the installments add up to what is left.
 var initialPayment = credit && decimal.TryParse(Environment.GetEnvironmentVariable("SF_BETA_INITIAL"), NumberStyles.Number, CultureInfo.InvariantCulture, out var initial) ? initial : 0m;
 var data = new UblInvoiceData(
-    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : detractionSale ? "1001" : "0101",
+    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : detractionSale ? detractionOperation : "0101",
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"),
     exportSale ? new UblParty(Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_TYPE") ?? "0", Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_NUMBER") ?? "-", "CLIENTE DEL EXTERIOR")
     : receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
     ublLines, totals, 0.18m,
     credit ? "Credito" : "Contado", adjustments,
-    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - initialPayment - 50m - (detractionSale ? Math.Round(totals.PayableAmount * 0.12m, 0, MidpointRounding.AwayFromZero) : 0m) - (retentionSale ? Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero) : 0m), DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
+    credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - initialPayment - 50m - (detractionSale ? Math.Round(totals.PayableAmount * detractionPercentage / 100m, 0, MidpointRounding.AwayFromZero) : 0m) - (retentionSale ? Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero) : 0m), DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
     0.04m, initialPayment,
-    detractionSale ? new UblDetraction("037", 12m, Math.Round(totals.PayableAmount * 0.12m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000") : null,
+    detractionSale ? new UblDetraction(detractionCode, detractionPercentage, Math.Round(totals.PayableAmount * detractionPercentage / 100m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000") : null,
     retentionSale ? new UblRetention(3m, totals.PayableAmount, Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero)) : null);
 
 if (args.Contains("summary", StringComparer.Ordinal))

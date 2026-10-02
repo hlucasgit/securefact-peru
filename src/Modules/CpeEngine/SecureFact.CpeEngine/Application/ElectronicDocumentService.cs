@@ -91,7 +91,13 @@ internal sealed class ElectronicDocumentService(
         var buyer = new UblParty(d.Buyer.DocumentTypeCode, d.Buyer.DocumentNumber, d.Buyer.Name);
         var ublLines = d.Lines.Select(l => new UblLine(
             l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.UnitValue, null, l.IgvAffectationCode,
-            l.DiscountAffectingBase, l.ChargeAffectingBase, l.DiscountNotAffectingBase, l.ChargeNotAffectingBase)).ToList();
+            l.DiscountAffectingBase, l.ChargeAffectingBase, l.DiscountNotAffectingBase, l.ChargeNotAffectingBase,
+            l.Fishing is { } fishing ? new UblFishing(fishing.VesselRegistration, fishing.VesselName, fishing.SpeciesType, fishing.UnloadingPlace, fishing.UnloadingDate, fishing.SpeciesQuantity) : null,
+            l.Transport is { } transport
+                ? new UblCargoTransport(
+                    transport.OriginUbigeo, transport.OriginAddress, transport.DestinationUbigeo, transport.DestinationAddress, transport.TripDetail,
+                    transport.ServiceReferenceValue, transport.EffectiveLoadReferenceValue, transport.NominalLoadReferenceValue)
+                : null)).ToList();
 
         var generated = d.Note is { } note
             ? ubl.GenerateNote(new UblNoteData(
@@ -480,6 +486,23 @@ internal sealed class ElectronicDocumentService(
         if (d.Detraction is { } detraction)
         {
             lines.Add($"Operación sujeta a detracción: código {detraction.GoodsOrServiceCode}, {detraction.Percentage:0.##}% = S/ {detraction.Amount:0.00}; cuenta en el Banco de la Nación N.° {detraction.AccountNumber}");
+        }
+
+        foreach (var line in d.Lines)
+        {
+            if (line.Fishing is { } fishing)
+            {
+                lines.Add(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Ítem {line.LineNumber}, recursos hidrobiológicos: embarcación {fishing.VesselName} (matrícula {fishing.VesselRegistration}); especie {fishing.SpeciesType}, {fishing.SpeciesQuantity:0.00} TM; descarga en {fishing.UnloadingPlace} el {fishing.UnloadingDate:yyyy-MM-dd}"));
+            }
+
+            if (line.Transport is { } transport)
+            {
+                lines.Add(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Ítem {line.LineNumber}, transporte de carga: origen {transport.OriginUbigeo} {transport.OriginAddress}; destino {transport.DestinationUbigeo} {transport.DestinationAddress}; viaje: {transport.TripDetail}; valor referencial del servicio S/ {transport.ServiceReferenceValue:0.00}, de la carga efectiva S/ {transport.EffectiveLoadReferenceValue:0.00}, de la carga útil nominal S/ {transport.NominalLoadReferenceValue:0.00}"));
+            }
         }
 
         if (d.Retention is { } retention)
