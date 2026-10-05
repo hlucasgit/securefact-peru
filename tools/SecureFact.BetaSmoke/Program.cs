@@ -37,6 +37,8 @@ var lima = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSyst
 var number = (long)lima.TimeOfDay.TotalSeconds + 1;
 // "discount": a taxed line with the four line adjustments (catalogue 53: 00, 47, 01, 48), an exempt line and the four global ones (02, 49, 03, 50).
 var discount = args.Contains("discount", StringComparer.Ordinal);
+// "exempt": an exonerated line (affectation 20); SF_BETA_LEGENDS lists the legends of the exonerated sales to state (2001, 2002, 2003, 2008), comma separated.
+var exemptSale = args.Contains("exempt", StringComparer.Ordinal);
 // "ivap": a line of rice taxed with the IVAP (affectation 17, tax 1016) at 4 %.
 var ivapSale = args.Contains("ivap", StringComparer.Ordinal);
 // "detraction": an invoice of services taxed with the IGV subject to detraction (operation type 1001); "retention": the buyer withholds 3 % of the IGV.
@@ -56,6 +58,8 @@ var exportSale = args.Contains("export", StringComparer.Ordinal);
 var exportOperation = Environment.GetEnvironmentVariable("SF_BETA_EXPORT_OPERATION") ?? "0200";
 TaxableLine[] taxLines = exportSale
     ? [new TaxableLine(1, 100m, "40")]
+    : exemptSale
+    ? [new TaxableLine(1, 100m, "20")]
     : ivapSale
     ? [new TaxableLine(1, 100m, "17")]
     : discount
@@ -63,6 +67,8 @@ TaxableLine[] taxLines = exportSale
     : [new TaxableLine(1, 100m, "10")];
 UblLine[] ublLines = exportSale
     ? [new UblLine(1, "Bien de exportacion de prueba", "NIU", null, 1, 100m, null, "40")]
+    : exemptSale
+    ? [new UblLine(1, "Bien exonerado de prueba", "NIU", null, 1, 100m, null, "20")]
     : ivapSale
     ? [new UblLine(1, "Arroz pilado de prueba", "KGM", null, 1, 100m, null, "17")]
     : discount
@@ -90,7 +96,8 @@ var data = new UblInvoiceData(
     0.04m, initialPayment,
     detractionSale ? new UblDetraction(detractionCode, detractionPercentage, Math.Round(totals.PayableAmount * detractionPercentage / 100m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000") : null,
     retentionSale ? new UblRetention(3m, totals.PayableAmount, Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero)) : null,
-    exportSale ? Environment.GetEnvironmentVariable("SF_BETA_USAGE_COUNTRY") : null);
+    exportSale ? Environment.GetEnvironmentVariable("SF_BETA_USAGE_COUNTRY") : null,
+    Environment.GetEnvironmentVariable("SF_BETA_LEGENDS")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {

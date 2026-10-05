@@ -104,6 +104,34 @@ public sealed record CargoTransportDetail(
     decimal NominalLoadReferenceValue);
 
 /// <summary>
+/// Legends of catalogue 52 that an issuer states on a sale of exonerated operations: the exoneration of the Amazon region (2001 goods, 2002 services, 2003 construction contracts) and the
+/// one of the commercial zone of Tacna (2008). The sheets Factura2_0 and Boleta2_0 ask for the same thing in all four: the document carries operations exonerated from the IGV (tax 9997 with a
+/// positive base; rules 3283–3285 and 3289 in invoices, observations 4022–4024 and 4244 in receipts). The texts are the ones of the catalogue.
+/// </summary>
+public static class ExemptionLegends
+{
+    /// <summary>2001 – goods transferred in the Amazon region to be consumed there.</summary>
+    public const string AmazonGoods = "2001";
+
+    /// <summary>2002 – services provided in the Amazon region to be consumed there.</summary>
+    public const string AmazonServices = "2002";
+
+    /// <summary>2003 – construction contracts executed in the Amazon region.</summary>
+    public const string AmazonConstruction = "2003";
+
+    /// <summary>2008 – exonerated sale in the commercial zone of Tacna.</summary>
+    public const string TacnaCommercialZone = "2008";
+
+    public static IReadOnlyDictionary<string, string> Texts { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [AmazonGoods] = "BIENES TRANSFERIDOS EN LA AMAZONÍA REGIÓN SELVA PARA SER CONSUMIDOS EN LA MISMA",
+        [AmazonServices] = "SERVICIOS PRESTADOS EN LA AMAZONÍA REGIÓN SELVA PARA SER CONSUMIDOS EN LA MISMA",
+        [AmazonConstruction] = "CONTRATOS DE CONSTRUCCIÓN EJECUTADOS EN LA AMAZONÍA REGIÓN SELVA",
+        [TacnaCommercialZone] = "VENTA EXONERADA DEL IGV-ISC-IPM. PROHIBIDA LA VENTA FUERA DE LA ZONA COMERCIAL DE TACNA",
+    };
+}
+
+/// <summary>
 /// Detraction (SPOT) of an invoice: the buyer deposits <paramref name="Amount"/> in the issuer's account at the Banco de la Nación. SUNAT's rules check its structure but not the
 /// percentage or the amount, so both are the issuer's data; the platform only checks that they agree. The amount is always in soles.
 /// </summary>
@@ -162,7 +190,8 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
 /// <c>0101</c> by default, <c>0200</c> for the export of goods or <c>0201</c>, <c>0203</c>, <c>0204</c>, <c>0206</c>, <c>0207</c> and <c>0208</c> for the export of services (every line with
-/// affectation 40; the buyer of an invoice has no RUC in 0200, 0201 and 0204, and the buyer of a receipt never has one). <paramref name="UsageCountryCode"/> (ISO 3166-1 alpha-2, never <c>PE</c>) is required in 0201 and 0208 and refused elsewhere.
+/// affectation 40; the buyer of an invoice has no RUC in 0200, 0201 and 0204, and the buyer of a receipt never has one).
+/// <paramref name="LegendCodes"/> are the legends of <see cref="ExemptionLegends"/> (2001, 2002, 2003, 2008) the issuer states; each one needs exonerated operations in the document. <paramref name="UsageCountryCode"/> (ISO 3166-1 alpha-2, never <c>PE</c>) is required in 0201 and 0208 and refused elsewhere.
 /// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
 /// An invoice may carry a <paramref name="Detraction"/> or an IGV <paramref name="Retention"/>, never both; the net pending amount of a credit sale then
 /// excludes them too. The operation type of a detraction follows its catalogue 54 code (see <see cref="OperationTypes.ForDetraction"/>): 1002 (fishing) requires
@@ -181,7 +210,8 @@ public sealed record CreateDocumentRequest(
     decimal? InitialPayment = null,
     Detraction? Detraction = null,
     RetentionRequest? Retention = null,
-    string? UsageCountryCode = null);
+    string? UsageCountryCode = null,
+    IReadOnlyList<string>? LegendCodes = null);
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
@@ -252,7 +282,8 @@ public sealed record DocumentDto(
     decimal? InitialPayment = null,
     Detraction? Detraction = null,
     IgvRetention? Retention = null,
-    string? UsageCountryCode = null)
+    string? UsageCountryCode = null,
+    IReadOnlyList<string>? LegendCodes = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

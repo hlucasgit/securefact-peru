@@ -59,6 +59,7 @@ public sealed record UblLine(
 /// <param name="Detraction">Detraction of the invoice: the operation type is then 1001–1004 (by its code), the XML names the account and the amount and carries legend 2006.</param>
 /// <param name="Retention">IGV withholding of the invoice, stated as a global allowance of code 62; it does not change the payable amount.</param>
 /// <param name="UsageCountryCode">Country where the service of an export of services 0201 or 0208 is used, exploited or taken advantage of (ISO 3166-1 alpha-2, not PE); stated in the delivery location (rules 3098, 3099).</param>
+/// <param name="LegendCodes">Legends of the exonerated sales (catalogue 52: 2001, 2002, 2003, 2008), each stated as a <c>cbc:Note</c> with its catalogue text; the document then has exonerated operations.</param>
 /// <param name="InitialPayment">Part of a credit sale paid on the issue date (not stated in the XML: the net pending amount, the sum of the installments, already excludes it).</param>
 /// <param name="Adjustments">Global discounts and charges (catalogue 53 codes 02, 03, 49, 50) exactly as given to the TaxEngine; the generator states them and checks that they agree with <paramref name="Totals"/>.</param>
 public sealed record UblInvoiceData(
@@ -81,7 +82,8 @@ public sealed record UblInvoiceData(
     decimal InitialPayment = 0m,
     UblDetraction? Detraction = null,
     UblRetention? Retention = null,
-    string? UsageCountryCode = null);
+    string? UsageCountryCode = null,
+    IReadOnlyList<string>? LegendCodes = null);
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)

@@ -73,7 +73,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 new XAttribute("listName", "Tipo de Documento"),
                 new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01"),
                 data.DocumentTypeCode),
-            Legends(totals, data.Detraction is not null),
+            Legends(totals, data.Detraction is not null, data.LegendCodes),
             new XElement(Cbc + "DocumentCurrencyCode", currency),
             new XElement(Cbc + "LineCountNumeric", data.Lines.Count.ToString(CultureInfo.InvariantCulture)),
             SignatureInfo(data.Issuer),
@@ -280,6 +280,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return badDetails;
         }
 
+        if (CheckExemptionLegends(data) is { } badLegends)
+        {
+            return badLegends;
+        }
+
         switch (data.OperationTypeCode)
         {
             case SaleOperation:
@@ -300,6 +305,29 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             default:
                 return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101, 0200, 0201, 0203, 0204, 0206, 0207, 0208 o 1001 a 1004).");
         }
+    }
+
+    /// <summary>
+    /// The legends 2001, 2002, 2003 and 2008 are catalogue codes, appear once, and need exonerated operations in the document (rules 3283–3285 and 3289; observations 4022–4024 and 4244 in
+    /// receipts); an export has none (rule 3107).
+    /// </summary>
+    private static Error? CheckExemptionLegends(UblInvoiceData data)
+    {
+        if (data.LegendCodes is not { Count: > 0 } codes)
+        {
+            return null;
+        }
+
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", detail);
+
+        if (codes.Any(c => c is null || !SecureFact.Billing.Contracts.ExemptionLegends.Texts.ContainsKey(c)) || codes.Distinct(StringComparer.Ordinal).Count() != codes.Count)
+        {
+            return Invalid("Las leyendas admitidas son 2001, 2002, 2003 y 2008, sin repetir.");
+        }
+
+        return data.Totals.TotalExempt > 0 && !IsExportOperation(data.OperationTypeCode)
+            ? null
+            : Invalid("Las leyendas 2001, 2002, 2003 y 2008 requieren operaciones exoneradas del IGV y no van en una exportación.");
     }
 
     /// <summary>The country of use of an export of services 0201 or 0208 is a country other than Peru (rules 3098, 3099, 4041); the other types state none.</summary>
@@ -921,9 +949,16 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     }
 
     /// <summary>Legend 2007 "Operación sujeta a IVAP" when a line is taxed with the IVAP (observation 4264 otherwise).</summary>
-    private static List<XElement> Legends(TaxCalculationResult totals, bool detraction = false)
+    private static List<XElement> Legends(TaxCalculationResult totals, bool detraction = false, IReadOnlyList<string>? exemptionLegends = null)
     {
         var legends = new List<XElement>();
+
+        // Legends of the exonerated sales (2001–2003, 2008): the catalogue text under its code; the document carries exonerated operations (rules 3283–3285, 3289).
+        foreach (var code in exemptionLegends ?? [])
+        {
+            legends.Add(new XElement(Cbc + "Note", new XAttribute("languageLocaleID", code), SecureFact.Billing.Contracts.ExemptionLegends.Texts[code]));
+        }
+
         if (totals.Lines.Any(l => l.TaxCode == TaxCodes.Ivap && l.LineExtensionAmount > 0))
         {
             legends.Add(new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "2007"), "Operación sujeta a IVAP"));

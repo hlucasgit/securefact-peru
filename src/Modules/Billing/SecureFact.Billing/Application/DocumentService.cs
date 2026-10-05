@@ -119,6 +119,11 @@ internal sealed partial class DocumentService(
             return unidentified;
         }
 
+        if (request.LegendCodes is { Count: > 0 } && calculated.Value.TotalExempt <= 0)
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Leyenda sin operaciones exoneradas", "Las leyendas 2001, 2002, 2003 y 2008 requieren operaciones exoneradas del IGV en el documento (reglas 3283–3285 y 3289).");
+        }
+
         // A detraction without its own account uses the one registered in the company; the issued document keeps the account that was used.
         var effective = request;
         if (request.Detraction is { } named && string.IsNullOrWhiteSpace(named.AccountNumber))
@@ -643,6 +648,11 @@ internal sealed partial class DocumentService(
             return detailsError;
         }
 
+        if (ValidateLegendCodes(request) is { } legendError)
+        {
+            return legendError;
+        }
+
         var operationType = request.OperationTypeCode?.Trim();
         // A receipt of any export type never goes to a buyer with RUC (Boleta2_0, rule 2800); an invoice depends on the type.
         var foreignBuyer = OperationTypes.RequiresForeignBuyer(operationType) || (series.DocumentTypeCode == DocumentTypes.Receipt && OperationTypes.IsExport(operationType));
@@ -715,7 +725,8 @@ internal sealed partial class DocumentService(
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
             stored?.Detraction is { } storedDetraction ? OperationTypes.ForDetraction(storedDetraction.GoodsOrServiceCode) : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
-            stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null, stored?.UsageCountryCode);
+            stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null, stored?.UsageCountryCode,
+            stored?.LegendCodes is { Count: > 0 } legends ? legends.Where(c => c is not null).Select(c => c!.Trim()).ToList() : null);
     }
 
     /// <summary>Affectation code of the IVAP (catalogue 07).</summary>
@@ -1002,6 +1013,35 @@ internal sealed partial class DocumentService(
     }
 
     /// <summary>
+    /// The legends of the exonerated sales (<see cref="ExemptionLegends"/>): codes of the catalogue, none repeated, not in an export (whose exonerated total the sheet forbids, rule 3107). That the
+    /// document has exonerated operations is checked once the totals are known.
+    /// </summary>
+    private static Error? ValidateLegendCodes(CreateDocumentRequest request)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Leyenda inválida", detail);
+
+        if (request.LegendCodes is not { Count: > 0 } codes)
+        {
+            return null;
+        }
+
+        var normalized = codes.Select(c => c?.Trim()).ToList();
+        if (normalized.Any(c => c is null || !ExemptionLegends.Texts.ContainsKey(c)))
+        {
+            return Invalid("Las leyendas admitidas son 2001, 2002, 2003 (Amazonía) y 2008 (zona comercial de Tacna).");
+        }
+
+        if (normalized.Distinct(StringComparer.Ordinal).Count() != normalized.Count)
+        {
+            return Invalid("Una leyenda no se repite.");
+        }
+
+        return OperationTypes.IsExport(request.OperationTypeCode?.Trim())
+            ? Invalid("Una exportación no lleva leyendas de venta exonerada: no puede tener operaciones exoneradas (regla 3107).")
+            : null;
+    }
+
+    /// <summary>
     /// Data of the line that two operation types demand (sheet Factura2_0): every line of a fishing sale (1002) states vessel, species, place and date of unloading and the quantity
     /// (rules 3063, 3130–3135, 3115, 4280, 4281); every line of a cargo transport (1004) states origin, destination, trip detail and the reference values (3116–3126, 4236, 4270). The
     /// other operation types carry neither. The operation type follows the code of the detraction.
@@ -1091,7 +1131,7 @@ internal sealed partial class DocumentService(
 
     private sealed record StoredRequest(
         List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment, Detraction? Detraction, RetentionRequest? Retention,
-        string? UsageCountryCode);
+        string? UsageCountryCode, List<string?>? LegendCodes);
 
     [GeneratedRegex("^[A-Z]{2}$")]
     private static partial Regex UsageCountryPattern();

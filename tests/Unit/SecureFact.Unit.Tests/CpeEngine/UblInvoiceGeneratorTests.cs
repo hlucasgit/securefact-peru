@@ -292,6 +292,52 @@ public class UblInvoiceGeneratorTests
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Data("03", ("10", 1m, 1000m)) with { Retention = new UblRetention(3m, 1180m, 35.4m) }).Error.Code); // receipts do not
     }
 
+    // ---------- legends of the exonerated sales ----------
+
+    [Theory]
+    [InlineData("01", "2001", "BIENES TRANSFERIDOS EN LA AMAZONÍA REGIÓN SELVA PARA SER CONSUMIDOS EN LA MISMA")]
+    [InlineData("03", "2002", "SERVICIOS PRESTADOS EN LA AMAZONÍA REGIÓN SELVA PARA SER CONSUMIDOS EN LA MISMA")]
+    [InlineData("01", "2003", "CONTRATOS DE CONSTRUCCIÓN EJECUTADOS EN LA AMAZONÍA REGIÓN SELVA")]
+    [InlineData("01", "2008", "VENTA EXONERADA DEL IGV-ISC-IPM. PROHIBIDA LA VENTA FUERA DE LA ZONA COMERCIAL DE TACNA")]
+    [InlineData("03", "2008", "VENTA EXONERADA DEL IGV-ISC-IPM. PROHIBIDA LA VENTA FUERA DE LA ZONA COMERCIAL DE TACNA")]
+    public void An_exonerated_sale_states_its_legend_with_the_catalogue_text(string type, string code, string text)
+    {
+        var result = _generator.GenerateInvoice(Data(type, ("20", 1m, 100m)) with { LegendCodes = [code] });
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var note = Assert.Single(xml.XPathSelectElements("/inv:Invoice/cbc:Note", Namespaces));
+        Assert.Equal(code, note.Attribute("languageLocaleID")!.Value);
+        Assert.Equal(text, note.Value);
+    }
+
+    [Fact]
+    public void Several_legends_of_the_exonerated_sales_go_together_with_a_mixed_document()
+    {
+        var result = _generator.GenerateInvoice(Data("01", ("20", 1m, 100m), ("10", 1m, 100m)) with { LegendCodes = ["2001", "2008"] });
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal(["2001", "2008"], xml.XPathSelectElements("/inv:Invoice/cbc:Note", Namespaces).Select(n => n.Attribute("languageLocaleID")!.Value));
+    }
+
+    [Fact]
+    public void The_legends_of_the_exonerated_sales_need_exonerated_operations_and_catalogue_codes()
+    {
+        var exempt = Data("01", ("20", 1m, 100m));
+
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Data("01", ("10", 1m, 100m)) with { LegendCodes = ["2008"] }).Error.Code); // rule 3289
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(Data("03", ("30", 1m, 100m)) with { LegendCodes = ["2001"] }).Error.Code); // 4022
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(exempt with { LegendCodes = ["2009"] }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(exempt with { LegendCodes = ["2007"] }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(exempt with { LegendCodes = ["2008", "2008"] }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(exempt with { LegendCodes = [""] }).Error.Code);
+        Assert.True(_generator.GenerateInvoice(exempt with { LegendCodes = [] }).IsSuccess);
+        Assert.Empty(Parse(_generator.GenerateInvoice(exempt).Value).XPathSelectElements("/inv:Invoice/cbc:Note", Namespaces));
+    }
+
     // ---------- detraction types 1002-1004 ----------
 
     private static readonly UblFishing Catch = new("CO-10955-PM", "LUANA II", "Anchoveta", "Planta pesquera, Puerto Mollendo", new DateOnly(2026, 9, 28), 185.85m);

@@ -109,7 +109,7 @@ internal sealed class ElectronicDocumentService(
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
                 d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, d.InitialPayment ?? 0m,
                 d.Detraction is { } detraction ? new UblDetraction(detraction.GoodsOrServiceCode, detraction.Percentage, detraction.Amount, detraction.AccountNumber ?? string.Empty) : null,
-                d.Retention is { } retention ? new UblRetention(retention.Percentage, retention.BaseAmount, retention.Amount) : null, d.UsageCountryCode));
+                d.Retention is { } retention ? new UblRetention(retention.Percentage, retention.BaseAmount, retention.Amount) : null, d.UsageCountryCode, d.LegendCodes));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -502,6 +502,14 @@ internal sealed class ElectronicDocumentService(
                 lines.Add(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
                     $"Ítem {line.LineNumber}, transporte de carga: origen {transport.OriginUbigeo} {transport.OriginAddress}; destino {transport.DestinationUbigeo} {transport.DestinationAddress}; viaje: {transport.TripDetail}; valor referencial del servicio S/ {transport.ServiceReferenceValue:0.00}, de la carga efectiva S/ {transport.EffectiveLoadReferenceValue:0.00}, de la carga útil nominal S/ {transport.NominalLoadReferenceValue:0.00}"));
+            }
+        }
+
+        foreach (var code in d.LegendCodes ?? [])
+        {
+            if (ExemptionLegends.Texts.TryGetValue(code, out var legend))
+            {
+                lines.Add(legend);
             }
         }
 
