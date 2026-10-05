@@ -52,7 +52,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 
 ## Exportación
 - Facturas de exportación de bienes (`operationTypeCode` `0200`: líneas con afectación 40, tributo 9995, adquirente del exterior sin RUC), PDF con fila «Op. exportación» y nota de crédito de motivo 11. Aceptadas en el beta (con RUC, rechazada con 2800 como dice la regla); ADR-028. Pruebas: 618 pasan (369 unitarias, 6 arquitectura, 6 integración, 235 seguridad/API).
-- Pendiente: servicios de exportación (0201–0208), boletas de exportación, leyenda 2008.
+- Exportación de servicios (0201, 0203, 0204, 0206, 0207 y 0208) en facturas, con país del uso en 0201 y 0208 y adquirente según el tipo (ADR-031); las seis aceptadas en el beta. Pruebas: 650 pasan (388 unitarias, 6 arquitectura, 6 integración, 250 seguridad/API).
+- Pendiente: boletas de exportación, exportación 0202 y 0205 (datos del huésped en cada línea), leyenda 2008 (zona comercial de Tacna).
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).

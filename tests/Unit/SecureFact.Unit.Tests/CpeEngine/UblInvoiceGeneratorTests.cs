@@ -477,7 +477,64 @@ public class UblInvoiceGeneratorTests
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData(affectation: "10")).Error.Code); // 0200 with taxed lines
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0101")).Error.Code); // export lines on a sale
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData(type: "03")).Error.Code); // no export receipts yet
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0201")).Error.Code); // services are not supported yet
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202")).Error.Code); // lodging and tourist packages need the data of the guest
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205")).Error.Code);
+    }
+
+    // ---------- export of services ----------
+
+    [Theory]
+    [InlineData("0203")]
+    [InlineData("0204")]
+    [InlineData("0206")]
+    [InlineData("0207")]
+    public void An_export_of_services_without_a_country_validates_against_the_schema_and_states_its_type(string operation)
+    {
+        var result = _generator.GenerateInvoice(ExportData(operation));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal(operation, xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        Assert.Equal("9995", xml.XPathSelectElement("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:Delivery", Namespaces));
+    }
+
+    [Theory]
+    [InlineData("0201")]
+    [InlineData("0208")]
+    public void A_service_used_abroad_states_the_country_in_the_delivery_location(string operation)
+    {
+        var result = _generator.GenerateInvoice(ExportData(operation) with { UsageCountryCode = "US" });
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var country = xml.XPathSelectElement("/inv:Invoice/cac:Delivery/cac:DeliveryLocation/cac:Address/cac:Country/cbc:IdentificationCode", Namespaces)!;
+        Assert.Equal("US", country.Value);
+        Assert.Equal("ISO 3166-1", country.Attribute("listID")!.Value);
+        Assert.Equal("Country", country.Attribute("listName")!.Value);
+        var order = xml.Root!.Elements().Select(e => e.Name.LocalName).ToList();
+        Assert.True(order.IndexOf("AccountingCustomerParty") < order.IndexOf("Delivery") && order.IndexOf("Delivery") < order.IndexOf("TaxTotal"));
+    }
+
+    [Fact]
+    public void The_country_of_use_follows_the_rules_of_its_operation_types()
+    {
+        var services = ExportData("0201");
+
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(services).Error.Code); // 3098: required
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0208")).Error.Code);
+        foreach (var country in new[] { "PE", "us", "USA", "U1", "" })
+        {
+            Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(services with { UsageCountryCode = country }).Error.Code); // 3099: not Peru, a code
+        }
+
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0203") with { UsageCountryCode = "US" }).Error.Code); // only 0201 and 0208
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData() with { UsageCountryCode = "US" }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0207", affectation: "10")).Error.Code); // 2642: lines are 40
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0203") with { Retention = new UblRetention(3m, 100m, 3m) }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0203", "03")).Error.Code); // no export receipts yet
     }
 
     // ---------- IVAP (rice) ----------

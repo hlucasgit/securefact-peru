@@ -60,7 +60,8 @@ internal static partial class BillingRules
 
     /// <summary>Buyer identification. Invoices require a RUC (S02); receipts accept the catalogue-06 identity types.</summary>
     /// <param name="export">An export invoice goes to a buyer abroad: the sheet forbids the RUC there (rule 2800) and takes the other identity types.</param>
-    public static Error? ValidateBuyer(string documentTypeCode, BuyerSnapshot? buyer, bool export = false)
+    /// <param name="mayBeForeign">Other export invoices (shipping lines, ZED power, cargo support, services partly abroad) accept a buyer with RUC and the foreign identity types alike.</param>
+    public static Error? ValidateBuyer(string documentTypeCode, BuyerSnapshot? buyer, bool export = false, bool mayBeForeign = false)
     {
         static Error Bad(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Adquirente inválido", detail);
 
@@ -76,7 +77,8 @@ internal static partial class BillingRules
                 return Bad("Una factura de exportación se emite a un adquirente del exterior: documento de identidad tipo 0, 4, 7 o A, no RUC (regla 2800).");
             }
         }
-        else if (documentTypeCode == DocumentTypes.Invoice && buyer.DocumentTypeCode?.Trim() != IdentityDocuments.Ruc)
+        else if (documentTypeCode == DocumentTypes.Invoice && buyer.DocumentTypeCode?.Trim() != IdentityDocuments.Ruc
+            && !(mayBeForeign && buyer.DocumentTypeCode?.Trim() is IdentityDocuments.NoDocument or IdentityDocuments.ForeignerCard or IdentityDocuments.Passport or IdentityDocuments.DiplomaticId))
         {
             return Bad("Las facturas solo se emiten a adquirentes con RUC.");
         }

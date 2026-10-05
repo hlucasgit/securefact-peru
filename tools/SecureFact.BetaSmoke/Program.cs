@@ -52,6 +52,8 @@ var detractionCode = fishingSale ? "004" : passengerSale ? "028" : cargoSale ? "
 var detractionPercentage = detractionOperation == "1001" ? 12m : 4m;
 // "export": an export of goods (operation type 0200): affectation 40, tax 9995, a buyer abroad without RUC.
 var exportSale = args.Contains("export", StringComparer.Ordinal);
+// SF_BETA_EXPORT_OPERATION: the export type (0200 goods by default; 0201, 0203, 0204, 0206, 0207 or 0208 for services); SF_BETA_USAGE_COUNTRY: the country of use of a 0201 or 0208.
+var exportOperation = Environment.GetEnvironmentVariable("SF_BETA_EXPORT_OPERATION") ?? "0200";
 TaxableLine[] taxLines = exportSale
     ? [new TaxableLine(1, 100m, "40")]
     : ivapSale
@@ -78,7 +80,7 @@ var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
 // SF_BETA_INITIAL: part of the credit sale paid on the issue date; the installments add up to what is left.
 var initialPayment = credit && decimal.TryParse(Environment.GetEnvironmentVariable("SF_BETA_INITIAL"), NumberStyles.Number, CultureInfo.InvariantCulture, out var initial) ? initial : 0m;
 var data = new UblInvoiceData(
-    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? "0200" : detractionSale ? detractionOperation : "0101",
+    receipt ? "03" : "01", receipt ? "B001" : "F001", number, DateOnly.FromDateTime(lima.DateTime), TimeOnly.FromDateTime(lima.DateTime), "PEN", exportSale ? exportOperation : detractionSale ? detractionOperation : "0101",
     new UblParty("6", ruc, "EMPRESA DE PRUEBA SAC", "Prueba"),
     exportSale ? new UblParty(Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_TYPE") ?? "0", Environment.GetEnvironmentVariable("SF_BETA_EXPORT_BUYER_NUMBER") ?? "-", "CLIENTE DEL EXTERIOR")
     : receipt ? new UblParty("1", "12345678", "CLIENTE DE PRUEBA") : new UblParty("6", "20100066603", "CLIENTE DE PRUEBA SAC"),
@@ -87,7 +89,8 @@ var data = new UblInvoiceData(
     credit ? [new UblInstallment(50m, DateOnly.FromDateTime(lima.DateTime).AddDays(30)), new UblInstallment(totals.PayableAmount - initialPayment - 50m - (detractionSale ? Math.Round(totals.PayableAmount * detractionPercentage / 100m, 0, MidpointRounding.AwayFromZero) : 0m) - (retentionSale ? Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero) : 0m), DateOnly.FromDateTime(lima.DateTime).AddDays(60))] : null,
     0.04m, initialPayment,
     detractionSale ? new UblDetraction(detractionCode, detractionPercentage, Math.Round(totals.PayableAmount * detractionPercentage / 100m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000") : null,
-    retentionSale ? new UblRetention(3m, totals.PayableAmount, Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero)) : null);
+    retentionSale ? new UblRetention(3m, totals.PayableAmount, Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero)) : null,
+    exportSale ? Environment.GetEnvironmentVariable("SF_BETA_USAGE_COUNTRY") : null);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {

@@ -185,7 +185,9 @@ public sealed class ExportApiTests(ApiFixture api)
             ("export lines in a sale", InvoiceAsync(setup, setup.Invoice, ruc, Lines("40"), null)),
             ("export lines with the sale type", InvoiceAsync(setup, setup.Invoice, ruc, Lines("40"), "0101")),
             ("an export receipt", InvoiceAsync(setup, setup.Receipt, ForeignBuyer, Lines("40"), "0200")),
-            ("a services export", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0201")),
+            ("a services export without its country", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0201")),
+            ("lodging and tourist package exports", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0202")),
+            ("a tourist package export", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0205")),
             ("a foreign buyer in a sale", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("10"), null)),
         };
         foreach (var (name, pending) in cases)
@@ -197,6 +199,89 @@ public sealed class ExportApiTests(ApiFixture api)
 
         var first = await ExportAsync(setup);
         Assert.Equal(1, first.Number); // nothing refused took a number
+    }
+
+    private static Task<HttpResponseMessage> ServicesAsync(Setup setup, string operation, object buyer, string? country = null, string? series = null, object? detraction = null) =>
+        PostAsync(setup.Owner, "/api/v1/documents", new
+        {
+            seriesId = (series == "03" ? setup.Receipt : setup.Invoice).Id,
+            issueDate = Iso(TodayInLima()),
+            currency = "USD",
+            buyer,
+            lines = Lines("40"),
+            operationTypeCode = operation,
+            usageCountryCode = country,
+            detraction,
+        });
+
+    [Fact]
+    public async Task An_export_of_services_is_issued_with_its_country_signed_accepted_and_printed()
+    {
+        var setup = await NewTenantAsync("Export Services SAC");
+
+        var response = await ServicesAsync(setup, "0201", ForeignBuyer, "US");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{invoice.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal("0201", read.OperationTypeCode);
+        Assert.Equal("US", read.UsageCountryCode);
+        Assert.Equal(100m, read.Totals.TotalExport);
+
+        var electronic = await AcceptAsync(setup, invoice);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var root = XDocument.Parse(xml).Root!;
+        Assert.Equal("0201", root.Element(Cbc + "InvoiceTypeCode")!.Attribute("listID")!.Value);
+        Assert.Equal("US", root.Element(Cac + "Delivery")!.Element(Cac + "DeliveryLocation")!.Element(Cac + "Address")!.Element(Cac + "Country")!.Element(Cbc + "IdentificationCode")!.Value);
+        Assert.Contains("Op. exportaci", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_buyer_of_an_export_of_services_depends_on_its_type()
+    {
+        var setup = await NewTenantAsync("Export Services Buyers SAC");
+        object ruc = new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" };
+
+        // 0200, 0201 and 0204 go abroad (rule 2800: no RUC); the others also take a buyer with RUC (verified in the beta).
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ServicesAsync(setup, "0201", ruc, "US")).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ServicesAsync(setup, "0204", ruc)).StatusCode);
+        foreach (var operation in new[] { "0203", "0206", "0207" })
+        {
+            Assert.Equal(HttpStatusCode.Created, (await ServicesAsync(setup, operation, ruc)).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await ServicesAsync(setup, operation, ForeignBuyer)).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.Created, (await ServicesAsync(setup, "0204", ForeignBuyer)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await ServicesAsync(setup, "0208", ruc, "CL")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_country_of_use_is_required_by_0201_and_0208_and_refused_elsewhere()
+    {
+        var setup = await NewTenantAsync("Export Services Country SAC");
+
+        var cases = new (string Name, Task<HttpResponseMessage> Response)[]
+        {
+            ("0201 without a country", ServicesAsync(setup, "0201", ForeignBuyer)),
+            ("0208 without a country", ServicesAsync(setup, "0208", ForeignBuyer)),
+            ("Peru as the country", ServicesAsync(setup, "0201", ForeignBuyer, "PE")),
+            ("a lowercase country", ServicesAsync(setup, "0208", ForeignBuyer, "us")),
+            ("a three-letter country", ServicesAsync(setup, "0208", ForeignBuyer, "USA")),
+            ("a country in 0203", ServicesAsync(setup, "0203", ForeignBuyer, "US")),
+            ("a country in an export of goods", ServicesAsync(setup, "0200", ForeignBuyer, "US")),
+            ("a country in a sale", ServicesAsync(setup, "0101", ForeignBuyer, "US")),
+            ("a services export on a receipt", ServicesAsync(setup, "0203", ForeignBuyer, series: "03")),
+            ("a detraction on a services export", ServicesAsync(setup, "0203", ForeignBuyer, detraction: new { goodsOrServiceCode = "037", percentage = 12m, amount = 12m, accountNumber = "00012345678" })),
+        };
+        foreach (var (name, pending) in cases)
+        {
+            var response = await pending;
+            Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
+            Assert.Equal("SF-BIL-006", ProblemCode(await response.Content.ReadAsStringAsync()));
+        }
+
+        Assert.Equal(1, (await (await ServicesAsync(setup, "0201", ForeignBuyer, "US")).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!.Number); // nothing refused took a number
     }
 
     [Fact]

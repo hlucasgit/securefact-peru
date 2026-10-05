@@ -608,7 +608,8 @@ internal sealed partial class DocumentService(
             return detailsError;
         }
 
-        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate, request.OperationTypeCode == OperationTypes.Export) is { } buyerError)
+        var operationType = request.OperationTypeCode?.Trim();
+        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate, OperationTypes.RequiresForeignBuyer(operationType), OperationTypes.IsExport(operationType)) is { } buyerError)
         {
             return buyerError;
         }
@@ -677,7 +678,7 @@ internal sealed partial class DocumentService(
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
             stored?.Detraction is { } storedDetraction ? OperationTypes.ForDetraction(storedDetraction.GoodsOrServiceCode) : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
-            stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null);
+            stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null, stored?.UsageCountryCode);
     }
 
     /// <summary>Affectation code of the IVAP (catalogue 07).</summary>
@@ -855,7 +856,7 @@ internal sealed partial class DocumentService(
             return Invalid("La detracción y la retención del IGV son de las facturas.");
         }
 
-        if (request.OperationTypeCode?.Trim() == OperationTypes.Export)
+        if (OperationTypes.IsExport(request.OperationTypeCode?.Trim()))
         {
             return Invalid("Una exportación no está sujeta a detracción ni a retención.");
         }
@@ -922,9 +923,22 @@ internal sealed partial class DocumentService(
         static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Tipo de operación inválido", detail);
 
         var operation = request.OperationTypeCode?.Trim();
-        if (operation is not (null or OperationTypes.Sale or OperationTypes.Export) && !OperationTypes.IsDetraction(operation))
+        if (operation is not (null or OperationTypes.Sale) && !OperationTypes.IsExport(operation) && !OperationTypes.IsDetraction(operation))
         {
-            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200 (exportación de bienes) o 1001 a 1004 (sujetas a detracción).");
+            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200, 0201, 0203, 0204, 0206, 0207 y 0208 (exportación) o 1001 a 1004 (sujetas a detracción).");
+        }
+
+        var usageCountry = request.UsageCountryCode;
+        if (OperationTypes.RequiresUsageCountry(operation))
+        {
+            if (usageCountry is null || !UsageCountryPattern().IsMatch(usageCountry) || usageCountry == "PE")
+            {
+                return Invalid($"El tipo de operación {operation} requiere el país del uso, explotación o aprovechamiento del servicio: código ISO 3166-1 de dos letras mayúsculas, distinto de PE (reglas 3098, 3099).");
+            }
+        }
+        else if (usageCountry is not null)
+        {
+            return Invalid("El país del uso, explotación o aprovechamiento del servicio es solo de los tipos de operación 0201 y 0208.");
         }
 
         var exportLines = request.Lines.Count(l => l?.Tax?.IgvAffectationCode == ExportAffectation);
@@ -942,7 +956,7 @@ internal sealed partial class DocumentService(
             }
         }
 
-        if (operation != OperationTypes.Export)
+        if (!OperationTypes.IsExport(operation))
         {
             return exportLines > 0 ? Invalid("Las líneas de exportación (afectación 40) requieren el tipo de operación 0200.") : null;
         }
@@ -1044,7 +1058,11 @@ internal sealed partial class DocumentService(
     private sealed record StoredLine(TaxableLine? Tax, FishingDetail? Fishing, CargoTransportDetail? Transport);
 
     private sealed record StoredRequest(
-        List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment, Detraction? Detraction, RetentionRequest? Retention);
+        List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment, Detraction? Detraction, RetentionRequest? Retention,
+        string? UsageCountryCode);
+
+    [GeneratedRegex("^[A-Z]{2}$")]
+    private static partial Regex UsageCountryPattern();
 
     private static StoredRequest? ReadStoredRequest(string json)
     {

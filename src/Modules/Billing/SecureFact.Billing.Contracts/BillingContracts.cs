@@ -21,6 +21,37 @@ public static class OperationTypes
     /// <summary>0200 – export of goods (the sale is not taxed: lines with affectation 40, tax 9995).</summary>
     public const string Export = "0200";
 
+    /// <summary>0201 – export of services, rendered entirely in the country. Names the country where the service is used (<see cref="CreateDocumentRequest.UsageCountryCode"/>).</summary>
+    public const string ExportServicesInCountry = "0201";
+
+    /// <summary>0203 – export of services, transport of shipping lines.</summary>
+    public const string ExportShippingLines = "0203";
+
+    /// <summary>0204 – export of services, services to foreign-flag ships and aircraft.</summary>
+    public const string ExportForeignCraftServices = "0204";
+
+    /// <summary>0206 – export of services, services complementary to cargo transport.</summary>
+    public const string ExportCargoSupport = "0206";
+
+    /// <summary>0207 – export of services, supply of electric power to subjects domiciled in an economic special zone (ZED).</summary>
+    public const string ExportZedElectricity = "0207";
+
+    /// <summary>0208 – export of services, rendered partly abroad. Names the country where the service is used.</summary>
+    public const string ExportServicesPartlyAbroad = "0208";
+
+    /// <summary>
+    /// The export types the platform issues: goods (0200) and the services above. The lodging (0202) and tourist package (0205) exports are not supported: they need
+    /// the data of the non-domiciled guest in every line.
+    /// </summary>
+    public static bool IsExport(string? operationTypeCode) =>
+        operationTypeCode is Export or ExportServicesInCountry or ExportShippingLines or ExportForeignCraftServices or ExportCargoSupport or ExportZedElectricity or ExportServicesPartlyAbroad;
+
+    /// <summary>The types whose buyer lives abroad: the sheet forbids the RUC there (rule 2800) unless the legend 2008 (Tacna commercial zone) is stated.</summary>
+    public static bool RequiresForeignBuyer(string? operationTypeCode) => operationTypeCode is Export or ExportServicesInCountry or ExportForeignCraftServices;
+
+    /// <summary>The types that name the country where the service is used, exploited or taken advantage of (rules 3098, 3099).</summary>
+    public static bool RequiresUsageCountry(string? operationTypeCode) => operationTypeCode is ExportServicesInCountry or ExportServicesPartlyAbroad;
+
     /// <summary>1001 – operation subject to detraction. Implied by a <see cref="Detraction"/> and never given by the client without one.</summary>
     public const string SaleWithDetraction = "1001";
 
@@ -130,7 +161,8 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// The buyer is given either inline (<paramref name="Buyer"/>) or by reference (<paramref name="CustomerId"/>), never both; a referenced
 /// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
-/// <c>0101</c> by default, or <c>0200</c> for the export of goods (invoices only, every line with affectation 40, and a buyer without RUC).
+/// <c>0101</c> by default, <c>0200</c> for the export of goods or <c>0201</c>, <c>0203</c>, <c>0204</c>, <c>0206</c>, <c>0207</c> and <c>0208</c> for the export of services (invoices only, every line with
+/// affectation 40; the buyer has no RUC in 0200, 0201 and 0204). <paramref name="UsageCountryCode"/> (ISO 3166-1 alpha-2, never <c>PE</c>) is required in 0201 and 0208 and refused elsewhere.
 /// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
 /// An invoice may carry a <paramref name="Detraction"/> or an IGV <paramref name="Retention"/>, never both; the net pending amount of a credit sale then
 /// excludes them too. The operation type of a detraction follows its catalogue 54 code (see <see cref="OperationTypes.ForDetraction"/>): 1002 (fishing) requires
@@ -148,7 +180,8 @@ public sealed record CreateDocumentRequest(
     string? OperationTypeCode = null,
     decimal? InitialPayment = null,
     Detraction? Detraction = null,
-    RetentionRequest? Retention = null);
+    RetentionRequest? Retention = null,
+    string? UsageCountryCode = null);
 
 /// <summary>
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
@@ -218,7 +251,8 @@ public sealed record DocumentDto(
     string OperationTypeCode = OperationTypes.Sale,
     decimal? InitialPayment = null,
     Detraction? Detraction = null,
-    IgvRetention? Retention = null)
+    IgvRetention? Retention = null,
+    string? UsageCountryCode = null)
 {
     public string FullNumber => $"{Series}-{Number}";
 }

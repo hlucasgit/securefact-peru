@@ -80,6 +80,12 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             Supplier(data.Issuer),
             Customer(data.Buyer));
 
+        // UBL order: the delivery follows the customer and precedes the payment means.
+        if (UsesCountry(data.OperationTypeCode) && data.UsageCountryCode is { } usageCountry)
+        {
+            root.Add(UsageCountry(usageCountry));
+        }
+
         // Invoices must state their payment form (error 3244 since 2022-01-01, found against the SUNAT beta service). Receipts do not carry it.
         if (data.DocumentTypeCode == "01")
         {
@@ -133,6 +139,15 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     private const string SaleOperation = "0101";
 
     private const string ExportOperation = "0200";
+
+    private const string ExportServicesInCountryOperation = "0201";
+
+    private const string ExportServicesPartlyAbroadOperation = "0208";
+
+    /// <summary>Export types supported: goods (0200) and the services 0201, 0203, 0204, 0206, 0207 and 0208 (the lodging 0202 and the tourist package 0205 need the data of the guest in every line).</summary>
+    private static bool IsExportOperation(string? operation) => operation is ExportOperation or "0201" or "0203" or "0204" or "0206" or "0207" or "0208";
+
+    private static bool UsesCountry(string? operation) => operation is ExportServicesInCountryOperation or ExportServicesPartlyAbroadOperation;
 
     private const string SaleWithDetractionOperation = "1001";
 
@@ -188,7 +203,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         if (data.Retention is { } retention)
         {
-            if (detraction is not null || data.OperationTypeCode == ExportOperation || data.DocumentTypeCode != "01")
+            if (detraction is not null || IsExportOperation(data.OperationTypeCode) || data.DocumentTypeCode != "01")
             {
                 return Invalid("La retención del IGV es de una factura de venta interna y no se combina con la detracción.");
             }
@@ -273,7 +288,12 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 return exportLines == 0 && data.DocumentTypeCode == "01"
                     ? null
                     : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", $"La operación sujeta a detracción ({data.OperationTypeCode}) es una factura de venta, no una exportación.");
-            case ExportOperation:
+            case ExportOperation or "0201" or "0203" or "0204" or "0206" or "0207" or "0208":
+                if (CheckUsageCountry(data) is { } badCountry)
+                {
+                    return badCountry;
+                }
+
                 if (data.DocumentTypeCode != "01")
                 {
                     return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", "La exportación solo se emite con facturas.");
@@ -283,9 +303,39 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                     ? null
                     : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Una exportación lleva solo líneas de exportación (afectación 40).");
             default:
-                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101, 0200 o 1001 a 1004).");
+                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101, 0200, 0201, 0203, 0204, 0206, 0207, 0208 o 1001 a 1004).");
         }
     }
+
+    /// <summary>The country of use of an export of services 0201 or 0208 is a country other than Peru (rules 3098, 3099, 4041); the other types state none.</summary>
+    private static Error? CheckUsageCountry(UblInvoiceData data)
+    {
+        var country = data.UsageCountryCode;
+        var valid = country is { Length: 2 } && country.All(char.IsAsciiLetterUpper) && country != "PE";
+        if (UsesCountry(data.OperationTypeCode))
+        {
+            return valid ? null : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", $"El tipo de operación {data.OperationTypeCode} requiere el país del uso del servicio (ISO 3166-1, distinto de PE).");
+        }
+
+        return country is null ? null : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "El país del uso del servicio es solo de los tipos de operación 0201 y 0208.");
+    }
+
+    /// <summary>Location of the use of the service: the invoice-level delivery with only the country (sheet Factura2_0, rows "País del uso, explotación o aprovechamiento del servicio").</summary>
+    private static XElement UsageCountry(string country) =>
+        new(
+            Cac + "Delivery",
+            new XElement(
+                Cac + "DeliveryLocation",
+                new XElement(
+                    Cac + "Address",
+                    new XElement(
+                        Cac + "Country",
+                        new XElement(
+                            Cbc + "IdentificationCode",
+                            new XAttribute("listID", "ISO 3166-1"),
+                            new XAttribute("listAgencyName", "United Nations Economic Commission for Europe"),
+                            new XAttribute("listName", "Country"),
+                            country)))));
 
     /// <summary>
     /// Data of the line that two operation types demand (sheet Factura2_0): every line of a fishing sale (1002) states vessel, species, place and date of unloading and quantity
