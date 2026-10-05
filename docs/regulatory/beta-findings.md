@@ -27,7 +27,7 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Exportación** (R-052): factura de exportación de bienes (0200, línea de afectación 40, tributo 9995, adquirente tipo 0) y nota de crédito de motivo 11 sobre ella: aceptadas con código 0, sin observaciones. Con un adquirente RUC el beta rechaza con **2800** (`cbc:ID/schemeID` valor 6), como dice la regla.
 
-- **Exportación de servicios** (R-055): una factura de cada tipo 0201, 0203, 0204, 0206, 0207 y 0208 (línea de afectación 40, en dólares; país `US` en 0201 y 0208; adquirente tipo 0 en 0203 y 0204 y RUC en 0206 y 0207): las seis aceptadas, código 0, sin observaciones. **El beta no exigió el padrón de exportadores (regla 3097)** al emisor de 0201.
+- **Exportación de servicios** (R-055): una factura de cada tipo 0201, 0203, 0204, 0206, 0207 y 0208 (línea de afectación 40, en dólares; país `US` en 0201 y 0208; adquirente tipo 0 en 0203 y 0204 y RUC en 0206 y 0207): las seis aceptadas, código 0, sin observaciones. **El beta no exigió el padrón de exportadores (regla 3097)** al emisor de 0201. **Boletas de exportación**: 0200 y 0208 (país `US`, adquirente tipo 0) por `sendBill` y un resumen diario con una boleta de exportación en dólares (código 04, IGV 0.00): aceptados, código 0. Una boleta 0207 con adquirente RUC fue rechazada con **2800** (la hoja `Boleta2_0` lo prohíbe en todo tipo de exportación).
 
 - **Entrega inicial** (R-048): factura de 118.00 al crédito con 18.00 pagados al emitir y dos cuotas de 50.00 (monto neto pendiente 100.00, menor que el importe total): aceptada, código 0, sin observaciones.
 

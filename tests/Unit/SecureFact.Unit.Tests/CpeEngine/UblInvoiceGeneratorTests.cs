@@ -476,7 +476,6 @@ public class UblInvoiceGeneratorTests
     {
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData(affectation: "10")).Error.Code); // 0200 with taxed lines
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0101")).Error.Code); // export lines on a sale
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData(type: "03")).Error.Code); // no export receipts yet
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202")).Error.Code); // lodging and tourist packages need the data of the guest
         Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205")).Error.Code);
     }
@@ -534,7 +533,36 @@ public class UblInvoiceGeneratorTests
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData() with { UsageCountryCode = "US" }).Error.Code);
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0207", affectation: "10")).Error.Code); // 2642: lines are 40
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0203") with { Retention = new UblRetention(3m, 100m, 3m) }).Error.Code);
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0203", "03")).Error.Code); // no export receipts yet
+    }
+
+    [Theory]
+    [InlineData("0200", null)]
+    [InlineData("0201", "US")]
+    [InlineData("0203", null)]
+    [InlineData("0204", null)]
+    [InlineData("0206", null)]
+    [InlineData("0207", null)]
+    [InlineData("0208", "CL")]
+    public void An_export_receipt_validates_against_the_schema_and_states_its_type(string operation, string? country)
+    {
+        var result = _generator.GenerateInvoice(ExportData(operation, "03") with { UsageCountryCode = country });
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("03", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Value);
+        Assert.Equal(operation, xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        Assert.Equal("9995", xml.XPathSelectElement("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Empty(xml.XPathSelectElements("/inv:Invoice/cac:PaymentTerms", Namespaces)); // a receipt states no payment form
+    }
+
+    [Fact]
+    public void An_export_receipt_follows_the_rules_of_its_type()
+    {
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0201", "03")).Error.Code); // 3098: the country
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0200", "03", "10")).Error.Code); // 2642
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202", "03")).Error.Code); // catalogue 51: invoices only
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205", "03")).Error.Code);
     }
 
     // ---------- IVAP (rice) ----------

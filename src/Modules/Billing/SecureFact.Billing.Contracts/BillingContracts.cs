@@ -40,8 +40,8 @@ public static class OperationTypes
     public const string ExportServicesPartlyAbroad = "0208";
 
     /// <summary>
-    /// The export types the platform issues: goods (0200) and the services above. The lodging (0202) and tourist package (0205) exports are not supported: they need
-    /// the data of the non-domiciled guest in every line.
+    /// The export types the platform issues, in invoices and receipts: goods (0200) and the services above. The lodging (0202) and tourist package (0205) exports are not supported:
+    /// they need the data of the non-domiciled guest in every line (and are invoice-only in catalogue 51).
     /// </summary>
     public static bool IsExport(string? operationTypeCode) =>
         operationTypeCode is Export or ExportServicesInCountry or ExportShippingLines or ExportForeignCraftServices or ExportCargoSupport or ExportZedElectricity or ExportServicesPartlyAbroad;
@@ -161,8 +161,8 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// The buyer is given either inline (<paramref name="Buyer"/>) or by reference (<paramref name="CustomerId"/>), never both; a referenced
 /// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
-/// <c>0101</c> by default, <c>0200</c> for the export of goods or <c>0201</c>, <c>0203</c>, <c>0204</c>, <c>0206</c>, <c>0207</c> and <c>0208</c> for the export of services (invoices only, every line with
-/// affectation 40; the buyer has no RUC in 0200, 0201 and 0204). <paramref name="UsageCountryCode"/> (ISO 3166-1 alpha-2, never <c>PE</c>) is required in 0201 and 0208 and refused elsewhere.
+/// <c>0101</c> by default, <c>0200</c> for the export of goods or <c>0201</c>, <c>0203</c>, <c>0204</c>, <c>0206</c>, <c>0207</c> and <c>0208</c> for the export of services (every line with
+/// affectation 40; the buyer of an invoice has no RUC in 0200, 0201 and 0204, and the buyer of a receipt never has one). <paramref name="UsageCountryCode"/> (ISO 3166-1 alpha-2, never <c>PE</c>) is required in 0201 and 0208 and refused elsewhere.
 /// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
 /// An invoice may carry a <paramref name="Detraction"/> or an IGV <paramref name="Retention"/>, never both; the net pending amount of a credit sale then
 /// excludes them too. The operation type of a detraction follows its catalogue 54 code (see <see cref="OperationTypes.ForDetraction"/>): 1002 (fishing) requires

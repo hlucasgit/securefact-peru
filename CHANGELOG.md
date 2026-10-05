@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Boletas de exportación (0200, 0201, 0203, 0204, 0206, 0207 y 0208): el adquirente nunca lleva RUC y el resumen diario informa el valor de exportación bajo el código 04; aceptadas en el beta (ADR-031).
 - Exportación de servicios (tipos de operación 0201, 0203, 0204, 0206, 0207 y 0208) en facturas: país del uso del servicio en 0201 y 0208, adquirente con o sin RUC según el tipo; las seis aceptadas en el beta (ADR-031, R-055).
 - Tipos de operación de detracción 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte de pasajeros y de carga): el tipo sigue al código 004, 028 o 027, con los datos de pesca (3001–3006) o del viaje en cada línea, en el UBL y en el PDF; una factura de cada tipo aceptada en el beta (ADR-030, R-054).
 - Cuenta de detracciones en los datos de la empresa: una detracción sin cuenta propia usa la de la empresa y la factura emitida conserva la cuenta usada (ADR-029; migración `AddDetractionAccount`).

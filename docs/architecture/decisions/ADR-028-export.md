@@ -18,6 +18,6 @@ Hojas `Factura2_0` y `NotaCredito2_0` de las reglas de validación del 26.08.202
 Factura de exportación (0200, línea 40, adquirente tipo 0 sin documento) aceptada, código 0, sin observaciones; nota de crédito de motivo 11 sobre ella: aceptada, código 0, sin observaciones. Una factura de exportación con adquirente RUC: rechazada, **2800** (`cbc:ID/schemeID` valor 6).
 
 ## Límites
-- Servicios de exportación: ADR-031. Sin boletas de exportación, leyenda 2008, operaciones gratuitas de exportación ni descuentos de exportación probados en el beta.
+- Servicios y boletas de exportación: ADR-031. Sin leyenda 2008, operaciones gratuitas de exportación ni descuentos de exportación probados en el beta.
 - La letra «G» de la categoría la acepta el beta; la hoja no la fija (**P**).
 - El adquirente con tipo `-` (guion) que la regla 2800 menciona no se soporta; se usa el tipo 0.

@@ -184,7 +184,10 @@ public sealed class ExportApiTests(ApiFixture api)
             ("mixed lines", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, mixed, "0200")),
             ("export lines in a sale", InvoiceAsync(setup, setup.Invoice, ruc, Lines("40"), null)),
             ("export lines with the sale type", InvoiceAsync(setup, setup.Invoice, ruc, Lines("40"), "0101")),
-            ("an export receipt", InvoiceAsync(setup, setup.Receipt, ForeignBuyer, Lines("40"), "0200")),
+            ("an export receipt to a RUC buyer", InvoiceAsync(setup, setup.Receipt, ruc, Lines("40"), "0200")),
+            ("an export receipt to a DNI buyer", InvoiceAsync(setup, setup.Receipt, new { documentTypeCode = "1", documentNumber = "12345678", name = "Persona Natural" }, Lines("40"), "0200")),
+            ("taxed lines in an export receipt", InvoiceAsync(setup, setup.Receipt, ForeignBuyer, Lines("10"), "0200")),
+            ("a lodging export receipt", InvoiceAsync(setup, setup.Receipt, ForeignBuyer, Lines("40"), "0202")),
             ("a services export without its country", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0201")),
             ("lodging and tourist package exports", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0202")),
             ("a tourist package export", InvoiceAsync(setup, setup.Invoice, ForeignBuyer, Lines("40"), "0205")),
@@ -271,7 +274,8 @@ public sealed class ExportApiTests(ApiFixture api)
             ("a country in 0203", ServicesAsync(setup, "0203", ForeignBuyer, "US")),
             ("a country in an export of goods", ServicesAsync(setup, "0200", ForeignBuyer, "US")),
             ("a country in a sale", ServicesAsync(setup, "0101", ForeignBuyer, "US")),
-            ("a services export on a receipt", ServicesAsync(setup, "0203", ForeignBuyer, series: "03")),
+            ("a services export on a receipt to a RUC buyer", ServicesAsync(setup, "0207", new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" }, series: "03")),
+            ("a services export on a receipt without its country", ServicesAsync(setup, "0201", ForeignBuyer, series: "03")),
             ("a detraction on a services export", ServicesAsync(setup, "0203", ForeignBuyer, detraction: new { goodsOrServiceCode = "037", percentage = 12m, amount = 12m, accountNumber = "00012345678" })),
         };
         foreach (var (name, pending) in cases)
@@ -282,6 +286,44 @@ public sealed class ExportApiTests(ApiFixture api)
         }
 
         Assert.Equal(1, (await (await ServicesAsync(setup, "0201", ForeignBuyer, "US")).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!.Number); // nothing refused took a number
+    }
+
+    [Fact]
+    public async Task An_export_receipt_is_issued_to_a_buyer_abroad_stated_accepted_printed_and_summarised()
+    {
+        var setup = await NewTenantAsync("Export Receipt SAC");
+
+        var response = await ServicesAsync(setup, "0208", ForeignBuyer, "US", series: "03");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var receipt = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{receipt.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal("03", read.DocumentTypeCode);
+        Assert.Equal("0208", read.OperationTypeCode);
+        Assert.Equal(100m, read.Totals.TotalExport);
+        Assert.Equal(100m, read.Totals.PayableAmount);
+        var goods = await PostAsync(setup.Owner, "/api/v1/documents", new { seriesId = setup.Receipt.Id, issueDate = Iso(TodayInLima()), currency = "USD", buyer = ForeignBuyer, lines = Lines("40"), operationTypeCode = "0200" });
+        Assert.Equal(HttpStatusCode.Created, goods.StatusCode);
+
+        var electronic = (await (await setup.Owner.PostAsync($"/api/v1/documents/{receipt.Id}/electronic", null)).Content.ReadFromJsonAsync<ElectronicDocumentDto>(ApiFixture.JsonOptions))!;
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var root = XDocument.Parse(xml).Root!;
+        Assert.Equal("03", root.Element(Cbc + "InvoiceTypeCode")!.Value);
+        Assert.Equal("0208", root.Element(Cbc + "InvoiceTypeCode")!.Attribute("listID")!.Value);
+        Assert.Equal("US", root.Element(Cac + "Delivery")!.Element(Cac + "DeliveryLocation")!.Element(Cac + "Address")!.Element(Cac + "Country")!.Element(Cbc + "IdentificationCode")!.Value);
+        Assert.Contains("Op. exportaci", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+
+        // Receipts reach SUNAT in the daily summary, with the export value under code 04.
+        var created = await setup.Owner.PostAsJsonAsync("/api/v1/summaries", new { companyId = setup.Company.Id, referenceDate = Iso(TodayInLima()) });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var summary = Assert.Single((await created.Content.ReadFromJsonAsync<List<SummaryDto>>(ApiFixture.JsonOptions))!);
+        var summaryXml = XDocument.Parse(await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{summary.Document.Id}/xml"));
+        XNamespace sac = "urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1";
+        var lines = summaryXml.Descendants(sac + "SummaryDocumentsLine").ToList();
+        Assert.Equal(2, lines.Count);
+        Assert.All(lines, l => Assert.Equal("04", Assert.Single(l.Elements(sac + "BillingPayment")).Element(Cbc + "InstructionID")!.Value));
+        Assert.All(lines, l => Assert.Equal("USD", l.Element(sac + "TotalAmount")!.Attribute("currencyID")!.Value));
     }
 
     [Fact]

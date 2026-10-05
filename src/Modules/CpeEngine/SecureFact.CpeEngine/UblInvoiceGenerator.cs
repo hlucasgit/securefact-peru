@@ -294,11 +294,6 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                     return badCountry;
                 }
 
-                if (data.DocumentTypeCode != "01")
-                {
-                    return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", "La exportación solo se emite con facturas.");
-                }
-
                 return exportLines == data.Totals.Lines.Count
                     ? null
                     : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Una exportación lleva solo líneas de exportación (afectación 40).");

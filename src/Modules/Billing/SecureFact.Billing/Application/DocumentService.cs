@@ -609,7 +609,9 @@ internal sealed partial class DocumentService(
         }
 
         var operationType = request.OperationTypeCode?.Trim();
-        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate, OperationTypes.RequiresForeignBuyer(operationType), OperationTypes.IsExport(operationType)) is { } buyerError)
+        // A receipt of any export type never goes to a buyer with RUC (Boleta2_0, rule 2800); an invoice depends on the type.
+        var foreignBuyer = OperationTypes.RequiresForeignBuyer(operationType) || (series.DocumentTypeCode == DocumentTypes.Receipt && OperationTypes.IsExport(operationType));
+        if (BillingRules.ValidateBuyer(series.DocumentTypeCode, buyerToValidate, foreignBuyer, OperationTypes.IsExport(operationType)) is { } buyerError)
         {
             return buyerError;
         }
@@ -915,7 +917,7 @@ internal sealed partial class DocumentService(
     private const string ExportAffectation = "40";
 
     /// <summary>
-    /// Operation type (catalogue 51; sheet Factura2_0, rules 2642, 2800): the sale (0101) or the export of goods (0200). An export is an invoice whose lines all have affectation 40;
+    /// Operation type (catalogue 51; sheets Factura2_0 and Boleta2_0, rules 2642, 2800): the sale (0101) or an export. An export is an invoice or a receipt whose lines all have affectation 40;
     /// those lines exist only in an export; its buyer is checked with the export rule.
     /// </summary>
     private static Error? ValidateOperationType(Series series, CreateDocumentRequest request)
@@ -959,11 +961,6 @@ internal sealed partial class DocumentService(
         if (!OperationTypes.IsExport(operation))
         {
             return exportLines > 0 ? Invalid("Las líneas de exportación (afectación 40) requieren el tipo de operación 0200.") : null;
-        }
-
-        if (series.DocumentTypeCode != DocumentTypes.Invoice)
-        {
-            return Invalid("La exportación se factura con una factura: las boletas de exportación aún no están soportadas.");
         }
 
         return exportLines == request.Lines.Count ? null : Invalid("Una exportación lleva solo líneas con afectación 40 (regla 2642).");

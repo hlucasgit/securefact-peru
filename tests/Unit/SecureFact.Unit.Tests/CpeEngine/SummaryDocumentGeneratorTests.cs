@@ -208,6 +208,27 @@ public class SummaryDocumentGeneratorTests
     }
 
     [Fact]
+    public void A_receipt_of_an_export_states_the_sale_value_with_code_04_and_no_igv()
+    {
+        var export = Taxed(1, "B001", 1) with { Currency = "USD", TotalAmount = 100m, TaxedAmount = 0m, IgvAmount = 0m, ExportAmount = 100m, BuyerDocumentTypeCode = null, BuyerDocumentNumber = null };
+
+        var result = _generator.Generate(Data(export, Taxed(2, "B001", 2)));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml));
+        var line = xml.XPathSelectElements("//sac:SummaryDocumentsLine", Namespaces).First();
+        var payment = Assert.Single(line.XPathSelectElements("sac:BillingPayment", Namespaces));
+        Assert.Equal("04", payment.XPathSelectElement("cbc:InstructionID", Namespaces)!.Value);
+        Assert.Equal("100.00", payment.XPathSelectElement("cbc:PaidAmount", Namespaces)!.Value);
+        Assert.Equal("USD", payment.XPathSelectElement("cbc:PaidAmount", Namespaces)!.Attribute("currencyID")!.Value);
+        Assert.Equal("0.00", line.XPathSelectElement("cac:TaxTotal/cbc:TaxAmount", Namespaces)!.Value);
+
+        Assert.False(_generator.Generate(Data(export with { TotalAmount = 118m })).IsSuccess); // the total includes the export value and nothing else
+        Assert.False(_generator.Generate(Data(export with { ExportAmount = -1m })).IsSuccess);
+    }
+
+    [Fact]
     public void A_line_with_status_3_voids_a_document_and_validates_against_the_schema()
     {
         var result = _generator.Generate(Data(Taxed(1, "B001", 1) with { Status = "3" }, NoteLine(2, "07", "BC01", 1) with { Status = "3" }));

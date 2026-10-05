@@ -7,7 +7,8 @@ namespace SecureFact.CpeEngine.Contracts;
 /// <see cref="BuyerDocumentTypeCode"/> and <see cref="BuyerDocumentNumber"/> are both null when the receipt has no buyer identification.
 /// <see cref="OtherCharges"/> and <see cref="OtherDiscounts"/> are the charges and discounts that do not affect the taxable base (catalogue 53 codes 48/50 and 01/03):
 /// the summary informs the charges in an <c>AllowanceCharge</c> node, and both enter the total. With <see cref="IsIvap"/> the tax of the line is the IVAP
-/// (tax 1016) rather than the IGV: <c>TaxedAmount</c>, <c>IgvAmount</c> and <c>IgvRate</c> then hold its base, its amount and its rate.
+/// (tax 1016) rather than the IGV: <c>TaxedAmount</c>, <c>IgvAmount</c> and <c>IgvRate</c> then hold its base, its amount and its rate. <see cref="ExportAmount"/> is the sale value
+/// of an export (catalogue 11 code 04); the IGV of such a receipt is zero.
 /// </summary>
 public sealed record SummaryLineData(
     int LineNumber,
@@ -29,7 +30,8 @@ public sealed record SummaryLineData(
     string Status = "1",
     decimal OtherCharges = 0m,
     decimal OtherDiscounts = 0m,
-    bool IsIvap = false);
+    bool IsIvap = false,
+    decimal ExportAmount = 0m);
 
 /// <param name="ReferenceDate">Issue date of every receipt in the summary (they must all share it).</param>
 /// <param name="IssueDate">Date the summary is generated; it names the file and is never before <paramref name="ReferenceDate"/>.</param>

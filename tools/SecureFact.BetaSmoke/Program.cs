@@ -226,6 +226,12 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
         line = line with { TotalAmount = 104m, TaxedAmount = 100m, IgvAmount = 4m, IgvRate = 0.04m, IsIvap = true };
     }
 
+    if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_EXPORT") is not null)
+    {
+        // A receipt of an export: 100 of export sale value (code 04) in dollars, no IGV, a buyer without identification.
+        line = line with { Currency = "USD", TotalAmount = 100m, TaxedAmount = 0m, IgvAmount = 0m, ExportAmount = 100m, BuyerDocumentTypeCode = null, BuyerDocumentNumber = null };
+    }
+
     var lines = new List<SummaryLineData> { line };
     if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_NOTE") is { } noteKind)
     {

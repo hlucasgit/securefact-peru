@@ -14,7 +14,7 @@ namespace SecureFact.CpeEngine;
 /// UBL 2.0 <c>SummaryDocuments</c> (daily summary of receipts, "Resumen Diario 1.1"). Element order follows the official XSD
 /// (UBLPE-SummaryDocuments-1.0) and the mandatory tags of sheet <c>Resumen Diario1_1</c> of the 2026-08-26 validation rules (S16);
 /// the 2018 guide (S18) gives the examples. Scope: receipts (03) and notes (07/08) of receipts that are added (status 1) with taxed, exempt and unaffected amounts in
-/// the receipt's own currency. Notes, voids (status 3), modifications, free operations, exports, ISC, ICBPER and perception return
+/// the receipt's own currency, and exports (04). Modifications, free operations, ISC, ICBPER and perception return
 /// <c>SF-CPE-002</c> or are absent from the model, never silently dropped.
 /// </summary>
 internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerator
@@ -157,17 +157,17 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Invalid($"{label}: moneda inválida.");
             }
 
-            if (new[] { line.TotalAmount, line.TaxedAmount, line.ExemptAmount, line.UnaffectedAmount, line.IgvAmount, line.OtherCharges, line.OtherDiscounts }.Any(a => a < 0))
+            if (new[] { line.TotalAmount, line.TaxedAmount, line.ExemptAmount, line.UnaffectedAmount, line.ExportAmount, line.IgvAmount, line.OtherCharges, line.OtherDiscounts }.Any(a => a < 0))
             {
                 return Invalid($"{label}: los importes no pueden ser negativos.");
             }
 
-            if (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount <= 0)
+            if (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.ExportAmount <= 0)
             {
-                return Unsupported($"{label}: solo se informan operaciones gravadas, exoneradas o inafectas con valor de venta; las gratuitas y exportaciones aún no están soportadas.");
+                return Unsupported($"{label}: solo se informan operaciones gravadas, exoneradas, inafectas o de exportación con valor de venta; las gratuitas aún no están soportadas.");
             }
 
-            if (Math.Abs(line.TotalAmount - (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.IgvAmount + line.OtherCharges - line.OtherDiscounts)) > TotalTolerance)
+            if (Math.Abs(line.TotalAmount - (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.ExportAmount + line.IgvAmount + line.OtherCharges - line.OtherDiscounts)) > TotalTolerance)
             {
                 return Unsupported($"{label}: el importe total no coincide con la suma de valores de venta, IGV y otros cargos menos otros descuentos (ISC, ICBPER u otros tributos aún no están soportados).");
             }
@@ -233,8 +233,8 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
             new XElement(Cac + "Status", new XElement(Cbc + "ConditionCode", line.Status)),
             new XElement(Sac + "TotalAmount", new XAttribute("currencyID", line.Currency), Money(line.TotalAmount)));
 
-        // One BillingPayment per sale-value type that applies (catalogue 11: 01 taxed, 02 exempt, 03 unaffected); the sheet marks them "only if applicable".
-        foreach (var (code, amount) in new[] { ("01", line.TaxedAmount), ("02", line.ExemptAmount), ("03", line.UnaffectedAmount) })
+        // One BillingPayment per sale-value type that applies (catalogue 11: 01 taxed, 02 exempt, 03 unaffected, 04 export); the sheet marks them "only if applicable".
+        foreach (var (code, amount) in new[] { ("01", line.TaxedAmount), ("02", line.ExemptAmount), ("03", line.UnaffectedAmount), ("04", line.ExportAmount) })
         {
             if (amount > 0)
             {
