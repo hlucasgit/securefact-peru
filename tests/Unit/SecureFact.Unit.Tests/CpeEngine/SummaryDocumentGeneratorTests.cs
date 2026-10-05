@@ -45,7 +45,7 @@ public class SummaryDocumentGeneratorTests
 
     internal static SummaryData Data(params SummaryLineData[] lines) =>
         new("20100066603", "EMISORA DEMO SAC", new DateOnly(2026, 9, 30), new DateOnly(2026, 10, 1), 1,
-            lines.Length > 0 ? lines : [Taxed(1, "B001", 1), Exempt(2, "B001", 2)]);
+            lines.Length > 0 ? lines : [Taxed(1, "B001", 1), Exempt(2, "B001", 2)], 700m);
 
     internal static SummaryLineData Taxed(int line, string series, long number, string currency = "PEN") =>
         new(line, series, number, "1", "12345678", currency, 118m, 100m, 0m, 0m, 18m, 0.18m);
@@ -370,6 +370,8 @@ public class SummaryDocumentGeneratorTests
         Assert.False(result.IsSuccess);
         Assert.Equal(ErrorCodes.CpeInvalidDocument, result.Error.Code);
         Assert.True(_generator.Generate(Data(anonymous with { BuyerDocumentTypeCode = "1", BuyerDocumentNumber = "12345678" })).IsSuccess);
+        Assert.True(_generator.Generate(Data(anonymous) with { ReceiptIdentificationThreshold = 800m }).IsSuccess); // the amount is the versioned rule, not a constant
+        Assert.False(_generator.Generate(Data(anonymous) with { ReceiptIdentificationThreshold = 799.99m }).IsSuccess);
     }
 
     public static TheoryData<string, SummaryData, string> InvalidData() => new()

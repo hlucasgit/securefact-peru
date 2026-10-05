@@ -26,7 +26,6 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
     private static readonly XNamespace Ext = "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2";
     private static readonly XNamespace Ds = "http://www.w3.org/2000/09/xmldsig#";
 
-    private const decimal ReceiptIdentificationThreshold = 700m;
     private const decimal TotalTolerance = 0.05m;
 
     [GeneratedRegex("^B[A-Z0-9]{3}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
@@ -182,9 +181,9 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Invalid($"{label}: el tipo y el número de documento del adquirente se informan juntos o ninguno.");
             }
 
-            if (line.BuyerDocumentTypeCode is null && line.Currency == "PEN" && line.TotalAmount > ReceiptIdentificationThreshold)
+            if (line.BuyerDocumentTypeCode is null && line.Currency == "PEN" && line.TotalAmount > data.ReceiptIdentificationThreshold)
             {
-                return Invalid($"{label}: una boleta de más de S/ {ReceiptIdentificationThreshold:0} requiere identificar al adquirente (regla 2514).");
+                return Invalid($"{label}: una boleta de más de S/ {data.ReceiptIdentificationThreshold:0.00} requiere identificar al adquirente (regla 2514).");
             }
         }
 

@@ -11,6 +11,9 @@ public static class RuleCodes
     public const string IcbperUnitAmount = "tax.icbper.unit_amount";
     public const string IssueDateMaxAgeDays = "billing.issue_date_max_age_days";
     public const string NoteIssueDateMaxAgeDays = "billing.note_issue_date_max_age_days";
+
+    /// <summary>Amount in soles above which a receipt (or a note of one) must identify the buyer.</summary>
+    public const string ReceiptIdentificationThreshold = "billing.receipt_identification_threshold";
 }
 
 public enum RuleVerification

@@ -22,6 +22,5 @@ Una factura de cada tipo soportado, línea de afectación 40 en dólares: 0201 y
 
 ## Límites (P)
 - **Padrón de exportadores** (regla 3097: en 0201 el emisor debe figurar en el padrón con indicador 05): la plataforma no tiene el padrón y el beta no lo exigió al emisor de prueba. En producción SUNAT puede rechazar un 0201 de un emisor que no esté en el padrón.
-- **Boletas de más de S/ 700 sin identificar al adquirente** (regla 2514 del resumen): el generador del resumen la exige, pero Billing no la comprueba al emitir; una boleta en soles de más de S/ 700 con adquirente tipo 0 (también de exportación) se emite y falla al armar el resumen. Pendiente propio (el umbral debe salir de las reglas versionadas).
 - **Código de país**: el catálogo 4 sembrado no trae la lista ISO 3166-1; se comprueba solo el formato (dos letras mayúsculas) y que no sea `PE`.
 - La plataforma no decide si un servicio califica como exportación según la norma del IGV: lo declara el emisor al elegir el tipo de operación. Las fuentes de este proyecto no incluyen esos requisitos.

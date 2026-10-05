@@ -36,7 +36,8 @@ public sealed record SummaryLineData(
 /// <param name="ReferenceDate">Issue date of every receipt in the summary (they must all share it).</param>
 /// <param name="IssueDate">Date the summary is generated; it names the file and is never before <paramref name="ReferenceDate"/>.</param>
 /// <param name="Correlative">1 to 99999; one per file generated for the same day (blocks of at most 500 lines each).</param>
-public sealed record SummaryData(string Ruc, string LegalName, DateOnly ReferenceDate, DateOnly IssueDate, int Correlative, IReadOnlyList<SummaryLineData> Lines);
+/// <param name="ReceiptIdentificationThreshold">Amount in soles above which a line must carry the buyer (rule 2514), as the versioned rule in force on the reference date says.</param>
+public sealed record SummaryData(string Ruc, string LegalName, DateOnly ReferenceDate, DateOnly IssueDate, int Correlative, IReadOnlyList<SummaryLineData> Lines, decimal ReceiptIdentificationThreshold);
 
 /// <summary>An unsigned daily-summary XML (UBL 2.0 SummaryDocuments) and its SUNAT file names.</summary>
 public sealed record SummaryDocument(string Xml, string Identifier, string FileBaseName)

@@ -184,6 +184,12 @@ internal sealed class VoidService(
             return ivap.Error;
         }
 
+        var identification = await rules.ResolveDecimalAsync(RuleCodes.ReceiptIdentificationThreshold, "amount", referenceDate, cancellationToken);
+        if (!identification.IsSuccess)
+        {
+            return identification.Error;
+        }
+
         // The summary line repeats the amounts of the document it voids (the sheet makes them mandatory); the reason stays in our own record.
         var lines = new List<SummaryLineData>();
         foreach (var (document, _) in block)
@@ -202,7 +208,7 @@ internal sealed class VoidService(
             var prefix = $"{company.Ruc}-RC-{generationDate.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)}-";
             var correlative = 1 + await db.ElectronicDocuments.CountAsync(e => e.CompanyId == company.Id && e.DocumentTypeCode == ElectronicDocument.SummaryType && e.FileBaseName.StartsWith(prefix), cancellationToken);
 
-            var generated = summaryGenerator.Generate(new SummaryData(company.Ruc, company.LegalName, referenceDate, generationDate, correlative, lines));
+            var generated = summaryGenerator.Generate(new SummaryData(company.Ruc, company.LegalName, referenceDate, generationDate, correlative, lines, identification.Value));
             if (!generated.IsSuccess)
             {
                 return generated.Error;

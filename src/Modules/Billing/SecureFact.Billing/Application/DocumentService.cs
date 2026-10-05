@@ -14,6 +14,7 @@ using SecureFact.Rules.Contracts;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Results;
 using SecureFact.TaxEngine.Contracts;
+using IdentityDocuments = SecureFact.SharedKernel.Domain.IdentityDocuments;
 
 namespace SecureFact.Billing.Application;
 
@@ -110,6 +111,12 @@ internal sealed partial class DocumentService(
         if (!calculated.IsSuccess)
         {
             return calculated.Error;
+        }
+
+        if (series.DocumentTypeCode == DocumentTypes.Receipt
+            && await CheckReceiptIdentificationAsync(request.IssueDate, request.Currency, buyer!, calculated.Value.PayableAmount, cancellationToken) is { } unidentified)
+        {
+            return unidentified;
         }
 
         // A detraction without its own account uses the one registered in the company; the issued document keeps the account that was used.
@@ -328,9 +335,37 @@ internal sealed partial class DocumentService(
         }
 
         var buyer = new BuyerSnapshot(referenced.BuyerDocumentTypeCode, referenced.BuyerDocumentNumber, referenced.BuyerName, referenced.BuyerAddress, referenced.BuyerEmail);
+        if (referenced.DocumentTypeCode == DocumentTypes.Receipt
+            && await CheckReceiptIdentificationAsync(request.IssueDate, referenced.Currency, buyer, calculated.Value.PayableAmount, cancellationToken) is { } unidentified)
+        {
+            return unidentified;
+        }
+
         var note = new NoteInfo(request.ReasonCode!.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
         return await IssueAsync(
             tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines!, calculated.Value, note, cancellationToken);
+    }
+
+    /// <summary>
+    /// A receipt of more than the threshold in soles (rule 2514 of the daily summary sheet; the amount is a versioned rule) must identify its buyer: the summary that reports it needs the buyer,
+    /// so a receipt that cannot be summarised is refused when issued. The rule does not apply to receipts in another currency, nor to a buyer with any identification.
+    /// </summary>
+    private async Task<Error?> CheckReceiptIdentificationAsync(DateOnly issueDate, string currency, BuyerSnapshot buyer, decimal payable, CancellationToken cancellationToken)
+    {
+        if (currency != "PEN" || buyer.DocumentTypeCode.Trim() != IdentityDocuments.NoDocument)
+        {
+            return null;
+        }
+
+        var threshold = await rules.ResolveDecimalAsync(RuleCodes.ReceiptIdentificationThreshold, "amount", issueDate, cancellationToken);
+        if (!threshold.IsSuccess)
+        {
+            return threshold.Error;
+        }
+
+        return payable > threshold.Value
+            ? Error.Validation(ErrorCodes.InvalidDocument, "Adquirente sin identificar", $"Una boleta de más de S/ {threshold.Value:0.00} requiere identificar al adquirente: indique su tipo y número de documento.")
+            : null;
     }
 
     /// <summary>

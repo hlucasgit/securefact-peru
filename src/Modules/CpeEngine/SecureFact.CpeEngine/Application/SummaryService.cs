@@ -86,6 +86,12 @@ internal sealed class SummaryService(
             return ivap.Error;
         }
 
+        var identification = await rules.ResolveDecimalAsync(RuleCodes.ReceiptIdentificationThreshold, "amount", referenceDate, cancellationToken);
+        if (!identification.IsSuccess)
+        {
+            return identification.Error;
+        }
+
         // Every receipt needs its electronic document (and with it a valid certificate) before it can be reported.
         var pending = new List<(DocumentDto Receipt, ElectronicDocument Document)>();
         foreach (var receipt in receipts)
@@ -129,7 +135,7 @@ internal sealed class SummaryService(
         {
             foreach (var block in candidates.Chunk(ISummaryDocumentGenerator.MaxLines))
             {
-                var summary = await CreateBlockAsync(tenant.Value, company.Value, referenceDate, today, igv.Value, ivap.Value, block, certificate.Value, cancellationToken);
+                var summary = await CreateBlockAsync(tenant.Value, company.Value, referenceDate, today, igv.Value, ivap.Value, identification.Value, block, certificate.Value, cancellationToken);
                 if (!summary.IsSuccess)
                 {
                     return summary.Error;
@@ -162,6 +168,7 @@ internal sealed class SummaryService(
         DateOnly generationDate,
         decimal igvRate,
         decimal ivapRate,
+        decimal identificationThreshold,
         (DocumentDto Receipt, ElectronicDocument Document)[] block,
         System.Security.Cryptography.X509Certificates.X509Certificate2 certificate,
         CancellationToken cancellationToken)
@@ -173,7 +180,7 @@ internal sealed class SummaryService(
             var prefix = $"{company.Ruc}-RC-{generationDate.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)}-";
             var correlative = 1 + await db.ElectronicDocuments.CountAsync(e => e.CompanyId == company.Id && e.DocumentTypeCode == ElectronicDocument.SummaryType && e.FileBaseName.StartsWith(prefix), cancellationToken);
 
-            var generated = generator.Generate(new SummaryData(company.Ruc, company.LegalName, referenceDate, generationDate, correlative, lines));
+            var generated = generator.Generate(new SummaryData(company.Ruc, company.LegalName, referenceDate, generationDate, correlative, lines, identificationThreshold));
             if (!generated.IsSuccess)
             {
                 return generated.Error;

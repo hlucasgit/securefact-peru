@@ -239,7 +239,7 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
         lines.Add(new SummaryLineData(2, "BC01", number, "1", "12345678", "PEN", 118m, 100m, 0m, 0m, 18m, 0.18m, noteKind == "nd" ? "08" : "07", "03", "B001", Environment.GetEnvironmentVariable("SF_BETA_NOTE_UNKNOWN_REF") is null ? number : number + 5_000_000));
     }
 
-    var generated = provider.GetRequiredService<ISummaryDocumentGenerator>().Generate(new SummaryData(ruc, "EMPRESA DE PRUEBA SAC", reference, today, (int)number, lines));
+    var generated = provider.GetRequiredService<ISummaryDocumentGenerator>().Generate(new SummaryData(ruc, "EMPRESA DE PRUEBA SAC", reference, today, (int)number, lines, 700m));
     if (!generated.IsSuccess) { Console.Error.WriteLine($"RC: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
     var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);
     if (!signed.IsSuccess) { Console.Error.WriteLine($"Sign: {signed.Error.Code} {signed.Error.Detail}"); return 1; }

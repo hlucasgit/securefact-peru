@@ -16,7 +16,7 @@ namespace SecureFact.Security.Tests;
 [Collection(ApiTestGroup.Name)]
 public sealed class RulesTests(ApiFixture api)
 {
-    private static readonly string[] AllCodes = [RuleCodes.IgvRate, RuleCodes.IgvReducedRate, RuleCodes.IvapRate, RuleCodes.IcbperUnitAmount, RuleCodes.IssueDateMaxAgeDays];
+    private static readonly string[] AllCodes = [RuleCodes.IgvRate, RuleCodes.IgvReducedRate, RuleCodes.IvapRate, RuleCodes.IcbperUnitAmount, RuleCodes.IssueDateMaxAgeDays, RuleCodes.ReceiptIdentificationThreshold];
 
     private RulesDbContext OwnerContext()
     {
@@ -43,6 +43,7 @@ public sealed class RulesTests(ApiFixture api)
         Assert.Subset(rules.Select(r => r.Code).ToHashSet(StringComparer.Ordinal), AllCodes.ToHashSet(StringComparer.Ordinal));
         Assert.Equal(RuleVerification.Verified, rules.Single(r => r.Code == RuleCodes.IgvRate).Verification);
         Assert.Equal(RuleVerification.Pending, rules.Single(r => r.Code == RuleCodes.IcbperUnitAmount).Verification);
+        Assert.Equal(RuleVerification.Verified, rules.Single(r => r.Code == RuleCodes.ReceiptIdentificationThreshold).Verification);
         Assert.All(rules, r => Assert.False(string.IsNullOrWhiteSpace(r.Source)));
     }
 
