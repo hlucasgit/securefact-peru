@@ -38,7 +38,7 @@ jobs:
           dotnet tool run reportgenerator -reports:"coverage-results/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:"MarkdownSummaryGithub;JsonSummary;Cobertura;HtmlInline" -assemblyfilters:"+SecureFact.*"
           cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
           python3 .github/scripts/check_coverage.py coverage/Summary.json "$MIN_LINE_COVERAGE" "$MIN_BRANCH_COVERAGE"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage
@@ -52,7 +52,7 @@ jobs:
         run: |
           dotnet tool install --global Microsoft.Sbom.DotNetTool
           sbom-tool generate -b ./src -bc . -pn SecureFact -pv 0.0.0-${{ github.sha }} -ps SecureFact -nsb https://securefact.invalid -V Error || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sbom
@@ -116,7 +116,7 @@ jobs:
       - name: End-to-end tests
         working-directory: web
         run: npm run e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-report
