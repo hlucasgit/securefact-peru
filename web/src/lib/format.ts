@@ -81,4 +81,6 @@ export const ADMIN_ROLES = ['TenantOwner', 'TenantAdmin', 'PlatformSuperAdmin']
 export const PLATFORM_ROLES = ['PlatformSuperAdmin', 'PlatformSupport']
 /** Roles with the permission to read the audit trail and to requeue the messages that failed. */
 export const AUDIT_ROLES = ['TenantOwner', 'Auditor', 'PlatformSuperAdmin', 'PlatformSupport']
+/** Who reads the plan and the consumption of the account (permission tenants.read, without the roles that only read documents). */
+export const PLAN_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']
 export const QUEUE_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']

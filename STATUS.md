@@ -101,14 +101,15 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 - **`web/`** (React + TypeScript + Vite, ADR-038): ingreso con segundo factor, panel, empresas (datos, establecimientos, series, certificado digital y credenciales SOL), clientes, productos, **emisión** de facturas y boletas (ítems con afectación, descuento, ISC y bolsas de plástico; venta al crédito), documentos (lista, detalle, generar y firmar, enviar, consultar, reintentar, XML, PDF, CDR, archivo conservado, baja), **notas** de crédito y débito, resumen diario, usuarios, segundo factor y reglas. Claro, oscuro y móvil.
 - La interfaz **no calcula impuestos**: muestra lo que calcula la API. Un solo origen (proxy de Vite / nginx), CSP estricta, sesión con el *access token* en memoria.
 - Empaquetada (`web/Dockerfile`, servicio `web` de `docker-compose.yml`) y en el CI (lint, tipos, 16 pruebas, compilación, `npm audit`, Trivy).
-- **Pruebas de extremo a extremo** (Playwright, ADR-040): 38 recorridos contra la API real, los workers y el **simulador de SUNAT** (ADR-039), 3 corridas seguidas sin fallos; el CI las corre (trabajo `e2e`). Encontraron y corrigieron un 500 en inicios de sesión simultáneos de una misma cuenta.
+- **Pruebas de extremo a extremo** (Playwright, ADR-040): 40 recorridos contra la API real, los workers y el **simulador de SUNAT** (ADR-039), 3 corridas seguidas sin fallos; el CI las corre (trabajo `e2e`). Encontraron y corrigieron un 500 en inicios de sesión simultáneos de una misma cuenta.
 - Pendiente: el envío a SUNAT desde la interfaz solo está probado contra el simulador (el beta, por API), exportaciones, detracciones, retenciones y transporte de carga desde la interfaz (siguen por API), administración de plataforma, importación masiva, planes, recuperación de contraseña, *refresh token* en cookie `HttpOnly`.
 
 ## Administración de plataforma
 - **Inquilinos** (ADR-041): lista con búsqueda y estado, alta con su propietario, detalle con usuarios, y **suspender, reactivar y cerrar** con motivo (el cierre es definitivo y pide escribir el nombre). Un inquilino suspendido o cerrado no ingresa, no renueva y no usa la API (el estado se cachea 10 s por proceso); todo cambio queda en la auditoría. El soporte lee y no cambia.
 - **Auditoría** con filtros y **verificación de la cadena**, y **mensajes fallidos** con reencolado, en la interfaz.
 - **Workers**: un inquilino suspendido o cerrado no recibe envíos ni resúmenes nuevos hacia SUNAT; el sondeo de tickets y el archivo continúan.
-- Pendiente: revendedores, planes y métricas por inquilino, «entrar como», exportar o dar de baja definitiva una cuenta.
+- **Planes y consumo** (ADR-042): catálogo de planes con tope de empresas, de usuarios activos y de comprobantes por mes (vacío es ilimitado); toda cuenta existente pasó al plan **Piloto**, sin límites. La plataforma crea planes y los asigna; Organizations, Identity y Billing rechazan lo que el plan no permite (`SF-PLAN-001`) y el conteo mensual es exacto con solicitudes simultáneas. La cuenta ve su plan y su consumo.
+- Pendiente: revendedores, precios y facturación de la plataforma a sus cuentas, «entrar como», exportar o dar de baja definitiva una cuenta.
 
 ## ISC e ICBPER
 - **ISC** (al valor y de monto fijo) **e ICBPER** en el UBL de facturas, boletas, notas y resumen diario, y en el PDF (ADR-037): subtotales de línea y globales según las hojas de reglas; el ISC entra en la base del IGV de la línea. Aceptados por el beta de SUNAT (factura, boleta, notas y resumen).

@@ -6,8 +6,11 @@ import type {
   AuditRecord,
   AuditVerification,
   DeadMessage,
+  PlanInput,
+  PlanRow,
   TenantRow,
   TenantStatus,
+  TenantUsage,
   CatalogEntry,
   Certificate,
   Company,
@@ -47,6 +50,9 @@ export const keys = {
   tenants: (search: string, status: string) => ['platform', 'tenants', search, status] as const,
   platformTenant: (id: string) => ['platform', 'tenant', id] as const,
   tenantUsers: (id: string) => ['platform', 'tenant', id, 'users'] as const,
+  tenantUsage: (id: string) => ['platform', 'tenant', id, 'usage'] as const,
+  plans: ['platform', 'plans'] as const,
+  myPlan: ['plan'] as const,
   audit: (filters: string) => ['audit', filters] as const,
   dead: ['outbox', 'dead'] as const,
   tenant: ['tenant'] as const,
@@ -175,6 +181,15 @@ export const useCreateTenantUser = (tenantId: string) =>
   useAction((input: { email: string; displayName: string; password: string; roles: string[] }) => post<AppUser>('/api/v1/users', { ...input, tenantId }), [keys.tenantUsers(tenantId)])
 export const useRevokeSessions = () => useAction((userId: string) => post(`/api/v1/users/${userId}/sessions/revoke`), [])
 export const useDeactivateTenantUser = (tenantId: string) => useAction((userId: string) => post(`/api/v1/users/${userId}/deactivate`), [keys.tenantUsers(tenantId)])
+
+// Plans (ADR-042)
+export const usePlans = () => useQuery({ queryKey: keys.plans, queryFn: () => get<PlanRow[]>('/api/v1/platform/plans') })
+export const useCreatePlan = () => useAction((input: PlanInput) => post<PlanRow>('/api/v1/platform/plans', input), [keys.plans])
+export const useUpdatePlan = (id: string) => useAction((input: PlanInput) => put<PlanRow>(`/api/v1/platform/plans/${id}`, input), [keys.plans, ['platform', 'tenant']])
+export const useAssignPlan = (tenantId: string) =>
+  useAction((planId: string) => post<TenantRow>(`/api/v1/platform/tenants/${tenantId}/plan`, { planId }), [keys.platformTenant(tenantId), keys.tenantUsage(tenantId), ['audit']])
+export const useTenantUsage = (id: string) => useQuery({ queryKey: keys.tenantUsage(id), queryFn: () => get<TenantUsage>(`/api/v1/platform/tenants/${id}/usage`) })
+export const useMyPlan = () => useQuery({ queryKey: keys.myPlan, queryFn: () => get<TenantUsage>('/api/v1/plan') })
 
 export interface AuditFilters {
   tenantId: string

@@ -29,13 +29,13 @@ function links(roles: string[]): string[] {
 
 describe('the navigation follows the role', () => {
   it('shows platform staff the platform and no tenant operation', () => {
-    expect(links(['PlatformSuperAdmin'])).toEqual(['Inquilinos', 'Auditoría', 'Seguridad', 'Reglas'])
+    expect(links(['PlatformSuperAdmin'])).toEqual(['Inquilinos', 'Planes', 'Auditoría', 'Seguridad', 'Reglas'])
   })
 
   it('shows a tenant owner the operation, the audit and the failed messages, and no platform', () => {
     const owner = links(['TenantOwner'])
 
-    expect(owner).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Emitir', 'Usuarios', 'Auditoría', 'Mensajes fallidos']))
+    expect(owner).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Emitir', 'Usuarios', 'Plan y consumo', 'Auditoría', 'Mensajes fallidos']))
     expect(owner).not.toContain('Inquilinos')
   })
 
@@ -43,7 +43,7 @@ describe('the navigation follows the role', () => {
     const reader = links(['ReadOnly'])
 
     expect(reader).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Clientes']))
-    for (const hidden of ['Emitir', 'Resumen diario', 'Usuarios', 'Auditoría', 'Mensajes fallidos', 'Inquilinos']) expect(reader).not.toContain(hidden)
+    for (const hidden of ['Emitir', 'Resumen diario', 'Usuarios', 'Plan y consumo', 'Auditoría', 'Mensajes fallidos', 'Inquilinos']) expect(reader).not.toContain(hidden)
   })
 
   it('shows an auditor the audit and nothing to issue', () => {

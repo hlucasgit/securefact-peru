@@ -14,6 +14,7 @@ import { Login } from './pages/Login'
 import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
 import { NewNote } from './pages/NewNote'
+import { MyPlan, Plans } from './pages/Plans'
 import { TenantDetail, Tenants } from './pages/Platform'
 import { Summaries } from './pages/Summaries'
 
@@ -39,6 +40,8 @@ export function App() {
         <Route index element={<Home />} />
         <Route path="plataforma/inquilinos" element={<Tenants />} />
         <Route path="plataforma/inquilinos/:id" element={<TenantDetail />} />
+        <Route path="plataforma/planes" element={<Plans />} />
+        <Route path="plan" element={<MyPlan />} />
         <Route path="auditoria" element={<Audit />} />
         <Route path="mensajes" element={<DeadMessages />} />
         <Route path="documentos" element={<Documents />} />

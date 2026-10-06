@@ -16,6 +16,7 @@ import type { TenantRow, TenantStatus } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, ConfirmButton, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextAreaField, TextField, useToast } from '../components/ui'
 import { ROLE_LABELS, TENANT_ROLES, dateTime } from '../lib/format'
+import { TenantPlanCard } from './Plans'
 import type { Tone } from '../lib/format'
 
 const STATUS_LABELS: Record<TenantStatus, string> = { Active: 'Activo', Suspended: 'Suspendido', Closed: 'Cerrado' }
@@ -205,6 +206,8 @@ export function TenantDetail() {
           <Link to={`/auditoria?tenantId=${t.id}`}>Ver la auditoría de esta cuenta</Link>
         </p>
       </div>
+
+      <TenantPlanCard tenantId={t.id} canManage={canManage} closed={t.status === 'Closed'} />
 
       <div className="card">
         <div className="row spread" style={{ marginBottom: 8 }}>

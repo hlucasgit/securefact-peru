@@ -293,6 +293,40 @@ export interface TenantRow {
   environment: 'Sandbox' | 'Production'
   resellerId: string | null
   createdAt: string
+  planId: string
+}
+
+/** What a plan allows; a null limit is unlimited. */
+export interface PlanRow {
+  id: string
+  code: string
+  name: string
+  maxCompanies: number | null
+  maxUsers: number | null
+  maxDocumentsPerMonth: number | null
+  isActive: boolean
+}
+
+export interface PlanInput {
+  code: string
+  name: string
+  maxCompanies: number | null
+  maxUsers: number | null
+  maxDocumentsPerMonth: number | null
+  isActive: boolean
+}
+
+export interface UsageItem {
+  used: number
+  limit: number | null
+}
+
+export interface TenantUsage {
+  plan: PlanRow
+  period: string
+  companies: UsageItem
+  users: UsageItem
+  documentsThisMonth: UsageItem
 }
 
 export interface AuditRecord {
