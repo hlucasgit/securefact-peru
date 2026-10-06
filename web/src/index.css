@@ -110,7 +110,7 @@ code, .mono { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; f
 
 /* Forms */
 .field { display: grid; gap: 4px; }
-.field > span { font-size: 0.85rem; font-weight: 600; }
+.field > label { font-size: 0.85rem; font-weight: 600; }
 .field .hint { font-weight: 400; color: var(--muted); font-size: 0.8rem; }
 .input, select.input, textarea.input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
 .input:disabled { background: var(--surface-2); }

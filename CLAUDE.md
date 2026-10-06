@@ -8,7 +8,7 @@ Plataforma SaaS de facturación electrónica peruana (monolito modular .NET 10 +
 3. **Multitenancy**: toda tabla de negocio lleva `tenant_id` + RLS (ADR-003). Cada PR que toque datos incluye pruebas cross-tenant.
 4. **Dinero**: solo `decimal`/`numeric`; nunca `float/double`. Numeración: nunca `MAX()+1`.
 5. **Secretos**: nunca en claro, ni en logs, ni en el repo (ADR-007). Sin PFX/`.env` versionados.
-6. **No usar el beta de SUNAT para estrés**; usar el simulador. En Local/Test solo `SandboxChannel`.
+6. **No usar el beta de SUNAT para estrés**; usar el simulador (`Sunat:Environment=Sandbox`, ADR-039; se rechaza en producción). En Local/Test solo `SandboxChannel`.
 7. **No afirmar ser PSE.** `OwnPseMode=false`.
 8. Documentos aceptados y CDR son **inmutables**.
 9. No `catch (Exception) {}` vacíos, no TODO críticos, no código comentado, `CancellationToken` siempre, nullable habilitado.
@@ -23,6 +23,7 @@ dotnet build SecureFact.slnx
 dotnet build SecureFact.slnx -c Release   # como el CI: en Release las advertencias son errores
 dotnet test SecureFact.slnx
 (cd web && npm ci && npm run lint && npm run typecheck && npm test && npm run build)   # interfaz web, como el trabajo `web` del CI
+(cd web && npm run e2e)   # extremo a extremo (Playwright): pide la API con Sunat__Environment=Sandbox y los workers; ver web/README.md y ADR-040
 # cobertura: ver docs/testing/README.md (coverage.runsettings; el CI exige 95 % de líneas y 84 % de ramas)
 ```
 

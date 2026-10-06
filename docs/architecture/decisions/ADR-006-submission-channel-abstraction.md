@@ -8,7 +8,7 @@ SecureFact debe operar hoy sin ser PSE y migrar entre proveedores (SUNAT directo
 ## Decisión
 `ICpeSubmissionChannel` es el único límite entre el dominio y el exterior. Capacidades y contrato mínimo: `SubmitAsync(SignedPackage) → SubmissionResult` (síncrono: CDR o rechazo) y `PollAsync(ticket)` (asíncrono), con resultado tipado que clasifica el error: `Transport` (reintentable), `ProviderException` (1000–1999: corregir y reenviar), `Rejected` (2000–3999: CDR rechazada) y `AcceptedWithObservations`.
 
-Implementaciones: `SandboxChannel` (simulador interno), `DirectSunatChannel`, `ThirdPartyPseChannel`, `ThirdPartyOseChannel`, `FutureSecureFactPseChannel`.
+Implementaciones: `SandboxChannel` (simulador interno; hecho en ADR-039), `DirectSunatChannel`, `ThirdPartyPseChannel`, `ThirdPartyOseChannel`, `FutureSecureFactPseChannel`.
 
 Reglas:
 - Selección por `ProviderConfiguration` de la empresa y entorno; el `Router` no contiene lógica tributaria.

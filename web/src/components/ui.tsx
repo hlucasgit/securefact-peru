@@ -59,14 +59,15 @@ interface FieldProps {
 
 export function Field({ label, hint, error, children }: FieldProps) {
   const id = useId()
+  // The label names the control and nothing else: a label that wraps a select would take the text of every option into its name.
   return (
-    <label className="field" htmlFor={id}>
-      <span>
+    <div className="field">
+      <label htmlFor={id}>
         {label} {hint && <span className="hint">{hint}</span>}
-      </span>
+      </label>
       {children(id)}
       {error && <span className="error-text">{error}</span>}
-    </label>
+    </div>
   )
 }
 

@@ -128,6 +128,10 @@ services:
       Storage__S3__Bucket: ${SF_STORAGE_BUCKET:-securefact-documents}
       Storage__S3__AccessKey: ${S3_ACCESS_KEY:?set in .env}
       Storage__S3__SecretKey: ${S3_SECRET_KEY:?set in .env}
+      # SUNAT is never reached implicitly: leave empty to only prepare and sign, set Sandbox for the in-process simulator (ADR-039), or Beta / Production explicitly. Same value as the workers.
+      Sunat__Environment: ${SF_SUNAT_ENVIRONMENT:-}
+      # Sign-ins allowed per minute and address (the end-to-end tests raise it).
+      RateLimiting__AuthPermitPerMinute: ${SF_AUTH_RATE_LIMIT:-20}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${SF_OTLP_ENDPOINT:-}
     ports:
       - "127.0.0.1:${SF_API_PORT:-5180}:8080"

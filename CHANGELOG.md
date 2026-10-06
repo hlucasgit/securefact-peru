@@ -4,6 +4,9 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Pruebas de extremo a extremo de la interfaz con Playwright (`web/e2e/`): 28 recorridos contra la API real, PostgreSQL, S3, los workers y el simulador de SUNAT (autenticación con segundo factor, emisión con ISC e ICBPER, envío, notas, observación y rechazo, baja, resumen diario, puesta en marcha de una empresa, roles y aislamiento entre cuentas, accesibilidad con axe y teléfono); trabajo `e2e` del CI (ADR-040).
+- Simulador de SUNAT en proceso (`Sunat:Environment=Sandbox`, `SandboxSunatChannel`): acepta, observa o rechaza según una marca en la descripción del ítem; se rechaza en producción (ADR-039).
+- La pantalla del documento se actualiza sola mientras va en camino y muestra «Baja solicitada» hasta que SUNAT confirma la baja.
 - Interfaz web del MVP (`web/`, React 19 + TypeScript + Vite): ingreso con segundo factor, empresas, certificado y SOL, series, clientes, productos, emisión de facturas y boletas con ISC e ICBPER, notas de crédito y débito, seguimiento y envío a SUNAT, PDF, XML y CDR, archivo conservado, baja, resumen diario, usuarios y reglas; contenedor nginx con CSP, servicio `web` en `docker-compose.yml` y trabajo `web` en el CI (ADR-038).
 - ISC (sistemas al valor y de monto fijo) e ICBPER en el UBL de facturas, boletas, notas y resumen diario, y en el PDF: subtotales de línea y globales según las hojas de reglas, `DocumentLineDto.Isc` y `PlasticBagCount` en la lectura, validación de bolsas = cantidad de la línea; el monto por bolsa del ICBPER pasa a `Verified` con el calendario de la Ley 30884 (versiones 2 a 6 de la regla); aceptados por el beta de SUNAT (ADR-037, R-060).
 - Almacenamiento de objetos: `IObjectStorage` y su adaptador S3 (escritura única, hash comprobado al leer, enlaces prefirmados); el XML firmado y el CDR de cada documento electrónico se archivan en el almacén por el outbox propio del módulo CPE, con registro de solo inserción y red de seguridad para lo que falte; `GET /api/v1/electronic-documents/{id}/archive`; SeaweedFS fijado a 4.48; `PostgresOutboxSource` compartido por Billing y CPE (ADR-036).
@@ -50,4 +53,5 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - Fase 0: baseline normativo, matriz, C4, ERD, ADR-001…010, documentación PSE, roadmap.
 
 ### Fixed
+- Inicios de sesión simultáneos de una misma cuenta daban un error 500 (conflicto de concurrencia en la fila del usuario); se repiten hasta que cada uno responde, y renovar a la vez el mismo *refresh token* responde «sesión inválida» en lugar de 500 (encontrado por las pruebas de extremo a extremo).
 - El worker consulta solo los documentos que tienen ticket: antes consultaba también los comprobantes de un resumen, que esperan sin ticket propio, y el conteo del pase dependía de qué marca de tiempo era más reciente (prueba intermitente en el CI).

@@ -60,6 +60,21 @@ public static class CpeEngineModule
         return services;
     }
 
+    /// <summary>
+    /// Registers the in-process SUNAT simulator (ADR-039) for development, demos and end-to-end tests. It is refused in production: it accepts documents without validating them, so a real
+    /// issuer would believe its documents were accepted by SUNAT.
+    /// </summary>
+    public static IServiceCollection AddSandboxSubmissionChannel(this IServiceCollection services, bool isProduction)
+    {
+        if (isProduction)
+        {
+            throw new InvalidOperationException("Sunat:Environment 'Sandbox' (the SUNAT simulator) is not allowed in production.");
+        }
+
+        services.AddSingleton<ICpeSubmissionChannel, SandboxSunatChannel>();
+        return services;
+    }
+
     /// <summary>Applies pending migrations. Must run with the schema-owner connection, never the runtime role.</summary>
     public static async Task MigrateAsync(string ownerConnectionString, CancellationToken cancellationToken = default)
     {

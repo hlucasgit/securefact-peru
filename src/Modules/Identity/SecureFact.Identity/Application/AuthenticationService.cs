@@ -32,7 +32,30 @@ internal sealed partial class AuthenticationService(
 
     private IdentityOptions Options => options.Value;
 
+    /// <summary>
+    /// Two sign-ins of the same account at once (two devices, a retried request) update the same user row; the second one loses the concurrency check. The sign-in is repeated from
+    /// a clean state a few times, so the loser answers on what the winner left (a one-time code already used is then refused, as it must be) instead of failing with a 500.
+    /// </summary>
     public async Task<Result<AuthTokens>> LoginAsync(LoginRequest request, ClientInfo client, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await TryLoginAsync(request, client, cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < MaxConcurrentAttempts)
+            {
+                // Each round has one winner, so n sign-ins at once need up to n rounds; the pause spreads the losers apart.
+                db.ChangeTracker.Clear();
+                await Task.Delay(Random.Shared.Next(2, 25), cancellationToken);
+            }
+        }
+    }
+
+    private const int MaxConcurrentAttempts = 24;
+
+    private async Task<Result<AuthTokens>> TryLoginAsync(LoginRequest request, ClientInfo client, CancellationToken cancellationToken)
     {
         // The tenant is unknown until the account is found, so the lookup runs in an explicit, narrow platform scope.
         using var elevated = scope.Elevate("identity:login");
@@ -136,7 +159,16 @@ internal sealed partial class AuthenticationService(
         var (newRefresh, next) = StartSession(user, session.FamilyId, now, session.AbsoluteExpiresAt, client);
         session.Revoke("rotated", now, next.Id);
         db.Sessions.Add(next);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // The same refresh token was exchanged at the same moment by another request: only one rotation can win; this one is answered as an invalid session.
+            db.ChangeTracker.Clear();
+            return InvalidRefresh;
+        }
 
         return BuildTokens(user, next, newRefresh);
     }

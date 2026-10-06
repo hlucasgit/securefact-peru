@@ -84,6 +84,48 @@ jobs:
       - name: Vulnerable packages (production dependencies)
         run: npm audit --omit=dev --audit-level=high
 
+  # End-to-end tests of the web interface against the real API, PostgreSQL and S3 store, with the SUNAT simulator (ADR-039, ADR-040).
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Environment (local-only secrets, generated for this run)
+        run: |
+          cp .env.example .env
+          sed -i "s|^SF_JWT_SIGNING_KEY=.*|SF_JWT_SIGNING_KEY=$(openssl rand -base64 48)|; s|^SF_LOCAL_DEV_KEK=.*|SF_LOCAL_DEV_KEK=$(openssl rand -base64 32)|" .env
+      - name: Publish API and workers
+        run: |
+          dotnet publish src/SecureFact.Api -c Release -o run/api
+          dotnet publish src/SecureFact.Workers -c Release -o run/workers
+      - name: Start the stack
+        run: bash .github/scripts/e2e-stack.sh
+      - name: Install the web dependencies and the browser
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        working-directory: web
+        run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: |
+            web/playwright-report
+            web/test-results
+            logs
+          if-no-files-found: ignore
+
   secret-scan:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

@@ -128,10 +128,14 @@ if (appConnection is not null)
         case "Production":
             builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Production);
             break;
+        case "Sandbox":
+            // The in-process simulator (ADR-039): for development and end-to-end tests, never production.
+            builder.Services.AddSandboxSubmissionChannel(builder.Environment.IsProduction());
+            break;
         case null or "":
             break;
         default:
-            throw new InvalidOperationException("Sunat:Environment must be 'Beta' or 'Production'.");
+            throw new InvalidOperationException("Sunat:Environment must be 'Beta', 'Production' or 'Sandbox'.");
     }
     builder.Services.AddProductsModule(appConnection);
     builder.Services.AddBillingModule(appConnection);

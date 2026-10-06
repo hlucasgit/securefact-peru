@@ -7,10 +7,12 @@ import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, StateBadge, TextAreaField, useToast } from '../components/ui'
 import { BILLING_ROLES, date, dateTime, documentName, money } from '../lib/format'
 
-function save(blob: Blob, name: string, open = false) {
+function save(blob: Blob, name: string, tab: Window | null = null) {
   const url = URL.createObjectURL(blob)
-  if (open) {
-    window.open(url, '_blank', 'noopener')
+  if (tab) {
+    // The tab was opened by the click itself (a window opened after the wait for the file is taken for a pop-up and blocked); it is told where to go now, cut from this page.
+    tab.opener = null
+    tab.location.href = url
   } else {
     const link = document.createElement('a')
     link.href = url
@@ -23,14 +25,15 @@ function save(blob: Blob, name: string, open = false) {
 export function DocumentDetail() {
   const { id = '' } = useParams()
   const doc = useDocument(id)
-  const electronic = useElectronic(id)
+  const [voidRequested, setVoidRequested] = useState(false)
+  const electronic = useElectronic(id, voidRequested)
 
   if (doc.isPending) return <Loading />
   if (!doc.data) return <ErrorAlert error={doc.error} />
-  return <Detail document={doc.data} electronic={electronic.data ?? null} loadingElectronic={electronic.isPending} />
+  return <Detail document={doc.data} electronic={electronic.data ?? null} loadingElectronic={electronic.isPending} voidRequested={voidRequested} onVoidRequested={() => setVoidRequested(true)} />
 }
 
-function Detail({ document: doc, electronic, loadingElectronic }: { document: Document; electronic: ElectronicDocument | null; loadingElectronic: boolean }) {
+function Detail({ document: doc, electronic, loadingElectronic, voidRequested, onVoidRequested }: { document: Document; electronic: ElectronicDocument | null; loadingElectronic: boolean; voidRequested: boolean; onVoidRequested: () => void }) {
   const { hasRole } = useSession()
   const canIssue = hasRole(...BILLING_ROLES)
   const company = useCompany(doc.companyId)
@@ -51,11 +54,16 @@ function Detail({ document: doc, electronic, loadingElectronic }: { document: Do
   async function download(kind: 'pdf' | 'xml' | 'cdr') {
     if (!electronic) return
     setDownloadError(null)
+    const tab = kind === 'pdf' ? window.open('', '_blank') : null
+    if (kind === 'pdf' && !tab) {
+      setDownloadError(new Error('El navegador bloqueó la ventana del PDF. Permita las ventanas emergentes de este sitio.'))
+      return
+    }
     try {
       const blob = await fetchBlob(`/api/v1/electronic-documents/${electronic.id}/${kind}`)
-      if (kind === 'pdf') save(blob, `${electronic.fileBaseName}.pdf`, true)
-      else save(blob, kind === 'xml' ? `${electronic.fileBaseName}.xml` : `R-${electronic.fileBaseName}.zip`)
+      save(blob, kind === 'xml' ? `${electronic.fileBaseName}.xml` : `R-${electronic.fileBaseName}.zip`, tab)
     } catch (error) {
+      tab?.close()
       setDownloadError(error)
     }
   }
@@ -68,6 +76,11 @@ function Detail({ document: doc, electronic, loadingElectronic }: { document: Do
         {electronic && <StateBadge state={electronic.state} voided={electronic.voided} />}
       </PageHeader>
       <ErrorAlert error={actionError ?? downloadError} />
+      {voidRequested && electronic && !electronic.voided && (
+        <div className="alert info" role="status">
+          Baja solicitada. SUNAT responde en unos minutos; esta página se actualiza sola y mostrará «Anulado» cuando la confirme.
+        </div>
+      )}
 
       <div className="card">
         <h2>Envío a SUNAT</h2>
@@ -238,12 +251,12 @@ function Detail({ document: doc, electronic, loadingElectronic }: { document: Do
         </div>
       )}
 
-      {voiding && <VoidModal document={doc} onClose={() => setVoiding(false)} />}
+      {voiding && <VoidModal document={doc} onClose={() => setVoiding(false)} onRequested={onVoidRequested} />}
     </>
   )
 }
 
-function VoidModal({ document: doc, onClose }: { document: Document; onClose: () => void }) {
+function VoidModal({ document: doc, onClose, onRequested }: { document: Document; onClose: () => void; onRequested: () => void }) {
   const voidDocument = useCreateVoid(doc.id)
   const toast = useToast()
   const [reason, setReason] = useState('')
@@ -253,7 +266,7 @@ function VoidModal({ document: doc, onClose }: { document: Document; onClose: ()
         className="stack"
         onSubmit={(event) => {
           event.preventDefault()
-          voidDocument.mutate({ companyId: doc.companyId, items: [{ documentId: doc.id, reason: reason.trim() }] }, { onSuccess: () => { toast.ok('Comunicación de baja generada.'); onClose() } })
+          voidDocument.mutate({ companyId: doc.companyId, items: [{ documentId: doc.id, reason: reason.trim() }] }, { onSuccess: () => { toast.ok('Comunicación de baja generada.'); onRequested(); onClose() } })
         }}
       >
         <p>

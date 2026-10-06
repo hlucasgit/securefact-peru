@@ -74,9 +74,15 @@ export const useDocuments = (companyId: string | null, skip: number, take: numbe
 export const useDocument = (id: string) => useQuery({ queryKey: keys.document(id), queryFn: () => get<Document>(`/api/v1/documents/${id}`) })
 
 /** The electronic document of a document, or null while it was not prepared yet (the API answers 404). */
-export const useElectronic = (documentId: string) =>
+export const useElectronic = (documentId: string, watchVoid = false) =>
   useQuery({
     queryKey: keys.electronic(documentId),
+    // The workers send and read the answers in the background: while the document is on its way (or a voiding was requested and is not confirmed), look again every few seconds.
+    refetchInterval: (query) => {
+      const data = query.state.data
+      if (watchVoid && data?.voided !== true) return 5_000
+      return data && (data.state === 'ReadyToSend' || data.state === 'Sending' || data.state === 'AwaitingTicket') ? 5_000 : false
+    },
     queryFn: async () => {
       try {
         return await get<ElectronicDocument>(`/api/v1/documents/${documentId}/electronic`)

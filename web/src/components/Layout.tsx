@@ -22,26 +22,28 @@ export function Layout() {
 
   return (
     <div className="shell">
-      <aside className={`sidebar${open ? ' open' : ''}`} aria-label="Navegación principal">
+      <aside className={`sidebar${open ? ' open' : ''}`}>
         <div className="brand">
           SecureFact Perú
           <small>Facturación electrónica</small>
         </div>
-        {GROUPS.map((group) => {
-          const items = group.items.filter((item) => !item.roles || hasRole(...item.roles))
-          return (
-            items.length > 0 && (
-              <div key={group.title}>
-                <div className="nav-section">{group.title}</div>
-                {items.map((item) => (
-                  <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/documentos'} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={() => setOpen(false)}>
-                    {item.label}
-                  </NavLink>
-                ))}
-              </div>
+        <nav aria-label="Navegación principal">
+          {GROUPS.map((group) => {
+            const items = group.items.filter((item) => !item.roles || hasRole(...item.roles))
+            return (
+              items.length > 0 && (
+                <div key={group.title}>
+                  <div className="nav-section">{group.title}</div>
+                  {items.map((item) => (
+                    <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/documentos'} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={() => setOpen(false)}>
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )
             )
-          )
-        })}
+          })}
+        </nav>
         <div className="sidebar-foot">
           <div>{role ? (ROLE_LABELS[role] ?? role) : 'Sesión'}</div>
           <button className="btn small" type="button" onClick={() => void logout()}>
