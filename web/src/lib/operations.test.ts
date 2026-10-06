@@ -72,3 +72,15 @@ describe('the export types', () => {
     expect(buyerMustBeForeign('01', '0101')).toBe(false)
   })
 })
+
+describe('legends of exoneration', () => {
+  it('sends the legends chosen, and nothing when none was chosen', () => {
+    expect(buildDocumentRequest({ ...base, legends: ['2001', '2008'] }).legendCodes).toEqual(['2001', '2008'])
+    expect(buildDocumentRequest({ ...base, legends: [] })).not.toHaveProperty('legendCodes')
+    expect(buildDocumentRequest(base)).not.toHaveProperty('legendCodes')
+  })
+
+  it('never sends a legend in an export, whose total cannot be exonerated', () => {
+    expect(buildDocumentRequest({ ...base, operation: '0200', legends: ['2001'] })).not.toHaveProperty('legendCodes')
+  })
+})

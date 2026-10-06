@@ -1,5 +1,6 @@
 import { useCatalog, useProducts } from '../api/queries'
 import type { DocumentLine, Product } from '../api/types'
+import { copyTransport, emptyTransport, toRequestTransport, TransportEditor, type TransportState } from './TransportEditor'
 import { SelectField, TextField } from './ui'
 
 export interface LineState {
@@ -15,12 +16,14 @@ export interface LineState {
   isc: 'none' | 'AdValorem' | 'FixedAmount'
   iscValue: string
   bags: boolean
+  /** Cargo transport data: sent only in a detraction 027. */
+  transport: TransportState
 }
 
 let counter = 0
 
 export function emptyLine(): LineState {
-  return { key: ++counter, description: '', unitCode: 'NIU', productCode: null, quantity: '1', unitValue: '', affectation: '10', discount: '', referenceValue: '', isc: 'none', iscValue: '', bags: false }
+  return { key: ++counter, description: '', unitCode: 'NIU', productCode: null, quantity: '1', unitValue: '', affectation: '10', discount: '', referenceValue: '', isc: 'none', iscValue: '', bags: false, transport: emptyTransport() }
 }
 
 /** A line prefilled from a document line (to adjust it with a note). */
@@ -42,12 +45,13 @@ export function lineFrom(line: DocumentLine): LineState {
 const num = (text: string) => (text.trim() === '' ? 0 : Number(text))
 
 /** The `tax` of a line request. Amounts go as typed: the API calculates every total and every tax. */
-export function toRequestLine(line: LineState, isFree: boolean) {
+export function toRequestLine(line: LineState, isFree: boolean, withTransport = false) {
   const quantity = num(line.quantity)
   return {
     description: line.description.trim(),
     unitCode: line.unitCode.trim().toUpperCase(),
     productCode: line.productCode,
+    ...(withTransport ? { transport: toRequestTransport(line.transport) } : {}),
     tax: {
       quantity,
       unitValue: isFree ? 0 : num(line.unitValue),
@@ -65,9 +69,11 @@ interface Props {
   onChange: (lines: LineState[]) => void
   /** Every line has this affectation and it cannot be changed (the lines of an export). */
   fixedAffectation?: string
+  /** Every line states the data of a cargo transport (detraction 027). */
+  withTransport?: boolean
 }
 
-export function LinesEditor({ lines, onChange, fixedAffectation }: Props) {
+export function LinesEditor({ lines, onChange, fixedAffectation, withTransport = false }: Props) {
   const affectations = useCatalog('07')
   const products = useProducts('')
   const isFree = (code: string) => affectations.data?.find((entry) => entry.code === code)?.metadata['Codigo de tributo'] === '9996'
@@ -133,13 +139,19 @@ export function LinesEditor({ lines, onChange, fixedAffectation }: Props) {
                 <span>Bolsas de plástico (ICBPER): una por unidad</span>
               </label>
             </div>
+            {withTransport && <TransportEditor transport={line.transport} onChange={(transport) => update(line.key, { transport })} />}
           </div>
         </fieldset>
       ))}
-      <div>
+      <div className="actions">
         <button className="btn" type="button" onClick={() => onChange([...lines, emptyLine()])}>
           Agregar ítem
         </button>
+        {withTransport && lines.length > 1 && (
+          <button className="btn" type="button" onClick={() => onChange(lines.map((line, index) => (index === 0 ? line : { ...line, transport: copyTransport(lines[0].transport) })))}>
+            Usar el transporte del ítem 1 en todos
+          </button>
+        )}
       </div>
     </div>
   )

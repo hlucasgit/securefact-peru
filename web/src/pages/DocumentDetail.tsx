@@ -183,13 +183,16 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
         </div>
       </div>
 
-      {(doc.operationTypeCode !== '0101' || doc.detraction || doc.retention || doc.usageCountryCode) && (
+      {(doc.operationTypeCode !== '0101' || doc.detraction || doc.retention || doc.usageCountryCode || (doc.legendCodes?.length ?? 0) > 0) && (
         <div className="card">
           <h2>Operación</h2>
           <KeyValues
             items={[
               ['Tipo de operación', operationType.data?.find((entry) => entry.code === doc.operationTypeCode)?.description ?? doc.operationTypeCode],
               ...(doc.usageCountryCode ? ([['País del uso o aprovechamiento', doc.usageCountryCode]] as [string, React.ReactNode][]) : []),
+              ...((doc.legendCodes?.length ?? 0) > 0
+                ? ([['Leyendas', doc.legendCodes!.join(', ')]] as [string, React.ReactNode][])
+                : []),
               ...(doc.detraction
                 ? ([
                     ['Detracción', `${detractionCode.data?.find((entry) => entry.code === doc.detraction?.goodsOrServiceCode)?.description ?? doc.detraction.goodsOrServiceCode} (${doc.detraction.goodsOrServiceCode})`],
@@ -221,6 +224,12 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
                       {line.isc && <Badge tone="info">ISC {line.isc.system === 'AdValorem' ? `${Math.round(line.isc.rateOrUnitAmount * 10000) / 100} %` : money(line.isc.rateOrUnitAmount, doc.currency)}</Badge>}
                       {line.plasticBagCount > 0 && <Badge tone="info">{line.plasticBagCount} bolsas</Badge>}
                     </div>
+                    {line.transport && (
+                      <div className="muted">
+                        Transporte: {line.transport.originAddress} ({line.transport.originUbigeo}) → {line.transport.destinationAddress} ({line.transport.destinationUbigeo}) · {line.transport.tripDetail}
+                        {line.transport.legs && line.transport.legs.length > 0 && <> · {line.transport.legs.length} {line.transport.legs.length === 1 ? 'tramo' : 'tramos'}</>}
+                      </div>
+                    )}
                   </td>
                   <td className="num">{line.quantity} {line.unitCode}</td>
                   <td className="num">{money(line.unitValue, doc.currency)}</td>

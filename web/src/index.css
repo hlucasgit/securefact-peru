@@ -207,3 +207,6 @@ table.table { width: 100%; border-collapse: collapse; }
 .brand-logo-preview { max-height: 72px; max-width: 260px; object-fit: contain; align-self: flex-start; border: 1px solid var(--border); border-radius: 6px; padding: 6px; background: #fff; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .visually-hidden:focus-visible + .file-pick { outline: 2px solid var(--brand); outline-offset: 2px; }
+.transport, .leg { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; margin: 0; min-width: 0; }
+.transport > legend, .leg > legend { padding: 0 6px; font-weight: 600; }
+.leg { background: var(--surface-2); }

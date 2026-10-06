@@ -9,7 +9,7 @@ Las 16 pruebas unitarias de la interfaz no prueban lo que más importa: que la p
 ## Decisión
 - **Playwright** (`@playwright/test`, Chromium) en `web/e2e/`, contra la **API real** con PostgreSQL y el almacén S3, los **workers** y el **simulador de SUNAT** (ADR-039). La interfaz se sirve **compilada** (`vite preview`): el mismo paquete que se despliega.
 - **Cada archivo trabaja en su propia cuenta**: el administrador de plataforma (`SF_E2E_ADMIN_EMAIL`, `SF_E2E_ADMIN_PASSWORD`) crea por la API una cuenta nueva con su propietario para cada prueba, y una empresa lista (certificado, SOL, series) cuando hace falta. Las pruebas preparan su mundo por la API y **ejercitan la interfaz para lo que verifican**; así corren en paralelo (4 trabajadores) sin tocarse, y dos corridas seguidas no chocan.
-- **Qué cubren (53 recorridos)**:
+- **Qué cubren (57 recorridos)**:
   - *Autenticación*: ruta protegida con regreso, clave equivocada, cerrar sesión, recargar, segundo factor completo (con TOTP calculado en la prueba; el código del paso de la inscripción no se acepta dos veces, y la prueba usa el siguiente).
   - *Emisión*: factura con ISC e ICBPER de punta a punta (totales, XML firmado con 2000 y 7152, CDR, PDF), archivo conservado con su hash, boleta con DNI, crédito con cuotas que no suman, empresa sin series.
   - *Seguimiento*: nota de crédito que parte del documento aceptado con su ISC y sus bolsas, nota de débito, observación, falla y rechazo del simulador, baja hasta «Anulado» (1 minuto: SUNAT contesta con un ticket que los workers consultan cada minuto) y resumen diario.
@@ -18,6 +18,7 @@ Las 16 pruebas unitarias de la interfaz no prueban lo que más importa: que la p
   - *Plataforma* (ADR-041): crear inquilino con su propietario, suspender y reactivar con la sesión del propietario en otra ventana, cierre, búsqueda, usuarios, soporte de solo lectura, auditoría y su integridad.
   - *Planes* (ADR-042): crear un plan, asignarlo, agotar un tope de empresas y ampliarlo con la vista del propietario y la auditoría; accesibilidad del catálogo y acceso negado al propietario.
   - *Revendedores* (ADR-043): crear un revendedor y su administrador, abrir una cuenta con plan propio y propietario, aislamiento entre revendedores, mover una cuenta y apagar al revendedor.
+  - *Leyendas y transporte de carga* (ADR-047): una leyenda de exoneración emitida y aceptada, la leyenda que no viaja, el transporte de dos ítems con un tramo y el transporte que viaja solo con la detracción 027.
   - *Detracción, retención y exportación* (ADR-046): el monto que calcula el servidor, la factura emitida y aceptada, el cálculo que se descarta, la exportación con afectación fija y el país del uso.
   - *Suspensión por el revendedor* (ADR-045): suspender y reactivar con el cliente expulsado, la suspensión de la plataforma que el revendedor no levanta, y la plataforma que toma la del revendedor.
   - *Marca blanca* (ADR-044): el ingreso en el dominio de un revendedor (los nombres `*.e2e.test` se resuelven al servidor local con `--host-resolver-rules`), la marca editada por el revendedor y vista por su cliente, y el dominio asignado por la plataforma.

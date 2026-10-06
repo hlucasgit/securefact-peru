@@ -18,8 +18,17 @@ export const EXPORT_AFFECTATION = '40'
 /** Identity documents of a buyer abroad (catalogue 06): no document, foreigner card, passport, diplomatic ID. */
 export const FOREIGN_IDENTITY = ['0', '4', '7', 'A']
 
-/** Catalogue 54 codes whose operation needs data on every line (vessel and species; vehicle and trip): they are issued through the API. */
-export const DETRACTION_NEEDS_LINE_DETAILS = ['004', '027']
+/** Catalogue 54 codes whose operation needs data on every line that the form does not take yet: 004, the vessel and the species of a fishing sale. */
+export const DETRACTION_NEEDS_LINE_DETAILS = ['004']
+
+/** Catalogue 54 code of the cargo transport (operation 1004): every line states its origin, destination, trip and reference values, and optionally the legs with their vehicles. */
+export const CARGO_TRANSPORT_CODE = '027'
+
+/** Legends of catalogue 52 that an issuer states on a sale of exonerated operations: 2001, 2002, 2003 (Amazon region) and 2008 (commercial zone of Tacna). */
+export const EXEMPTION_LEGENDS = ['2001', '2002', '2003', '2008']
+
+/** Tax code of the exonerated operations (catalogue 07): a legend of exoneration needs a line with one of those affectations. */
+export const EXEMPT_TAX_CODE = '9997'
 
 export const isExport = (code: string) => EXPORT_TYPES.some((type) => type.code === code)
 
@@ -53,6 +62,7 @@ interface RequestInput {
   operation: string
   usageCountry: string
   deduction: DeductionInput
+  legends?: string[]
 }
 
 /**
@@ -82,5 +92,6 @@ export function buildDocumentRequest(input: RequestInput) {
     ...(exporting && needsUsageCountry(input.operation) ? { usageCountryCode: input.usageCountry.trim().toUpperCase() } : {}),
     ...(detraction ? { detraction } : {}),
     ...(retention ? { retention } : {}),
+    ...(!exporting && input.legends && input.legends.length > 0 ? { legendCodes: input.legends } : {}),
   }
 }

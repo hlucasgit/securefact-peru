@@ -153,6 +153,19 @@ export interface DocumentLine {
   igvAffectationCode: string
   isc: IscInput | null
   plasticBagCount: number
+  transport?: CargoTransport | null
+}
+
+export interface CargoTransport {
+  originUbigeo: string
+  originAddress: string
+  destinationUbigeo: string
+  destinationAddress: string
+  tripDetail: string
+  serviceReferenceValue: number
+  effectiveLoadReferenceValue: number
+  nominalLoadReferenceValue: number
+  legs: { originUbigeo: string; destinationUbigeo: string; vehicleConfiguration: string; usefulLoadTonnes: number; description: string | null; returnEmpty: boolean }[] | null
 }
 
 export interface Totals {
@@ -209,6 +222,7 @@ export interface Document {
   detraction: { goodsOrServiceCode: string; percentage: number; amount: number; accountNumber: string | null } | null
   retention: { percentage: number; baseAmount: number; amount: number } | null
   usageCountryCode: string | null
+  legendCodes: string[] | null
 }
 
 /** What issuing a document would calculate, with the amounts of a detraction or of a withholding when their percentage was given. */

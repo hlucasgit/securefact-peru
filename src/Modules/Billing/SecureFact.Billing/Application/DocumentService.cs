@@ -202,9 +202,9 @@ internal sealed partial class DocumentService(
             return Error.NotFound(ErrorCodes.SeriesNotFound, "Serie no encontrada", "La serie no existe o no es visible para este contexto.");
         }
 
-        // The amounts of a detraction and of a retention depend on the total, so they are left out of what is calculated and offered afterwards.
-        var operation = document.OperationTypeCode?.Trim();
-        var bare = document with { Detraction = null, Retention = null, Installments = null, InitialPayment = null, OperationTypeCode = OperationTypes.IsDetraction(operation) ? null : operation };
+        // The amounts of a detraction and of a retention depend on the total, so they are not checked here and are offered afterwards; the rest of what the document states (the code of the
+        // detraction, which sets the operation type and the data of every line, an export, a legend) is checked as in the issue. The installments need the final amounts too.
+        var bare = document with { Installments = null, InitialPayment = null };
         var prepared = await PrepareAsync(series, bare, preview: true, cancellationToken);
         if (!prepared.IsSuccess)
         {

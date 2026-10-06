@@ -7,7 +7,10 @@ import { DOCUMENT_TYPES, money, todayInLima } from '../lib/format'
 import {
   buildDocumentRequest,
   buyerMustBeForeign,
+  CARGO_TRANSPORT_CODE,
   DETRACTION_NEEDS_LINE_DETAILS,
+  EXEMPT_TAX_CODE,
+  EXEMPTION_LEGENDS,
   EXPORT_AFFECTATION,
   EXPORT_TYPES,
   FOREIGN_IDENTITY,
@@ -47,6 +50,7 @@ export function NewDocument() {
   const affectations = useCatalog('07')
   const operations = useCatalog('51')
   const detractionCodes = useCatalog('54')
+  const legendCatalog = useCatalog('52')
   const customers = useCustomers('')
 
   const [companyId, setCompanyId] = useState('')
@@ -62,6 +66,7 @@ export function NewDocument() {
   const [usageCountry, setUsageCountry] = useState('')
   const [deduction, setDeduction] = useState<DeductionInput>(noDeduction())
   const [calculation, setCalculation] = useState<Calculation | null>(null)
+  const [legends, setLegends] = useState<string[]>([])
 
   const activeCompanies = useMemo(() => companies.data?.filter((company) => company.status === 'Active') ?? [], [companies.data])
   const selectedCompany = activeCompanies.find((company) => company.id === companyId) ?? activeCompanies[0]
@@ -96,7 +101,11 @@ export function NewDocument() {
   const noBuyer = buyer.documentTypeCode === '0'
   const foreignOnly = buyerMustBeForeign(type, operation)
 
-  const requestLines = lines.map((line) => toRequestLine({ ...line, affectation: exporting ? EXPORT_AFFECTATION : line.affectation }, exporting ? false : lineIsFree(line.affectation, affectations.data)))
+  const cargo = activeDeduction.kind === 'detraction' && activeDeduction.goodsOrServiceCode === CARGO_TRANSPORT_CODE
+  const requestLines = lines.map((line) => toRequestLine({ ...line, affectation: exporting ? EXPORT_AFFECTATION : line.affectation }, exporting ? false : lineIsFree(line.affectation, affectations.data), cargo))
+  // A legend of exoneration needs a line that is exonerated: the card appears only then, and the API checks the rest.
+  const hasExempt = !exporting && lines.some((line) => affectations.data?.find((entry) => entry.code === line.affectation)?.metadata['Codigo de tributo'] === EXEMPT_TAX_CODE)
+  const legendsToSend = hasExempt ? legends : []
   const buyerBody = {
     documentTypeCode: buyer.documentTypeCode,
     documentNumber: noBuyer ? '-' : buyer.documentNumber.trim(),
@@ -106,10 +115,11 @@ export function NewDocument() {
   }
   const installmentsBody = credit && type === '01' ? installments.map((item) => ({ amount: Number(item.amount), dueDate: item.dueDate })) : undefined
   const request = (deductionToSend: DeductionInput) =>
-    buildDocumentRequest({ seriesId, issueDate, currency, buyer: buyerBody, lines: requestLines, installments: installmentsBody, operation, usageCountry, deduction: deductionToSend })
+    buildDocumentRequest({ seriesId, issueDate, currency, buyer: buyerBody, lines: requestLines, installments: installmentsBody, operation, usageCountry, deduction: deductionToSend, legends: legendsToSend })
 
   // The document without its deduction is what the API previews: the amounts of a detraction and of a withholding depend on the total.
-  const previewBody = { document: request(noDeduction()), detractionPercentage: activeDeduction.kind === 'detraction' ? Number(activeDeduction.percentage) || null : null, retentionPercentage: activeDeduction.kind === 'retention' ? Number(activeDeduction.retentionPercentage) || null : null }
+  // The amount of the detraction is what the preview gives, so it is not part of what is previewed (nor of what makes the result stale).
+  const previewBody = { document: request({ ...activeDeduction, amount: '0' }), detractionPercentage: activeDeduction.kind === 'detraction' ? Number(activeDeduction.percentage) || null : null, retentionPercentage: activeDeduction.kind === 'retention' ? Number(activeDeduction.retentionPercentage) || null : null }
   const previewKey = JSON.stringify(previewBody)
   const shown = calculation && calculation.key === previewKey ? calculation : null
   const canCalculate = Boolean(seriesId) && (previewBody.detractionPercentage !== null || previewBody.retentionPercentage !== null)
@@ -202,8 +212,23 @@ export function NewDocument() {
 
         <div className="card">
           <h2>Ítems</h2>
-          <LinesEditor lines={lines} onChange={setLines} fixedAffectation={exporting ? EXPORT_AFFECTATION : undefined} />
+          <LinesEditor lines={lines} onChange={setLines} fixedAffectation={exporting ? EXPORT_AFFECTATION : undefined} withTransport={cargo} />
         </div>
+
+        {hasExempt && (
+          <div className="card stack">
+            <h2>Leyendas de venta exonerada</h2>
+            <p className="muted">Si la venta está exonerada del IGV por la Amazonía o por la zona comercial de Tacna, indique la leyenda que corresponde. Salen impresas y en el XML.</p>
+            {EXEMPTION_LEGENDS.map((code) => (
+              <label className="checkbox" key={code}>
+                <input type="checkbox" checked={legends.includes(code)} onChange={(event) => setLegends(event.target.checked ? [...legends, code] : legends.filter((item) => item !== code))} />
+                <span>
+                  {code} · {legendCatalog.data?.find((entry) => entry.code === code)?.description ?? code}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
 
         {canDeduct && (
           <div className="card stack">
@@ -225,7 +250,7 @@ export function NewDocument() {
                   <TextField label="Monto de la detracción" hint="en soles" type="number" min="0" step="0.01" required value={deduction.amount} onChange={(event) => setDeduction({ ...deduction, amount: event.target.value })} />
                   <TextField label="Cuenta en el Banco de la Nación" hint={selectedCompany?.detractionAccount ? 'vacía: se usa la de la empresa' : 'obligatoria si la empresa no la tiene registrada'} required={!selectedCompany?.detractionAccount} maxLength={100} value={deduction.account} onChange={(event) => setDeduction({ ...deduction, account: event.target.value })} />
                 </div>
-                <p className="muted">Los porcentajes y los montos de la detracción son datos del emisor: SUNAT revisa su estructura, no su valor. Los códigos 004 (recursos hidrobiológicos) y 027 (transporte de carga) piden datos en cada línea y se emiten por la API.</p>
+                <p className="muted">Los porcentajes y los montos de la detracción son datos del emisor: SUNAT revisa su estructura, no su valor. El código 004 (recursos hidrobiológicos) pide datos de la embarcación en cada línea y se emite por la API. El 027 (transporte de carga) pide los datos del transporte en cada ítem, más abajo.</p>
               </>
             )}
 

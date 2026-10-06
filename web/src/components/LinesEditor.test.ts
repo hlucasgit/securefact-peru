@@ -1,4 +1,5 @@
 import { emptyLine, lineFrom, toRequestLine } from './LinesEditor'
+import { copyTransport, emptyLeg } from './TransportEditor'
 
 describe('toRequestLine', () => {
   it('sends the amounts as typed and one bag per unit when bags are on', () => {
@@ -51,5 +52,49 @@ describe('lineFrom', () => {
     })
 
     expect(line).toMatchObject({ quantity: '3', unitValue: '100', isc: 'AdValorem', iscValue: '10', bags: true, productCode: 'B1' })
+  })
+})
+
+describe('the cargo transport of a line', () => {
+  const transport = {
+    originUbigeo: ' 150101 ',
+    originAddress: ' Av. Argentina 123, Callao ',
+    destinationUbigeo: '040101',
+    destinationAddress: 'Parque Industrial, Arequipa',
+    tripDetail: 'Carga seca Lima - Arequipa',
+    serviceReferenceValue: '1500',
+    effectiveLoadReferenceValue: '1.5',
+    nominalLoadReferenceValue: '2.25',
+    legs: [] as ReturnType<typeof emptyLeg>[],
+  }
+
+  it('is sent only when the detraction is of cargo transport', () => {
+    const line = { ...emptyLine(), description: 'Flete', unitValue: '100', transport }
+
+    expect(toRequestLine(line, false)).not.toHaveProperty('transport')
+    expect(toRequestLine(line, false, true).transport).toMatchObject({
+      originUbigeo: '150101',
+      originAddress: 'Av. Argentina 123, Callao',
+      destinationUbigeo: '040101',
+      serviceReferenceValue: 1500,
+      effectiveLoadReferenceValue: 1.5,
+      nominalLoadReferenceValue: 2.25,
+    })
+    expect(toRequestLine(line, false, true).transport).not.toHaveProperty('legs')
+  })
+
+  it('sends the legs with their vehicles and leaves out what was not typed', () => {
+    const leg = { ...emptyLeg(), originUbigeo: '150101', destinationUbigeo: '040101', vehicleConfiguration: ' T3S3 ', usefulLoadTonnes: '28', description: '', effectiveLoadTonnes: '20.5', returnEmpty: true }
+    const sent = toRequestLine({ ...emptyLine(), transport: { ...transport, legs: [leg] } }, false, true).transport
+
+    expect(sent?.legs).toEqual([{ originUbigeo: '150101', destinationUbigeo: '040101', vehicleConfiguration: 'T3S3', usefulLoadTonnes: 28, effectiveLoadTonnes: 20.5, returnEmpty: true }])
+  })
+
+  it('copies the transport of a line to another with legs of their own', () => {
+    const first = { ...transport, legs: [{ ...emptyLeg(), vehicleConfiguration: 'T3S3' }] }
+    const copy = copyTransport(first)
+
+    expect(copy).toEqual({ ...first, legs: [{ ...first.legs[0], key: copy.legs[0].key }] })
+    expect(copy.legs[0].key).not.toBe(first.legs[0].key)
   })
 })

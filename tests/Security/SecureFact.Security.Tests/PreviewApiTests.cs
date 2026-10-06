@@ -138,6 +138,31 @@ public sealed class PreviewApiTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task The_preview_knows_the_operation_that_the_code_of_a_detraction_sets_and_the_data_of_every_line()
+    {
+        var setup = await NewTenantAsync("Transporte SAC");
+        var transport = new { originUbigeo = "150101", originAddress = "Av. Argentina 123", destinationUbigeo = "040101", destinationAddress = "Parque Industrial", tripDetail = "Carga seca", serviceReferenceValue = 1500m, effectiveLoadReferenceValue = 1.5m, nominalLoadReferenceValue = 2.25m };
+        object Cargo(object? withTransport, object? detraction) => new
+        {
+            seriesId = setup.Invoice.Id,
+            issueDate = Today(),
+            currency = "PEN",
+            buyer = new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" },
+            lines = new[] { new { description = "Flete", unitCode = "ZZ", tax = new { quantity = 1m, unitValue = 1000m, igvAffectationCode = "10" }, transport = withTransport } },
+            detraction,
+        };
+        var cargoDetraction = new { goodsOrServiceCode = "027", percentage = 4m, amount = 0m };
+
+        // A transport with the detraction 027 (operation 1004) is what issuing accepts; without it, or with another code, issuing refuses the data of the transport and so does the preview.
+        var accepted = await PreviewAsync(setup.Owner, Cargo(transport, cargoDetraction), detraction: 4m);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.Equal(1180.00m, await PayableAsync(accepted));
+        Assert.Equal("SF-BIL-006", await CodeAsync(await PreviewAsync(setup.Owner, Cargo(transport, null))));
+        Assert.Equal("SF-BIL-006", await CodeAsync(await PreviewAsync(setup.Owner, Cargo(transport, new { goodsOrServiceCode = "037", percentage = 12m, amount = 0m }))));
+        Assert.Equal("SF-BIL-006", await CodeAsync(await PreviewAsync(setup.Owner, Cargo(null, cargoDetraction)))); // 027 asks for the data of the transport in every line
+    }
+
+    [Fact]
     public async Task The_preview_needs_no_idempotency_key_takes_nothing_from_the_plan_and_is_for_those_who_issue()
     {
         using var admin = await api.AdminClientAsync();

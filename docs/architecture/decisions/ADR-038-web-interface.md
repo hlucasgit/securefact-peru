@@ -34,5 +34,5 @@ Administración de plataforma: ADR-041. Ingreso (con segundo factor) · Panel (e
 ## Límites (P)
 - Sin pruebas de extremo a extremo con navegador automatizado (solo las unitarias de arriba y la revisión manual).
 - La lista de documentos pide el estado de cada fila por separado (la API no lo trae en la lista): 25 llamadas pequeñas por página; un campo de estado en la lista las evitaría.
-- Detracción, retención y exportación se agregaron después (ADR-046). Fuera de esta primera entrega: leyendas y transporte de carga desde la interfaz (siguen por API), importación masiva, planes y métricas de consumo, *webhooks*, recuperación de contraseña, auditoría.
+- Detracción, retención y exportación se agregaron después (ADR-046). Las leyendas de venta exonerada y el transporte de carga se agregaron después (ADR-047). Fuera de esta primera entrega: importación masiva, planes y métricas de consumo, *webhooks*, recuperación de contraseña, auditoría.
 - Solo español.
