@@ -154,8 +154,11 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
             .Take(BatchSize)
             .ToListAsync(cancellationToken);
 
+        // Only the summary or communication that holds the ticket is polled: the receipts it reports wait in the same state without a ticket of their own and follow the outcome of their summary.
+        // Without this filter the pass polled them too, and whether that counted as a poll or as a conflict depended on which timestamp was newer.
         var polls = await db.ElectronicDocuments.AsNoTracking()
-            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.AwaitingTicket && (e.NextAttemptAt == null || e.NextAttemptAt <= now))
+            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.AwaitingTicket && e.Ticket != null && e.Ticket != string.Empty
+                && (e.NextAttemptAt == null || e.NextAttemptAt <= now))
             .OrderBy(e => e.UpdatedAt)
             .Select(e => new Due(e.TenantId, e.Id))
             .Take(BatchSize)

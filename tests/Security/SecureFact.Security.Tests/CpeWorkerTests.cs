@@ -202,6 +202,10 @@ public sealed class CpeWorkerTests(ApiFixture api)
         Assert.Equal(0, (await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId)).Polled);
         Assert.Empty(api.Sunat.StatusCalls);
 
+        // The receipts of the summary wait without a ticket of their own: even when they are the most recently updated, only the summary is polled (a pass once polled them too, and whether
+        // that counted depended on which timestamp was newer).
+        await ExecuteAsync($"UPDATE cpe.electronic_document SET updated_at = now() + interval '1 hour' WHERE id IN ('{closedA.Id}', '{closedB.Id}')");
+
         var summaryName = summaryCall.ZipFileName[..^".zip".Length];
         api.Sunat.EnqueueStatus(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, summaryName[(setup.Company.Ruc.Length + 1)..])));
         var second = await Processor(TimeSpan.FromMinutes(2)).RunOnceAsync(CancellationToken.None, setup.TenantId);
