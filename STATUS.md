@@ -56,7 +56,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Boletas de exportación en los siete tipos (ADR-031): adquirente nunca con RUC, resumen diario con el valor de exportación bajo el código 04; aceptadas en el beta. Pruebas: 660 pasan (397 unitarias, 6 arquitectura, 6 integración, 251 seguridad/API).
 - Boletas (y notas de boletas) en soles de más de S/ 700 deben identificar al adquirente: Billing lo rechaza al emitir con el monto de la regla versionada `billing.receipt_identification_threshold` (R-056). Pruebas: 663 pasan (397 unitarias, 6 arquitectura, 6 integración, 254 seguridad/API).
 - Leyendas de las ventas exoneradas 2001, 2002, 2003 (Amazonía) y 2008 (zona comercial de Tacna) en facturas y boletas (ADR-032); aceptadas en el beta. Pruebas: 673 pasan (404 unitarias, 6 arquitectura, 6 integración, 257 seguridad/API).
-- Pendiente: exportación 0202 y 0205 (datos del huésped en cada línea), tramos y vehículos del transporte de carga (1004).
+- Exportación de hospedaje (0202) y de paquete turístico (0205) en facturas, con el huésped no domiciliado en cada línea (ADR-033); aceptadas en el beta. Pruebas: 680 pasan (408 unitarias, 6 arquitectura, 6 integración, 260 seguridad/API).
+- Pendiente: tramos y vehículos del transporte de carga (1004).
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).

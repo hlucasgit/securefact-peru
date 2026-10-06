@@ -29,6 +29,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Exportación de servicios** (R-055): una factura de cada tipo 0201, 0203, 0204, 0206, 0207 y 0208 (línea de afectación 40, en dólares; país `US` en 0201 y 0208; adquirente tipo 0 en 0203 y 0204 y RUC en 0206 y 0207): las seis aceptadas, código 0, sin observaciones. **El beta no exigió el padrón de exportadores (regla 3097)** al emisor de 0201. **Boletas de exportación**: 0200 y 0208 (país `US`, adquirente tipo 0) por `sendBill` y un resumen diario con una boleta de exportación en dólares (código 04, IGV 0.00): aceptados, código 0. Una boleta 0207 con adquirente RUC fue rechazada con **2800** (la hoja `Boleta2_0` lo prohíbe en todo tipo de exportación).
 
+- **Hospedaje y paquete turístico** (R-058): una factura de exportación 0202 con las diez propiedades del huésped y la estadía (4000–4009) y una 0205 con las cuatro del huésped (4000, 4007–4009), en dólares y con adquirente tipo 0: aceptadas, código 0, sin observaciones.
+
 - **Leyendas de ventas exoneradas** (R-057): factura y boleta con una línea exonerada y la leyenda 2008, y una factura con las leyendas 2001, 2002 y 2003 a la vez: aceptadas, código 0, sin observaciones.
 
 - **Entrega inicial** (R-048): factura de 118.00 al crédito con 18.00 pagados al emitir y dos cuotas de 50.00 (monto neto pendiente 100.00, menor que el importe total): aceptada, código 0, sin observaciones.

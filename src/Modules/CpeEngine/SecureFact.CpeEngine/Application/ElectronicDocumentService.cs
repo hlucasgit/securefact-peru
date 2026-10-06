@@ -97,6 +97,11 @@ internal sealed class ElectronicDocumentService(
                 ? new UblCargoTransport(
                     transport.OriginUbigeo, transport.OriginAddress, transport.DestinationUbigeo, transport.DestinationAddress, transport.TripDetail,
                     transport.ServiceReferenceValue, transport.EffectiveLoadReferenceValue, transport.NominalLoadReferenceValue)
+                : null,
+            l.Guest is { } guest
+                ? new UblGuest(
+                    guest.Name, guest.DocumentTypeCode, guest.DocumentNumber, guest.PassportCountryCode, guest.ResidenceCountryCode, guest.CountryEntryDate, guest.CheckInDate,
+                    guest.CheckOutDate, guest.ConsumptionDate, guest.StayDays)
                 : null)).ToList();
 
         var generated = d.Note is { } note
@@ -495,6 +500,13 @@ internal sealed class ElectronicDocumentService(
                 lines.Add(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
                     $"Ítem {line.LineNumber}, recursos hidrobiológicos: embarcación {fishing.VesselName} (matrícula {fishing.VesselRegistration}); especie {fishing.SpeciesType}, {fishing.SpeciesQuantity:0.00} TM; descarga en {fishing.UnloadingPlace} el {fishing.UnloadingDate:yyyy-MM-dd}"));
+            }
+
+            if (line.Guest is { } guest)
+            {
+                lines.Add(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Ítem {line.LineNumber}, huésped no domiciliado: {guest.Name}, documento {guest.DocumentTypeCode} {guest.DocumentNumber}, pasaporte de {guest.PassportCountryCode}{(guest.CheckInDate is null ? string.Empty : $"; residencia {guest.ResidenceCountryCode}, ingreso al país {guest.CountryEntryDate:yyyy-MM-dd}, ingreso {guest.CheckInDate:yyyy-MM-dd}, salida {guest.CheckOutDate:yyyy-MM-dd}, consumo {guest.ConsumptionDate:yyyy-MM-dd}, {guest.StayDays} días")}"));
             }
 
             if (line.Transport is { } transport)

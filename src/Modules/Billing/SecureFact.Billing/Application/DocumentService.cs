@@ -449,9 +449,9 @@ internal sealed partial class DocumentService(
             return Invalid("Notas sin descuentos ni cargos", "Una nota no lleva descuentos ni cargos (ni de línea ni globales): indique los valores netos.");
         }
 
-        if (request.Lines!.Any(l => l is { Fishing: not null } or { Transport: not null }))
+        if (request.Lines!.Any(l => l is { Fishing: not null } or { Transport: not null } or { Guest: not null }))
         {
-            return Invalid("Notas sin datos de pesca ni de transporte", "Una nota no lleva datos de recursos hidrobiológicos ni de transporte de carga: son de la factura que modifica.");
+            return Invalid("Notas sin datos de pesca, transporte ni huésped", "Una nota no lleva datos de recursos hidrobiológicos, de transporte de carga ni del huésped: son de la factura que modifica.");
         }
 
         if (referenced.CompanyId != series.CompanyId)
@@ -716,7 +716,7 @@ internal sealed partial class DocumentService(
             var tax = storedLine?.Tax;
             return new DocumentLineDto(
                 l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.LineExtensionAmount, l.TaxCode, l.TotalTaxAmount, l.UnitPriceIncludingTaxes, l.UnitValue, l.AffectationCode,
-                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m, storedLine?.Fishing, storedLine?.Transport);
+                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m, storedLine?.Fishing, storedLine?.Transport, storedLine?.Guest);
         }).ToList();
         var buyer = new BuyerSnapshot(d.BuyerDocumentTypeCode, d.BuyerDocumentNumber, d.BuyerName, d.BuyerAddress, d.BuyerEmail);
         var note = d.ReferencedDocumentId is { } referencedId
@@ -973,7 +973,12 @@ internal sealed partial class DocumentService(
         var operation = request.OperationTypeCode?.Trim();
         if (operation is not (null or OperationTypes.Sale) && !OperationTypes.IsExport(operation) && !OperationTypes.IsDetraction(operation))
         {
-            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200, 0201, 0203, 0204, 0206, 0207 y 0208 (exportación) o 1001 a 1004 (sujetas a detracción).");
+            return Invalid($"El tipo de operación '{operation}' no está soportado: 0101 (venta interna), 0200 a 0208 (exportación) o 1001 a 1004 (sujetas a detracción).");
+        }
+
+        if (OperationTypes.IsInvoiceOnlyExport(operation) && series.DocumentTypeCode != DocumentTypes.Invoice)
+        {
+            return Invalid($"El tipo de operación {operation} solo se emite con facturas (catálogo 51).");
         }
 
         var usageCountry = request.UsageCountryCode;
@@ -1053,6 +1058,8 @@ internal sealed partial class DocumentService(
         var operation = request.Detraction is { } detraction ? OperationTypes.ForDetraction(detraction.GoodsOrServiceCode) : request.OperationTypeCode?.Trim() ?? OperationTypes.Sale;
         var fishing = operation == OperationTypes.FishingDetraction;
         var cargo = operation == OperationTypes.CargoTransportDetraction;
+        var lodging = operation == OperationTypes.ExportLodging;
+        var guestRequired = lodging || operation == OperationTypes.ExportTouristPackage;
         for (var i = 0; i < request.Lines.Count; i++)
         {
             var line = request.Lines[i];
@@ -1076,6 +1083,18 @@ internal sealed partial class DocumentService(
                     : "Los datos del transporte de carga son solo del tipo de operación 1004 (detracción con el código 027).");
             }
 
+            if (guestRequired != (line.Guest is not null))
+            {
+                return Invalid(number, guestRequired
+                    ? $"Cada línea del tipo de operación {operation} requiere los datos del huésped no domiciliado."
+                    : "Los datos del huésped son solo de los tipos de operación 0202 (hospedaje) y 0205 (paquete turístico).");
+            }
+
+            if (line.Guest is { } guest && GuestError(guest, lodging) is { } guestError)
+            {
+                return Invalid(number, guestError);
+            }
+
             if (line.Fishing is { } f
                 && !(IsText(f.VesselRegistration, 1, 15) && IsText(f.VesselName, 1, 100) && IsText(f.SpeciesType, 1, 150) && IsText(f.UnloadingPlace, 1, 100) && IsAmount(f.SpeciesQuantity)))
             {
@@ -1092,6 +1111,33 @@ internal sealed partial class DocumentService(
 
         return null;
     }
+
+    /// <summary>
+    /// The guest of a lodging (0202) or tourist package (0205) line (sheet Factura2_0, rules 3136–3145, 3065, 4280–4282): name, identity document and passport country always; the lodging
+    /// adds the residence country, the four dates (check-out not before check-in) and the days of stay; the package states none of them.
+    /// </summary>
+    private static string? GuestError(GuestDetail guest, bool lodging)
+    {
+        if (!IsText(guest.Name, 3, 200) || !IsText(guest.DocumentNumber, 3, 20) || guest.DocumentTypeCode is null || !IdentityDocuments.SupportedTypes.Contains(guest.DocumentTypeCode, StringComparer.Ordinal)
+            || !IsCountry(guest.PassportCountryCode))
+        {
+            return "El huésped requiere nombre (3 a 200 caracteres), tipo de documento del catálogo 06, número de documento (3 a 20 caracteres, sin saltos de línea) y país de emisión del pasaporte (ISO 3166-1, dos letras mayúsculas).";
+        }
+
+        var stay = guest.ResidenceCountryCode is not null || guest.CountryEntryDate is not null || guest.CheckInDate is not null || guest.CheckOutDate is not null
+            || guest.ConsumptionDate is not null || guest.StayDays is not null;
+        if (!lodging)
+        {
+            return stay ? "Un paquete turístico (0205) informa solo al huésped, sin los datos de la estadía." : null;
+        }
+
+        return IsCountry(guest.ResidenceCountryCode) && guest.CountryEntryDate is not null && guest.CheckInDate is not null && guest.CheckOutDate is not null && guest.ConsumptionDate is not null
+            && guest.StayDays is >= 0 and <= 9999 && guest.CheckOutDate >= guest.CheckInDate
+            ? null
+            : "El hospedaje (0202) requiere país de residencia, fechas de ingreso al país, de ingreso y de salida del establecimiento (la salida no antes del ingreso) y de consumo, y los días de permanencia (hasta 4 dígitos).";
+    }
+
+    private static bool IsCountry(string? value) => value is { Length: 2 } && value.All(char.IsAsciiLetterUpper);
 
     /// <summary>Text of the length the rules ask for, without line breaks, tabs or other control characters.</summary>
     private static bool IsText(string? value, int minLength, int maxLength) =>
@@ -1127,7 +1173,7 @@ internal sealed partial class DocumentService(
             : Invalid("El motivo 11 solo modifica una factura de exportación.");
     }
 
-    private sealed record StoredLine(TaxableLine? Tax, FishingDetail? Fishing, CargoTransportDetail? Transport);
+    private sealed record StoredLine(TaxableLine? Tax, FishingDetail? Fishing, CargoTransportDetail? Transport, GuestDetail? Guest);
 
     private sealed record StoredRequest(
         List<StoredLine?>? Lines, GlobalAdjustments? Adjustments, List<Installment?>? Installments, string? OperationTypeCode, decimal? InitialPayment, Detraction? Detraction, RetentionRequest? Retention,

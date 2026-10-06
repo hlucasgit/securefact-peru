@@ -522,8 +522,94 @@ public class UblInvoiceGeneratorTests
     {
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData(affectation: "10")).Error.Code); // 0200 with taxed lines
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0101")).Error.Code); // export lines on a sale
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202")).Error.Code); // lodging and tourist packages need the data of the guest
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205")).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0202")).Error.Code); // lodging and tourist packages need the guest in every line
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0205")).Error.Code);
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0209")).Error.Code);
+    }
+
+    // ---------- lodging and tourist package exports ----------
+
+    private static readonly UblGuest TouristGuest = new("John Smith", "7", "X1234567", "US");
+
+    private static readonly UblGuest LodgedGuest = new("John Smith", "7", "X1234567", "US", "CA", new DateOnly(2026, 9, 25), new DateOnly(2026, 9, 26), new DateOnly(2026, 9, 29), new DateOnly(2026, 9, 28), 3);
+
+    private static UblInvoiceData Lodging(UblGuest? guest = null) =>
+        WithLine(ExportData("0202"), l => l with { Guest = guest ?? LodgedGuest });
+
+    private static UblInvoiceData Package(UblGuest? guest = null) =>
+        WithLine(ExportData("0205"), l => l with { Guest = guest ?? TouristGuest });
+
+    [Fact]
+    public void A_lodging_export_states_the_guest_and_the_stay_of_every_line_with_the_catalogue_55_concepts()
+    {
+        var result = _generator.GenerateInvoice(Lodging());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("0202", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        var properties = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:Item/cac:AdditionalItemProperty", Namespaces).ToList();
+        Assert.Equal(["4000", "4001", "4002", "4003", "4004", "4005", "4006", "4007", "4008", "4009"], properties.Select(p => p.XPathSelectElement("cbc:NameCode", Namespaces)!.Value));
+        XElement Property(string code) => properties.Single(p => p.XPathSelectElement("cbc:NameCode", Namespaces)!.Value == code);
+        Assert.Equal("US", Property("4000").XPathSelectElement("cbc:Value", Namespaces)!.Value);
+        Assert.Equal("CA", Property("4001").XPathSelectElement("cbc:Value", Namespaces)!.Value);
+        Assert.Equal("2026-09-25", Property("4002").XPathSelectElement("cac:UsabilityPeriod/cbc:StartDate", Namespaces)!.Value);
+        Assert.Equal("2026-09-26", Property("4003").XPathSelectElement("cac:UsabilityPeriod/cbc:StartDate", Namespaces)!.Value);
+        Assert.Equal("2026-09-29", Property("4004").XPathSelectElement("cac:UsabilityPeriod/cbc:StartDate", Namespaces)!.Value);
+        Assert.Equal("2026-09-28", Property("4006").XPathSelectElement("cac:UsabilityPeriod/cbc:StartDate", Namespaces)!.Value);
+        var days = Property("4005").XPathSelectElement("cac:UsabilityPeriod/cbc:DurationMeasure", Namespaces)!;
+        Assert.Equal("3", days.Value);
+        Assert.Equal("DAY", days.Attribute("unitCode")!.Value);
+        Assert.Equal("John Smith", Property("4007").XPathSelectElement("cbc:Value", Namespaces)!.Value);
+        Assert.Equal("7", Property("4008").XPathSelectElement("cbc:Value", Namespaces)!.Value);
+        Assert.Equal("X1234567", Property("4009").XPathSelectElement("cbc:Value", Namespaces)!.Value);
+        Assert.All(properties, p => Assert.Equal("urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo55", p.XPathSelectElement("cbc:NameCode", Namespaces)!.Attribute("listURI")!.Value));
+    }
+
+    [Fact]
+    public void A_tourist_package_export_states_only_the_guest()
+    {
+        var result = _generator.GenerateInvoice(Package());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal("0205", xml.XPathSelectElement("/inv:Invoice/cbc:InvoiceTypeCode", Namespaces)!.Attribute("listID")!.Value);
+        Assert.Equal(["4000", "4007", "4008", "4009"], xml.XPathSelectElements("//cac:AdditionalItemProperty/cbc:NameCode", Namespaces).Select(n => n.Value));
+    }
+
+    [Fact]
+    public void The_guest_of_a_lodging_or_package_follows_the_rules_of_the_sheet()
+    {
+        UblInvoiceData[] refused =
+        [
+            WithLine(ExportData("0202"), l => l), // no guest in a lodging (rules 3136-3145)
+            WithLine(ExportData("0205"), l => l),
+            WithLine(ExportData("0203"), l => l with { Guest = TouristGuest }), // guest in another type
+            WithLine(ExportData(), l => l with { Guest = TouristGuest }),
+            Package(LodgedGuest), // a package states no stay
+            Lodging(TouristGuest), // a lodging states the stay
+            Lodging(LodgedGuest with { CheckOutDate = new DateOnly(2026, 9, 25) }), // observation 4282: out before in
+            Lodging(LodgedGuest with { StayDays = 10_000 }),
+            Lodging(LodgedGuest with { StayDays = -1 }),
+            Lodging(LodgedGuest with { ConsumptionDate = null }),
+            Lodging(LodgedGuest with { ResidenceCountryCode = "usa" }),
+            Package(TouristGuest with { Name = "ab" }), // 3 to 200
+            Package(TouristGuest with { Name = new string('A', 201) }),
+            Package(TouristGuest with { DocumentNumber = "ab" }), // 3 to 20
+            Package(TouristGuest with { DocumentNumber = new string('1', 21) }),
+            Package(TouristGuest with { DocumentTypeCode = "Z" }), // catalogue 06
+            Package(TouristGuest with { PassportCountryCode = "U" }),
+            Package(TouristGuest with { Name = "John\nSmith" }),
+        ];
+        foreach (var data in refused)
+        {
+            Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(data).Error.Code);
+        }
+
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202", "03") with { Lines = Lodging().Lines }).Error.Code); // invoices only (catalogue 51)
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205", "03") with { Lines = Package().Lines }).Error.Code);
+        Assert.True(_generator.GenerateInvoice(Lodging(LodgedGuest with { CheckOutDate = LodgedGuest.CheckInDate, StayDays = 0 })).IsSuccess);
     }
 
     // ---------- export of services ----------
@@ -607,8 +693,8 @@ public class UblInvoiceGeneratorTests
     {
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0201", "03")).Error.Code); // 3098: the country
         Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(ExportData("0200", "03", "10")).Error.Code); // 2642
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202", "03")).Error.Code); // catalogue 51: invoices only
-        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205", "03")).Error.Code);
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0202", "03") with { Lines = Lodging().Lines }).Error.Code); // catalogue 51: invoices only
+        Assert.Equal(ErrorCodes.CpeUnsupported, _generator.GenerateInvoice(ExportData("0205", "03") with { Lines = Package().Lines }).Error.Code);
     }
 
     // ---------- IVAP (rice) ----------

@@ -39,12 +39,21 @@ public static class OperationTypes
     /// <summary>0208 – export of services, rendered partly abroad. Names the country where the service is used.</summary>
     public const string ExportServicesPartlyAbroad = "0208";
 
+    /// <summary>0202 – export of services, lodging of non-domiciled guests (invoices only). Every line carries a <see cref="GuestDetail"/> with the stay.</summary>
+    public const string ExportLodging = "0202";
+
+    /// <summary>0205 – export of services that make up a tourist package (invoices only). Every line carries a <see cref="GuestDetail"/> with the guest only.</summary>
+    public const string ExportTouristPackage = "0205";
+
+    /// <summary>The types that only an invoice can carry (catalogue 51): lodging and tourist package.</summary>
+    public static bool IsInvoiceOnlyExport(string? operationTypeCode) => operationTypeCode is ExportLodging or ExportTouristPackage;
+
     /// <summary>
-    /// The export types the platform issues, in invoices and receipts: goods (0200) and the services above. The lodging (0202) and tourist package (0205) exports are not supported:
-    /// they need the data of the non-domiciled guest in every line (and are invoice-only in catalogue 51).
+    /// The export types the platform issues: goods (0200) and the services above, in invoices and receipts, and the lodging (0202) and tourist package (0205) exports, in invoices only.
     /// </summary>
     public static bool IsExport(string? operationTypeCode) =>
-        operationTypeCode is Export or ExportServicesInCountry or ExportShippingLines or ExportForeignCraftServices or ExportCargoSupport or ExportZedElectricity or ExportServicesPartlyAbroad;
+        operationTypeCode is Export or ExportServicesInCountry or ExportShippingLines or ExportForeignCraftServices or ExportCargoSupport or ExportZedElectricity or ExportServicesPartlyAbroad
+            or ExportLodging or ExportTouristPackage;
 
     /// <summary>The types whose buyer lives abroad: the sheet forbids the RUC there (rule 2800) unless the legend 2008 (Tacna commercial zone) is stated.</summary>
     public static bool RequiresForeignBuyer(string? operationTypeCode) => operationTypeCode is Export or ExportServicesInCountry or ExportForeignCraftServices;
@@ -179,7 +188,26 @@ public sealed record DocumentLineRequest(
     TaxableLine Tax,
     string? ProductCode = null,
     FishingDetail? Fishing = null,
-    CargoTransportDetail? Transport = null);
+    CargoTransportDetail? Transport = null,
+    GuestDetail? Guest = null);
+
+/// <summary>
+/// The non-domiciled guest of a lodging (0202) or tourist package (0205) line, with the concepts of catalogue 55 codes 4000–4009. The name (3–200 characters, code 4007), the identity
+/// document type (catalogue 06, 4008) and number (3–20 characters, 4009) and the country that issued the passport (ISO 3166-1, 4000) are always required. A lodging (0202) also states the
+/// country of residence (4001), the dates of entry to the country (4002), of check-in (4003), of check-out (4004, not before the check-in) and of consumption (4006), and the number of
+/// days of stay (4005, up to 4 digits); a tourist package states none of those.
+/// </summary>
+public sealed record GuestDetail(
+    string Name,
+    string DocumentTypeCode,
+    string DocumentNumber,
+    string PassportCountryCode,
+    string? ResidenceCountryCode = null,
+    DateOnly? CountryEntryDate = null,
+    DateOnly? CheckInDate = null,
+    DateOnly? CheckOutDate = null,
+    DateOnly? ConsumptionDate = null,
+    int? StayDays = null);
 
 /// <summary>One installment (cuota) of an invoice sold on credit: the amount due and the day it falls due.</summary>
 public sealed record Installment(decimal Amount, DateOnly DueDate);
@@ -189,7 +217,7 @@ public sealed record Installment(decimal Amount, DateOnly DueDate);
 /// The buyer is given either inline (<paramref name="Buyer"/>) or by reference (<paramref name="CustomerId"/>), never both; a referenced
 /// customer is copied into the document as a snapshot. An invoice (never a receipt) is sold on credit when <paramref name="Installments"/> is given: its
 /// amounts must add up to the payable amount and every due date must fall after the issue date. <paramref name="OperationTypeCode"/> is the catalogue 51 type:
-/// <c>0101</c> by default, <c>0200</c> for the export of goods or <c>0201</c>, <c>0203</c>, <c>0204</c>, <c>0206</c>, <c>0207</c> and <c>0208</c> for the export of services (every line with
+/// <c>0101</c> by default, <c>0200</c> for the export of goods or <c>0201</c>, <c>0202</c>, <c>0203</c>, <c>0204</c>, <c>0205</c>, <c>0206</c>, <c>0207</c> and <c>0208</c> for the export of services (every line with
 /// affectation 40; the buyer of an invoice has no RUC in 0200, 0201 and 0204, and the buyer of a receipt never has one).
 /// <paramref name="LegendCodes"/> are the legends of <see cref="ExemptionLegends"/> (2001, 2002, 2003, 2008) the issuer states; each one needs exonerated operations in the document. <paramref name="UsageCountryCode"/> (ISO 3166-1 alpha-2, never <c>PE</c>) is required in 0201 and 0208 and refused elsewhere.
 /// <paramref name="InitialPayment"/> is the part of a credit sale paid on the issue date (entrega inicial): the installments then add up to the payable amount minus it.
@@ -259,7 +287,8 @@ public sealed record DocumentLineDto(
     decimal DiscountNotAffectingBase = 0m,
     decimal ChargeNotAffectingBase = 0m,
     FishingDetail? Fishing = null,
-    CargoTransportDetail? Transport = null);
+    CargoTransportDetail? Transport = null,
+    GuestDetail? Guest = null);
 
 public sealed record DocumentDto(
     Guid Id,

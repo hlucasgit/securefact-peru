@@ -144,8 +144,8 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
     private const string ExportServicesPartlyAbroadOperation = "0208";
 
-    /// <summary>Export types supported: goods (0200) and the services 0201, 0203, 0204, 0206, 0207 and 0208 (the lodging 0202 and the tourist package 0205 need the data of the guest in every line).</summary>
-    private static bool IsExportOperation(string? operation) => operation is ExportOperation or "0201" or "0203" or "0204" or "0206" or "0207" or "0208";
+    /// <summary>Export types supported: goods (0200) and the services 0201 to 0208; the lodging 0202 and the tourist package 0205 are invoice-only and carry the guest in every line.</summary>
+    private static bool IsExportOperation(string? operation) => operation is ExportOperation or "0201" or "0202" or "0203" or "0204" or "0205" or "0206" or "0207" or "0208";
 
     private static bool UsesCountry(string? operation) => operation is ExportServicesInCountryOperation or ExportServicesPartlyAbroadOperation;
 
@@ -293,17 +293,22 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 return exportLines == 0 && data.DocumentTypeCode == "01"
                     ? null
                     : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", $"La operación sujeta a detracción ({data.OperationTypeCode}) es una factura de venta, no una exportación.");
-            case ExportOperation or "0201" or "0203" or "0204" or "0206" or "0207" or "0208":
+            case ExportOperation or "0201" or "0202" or "0203" or "0204" or "0205" or "0206" or "0207" or "0208":
                 if (CheckUsageCountry(data) is { } badCountry)
                 {
                     return badCountry;
+                }
+
+                if (data.OperationTypeCode is "0202" or "0205" && data.DocumentTypeCode != "01")
+                {
+                    return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación {data.OperationTypeCode} se emite solo con facturas (catálogo 51).");
                 }
 
                 return exportLines == data.Totals.Lines.Count
                     ? null
                     : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", "Una exportación lleva solo líneas de exportación (afectación 40).");
             default:
-                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101, 0200, 0201, 0203, 0204, 0206, 0207, 0208 o 1001 a 1004).");
+                return Error.Validation(ErrorCodes.CpeUnsupported, "Documento no soportado por el generador", $"El tipo de operación '{data.OperationTypeCode}' no está soportado (0101, 0200 a 0208 o 1001 a 1004).");
         }
     }
 
@@ -371,8 +376,22 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         var fishing = data.OperationTypeCode == FishingOperation;
         var cargo = data.OperationTypeCode == CargoTransportOperation;
+        var lodging = data.OperationTypeCode == "0202";
+        var guestRequired = lodging || data.OperationTypeCode == "0205";
         foreach (var line in data.Lines)
         {
+            if (guestRequired != (line.Guest is not null))
+            {
+                return Invalid(guestRequired
+                    ? $"La línea {line.LineNumber} requiere los datos del huésped no domiciliado (tipo de operación {data.OperationTypeCode})."
+                    : $"La línea {line.LineNumber} lleva datos del huésped, que son solo de los tipos de operación 0202 y 0205.");
+            }
+
+            if (line.Guest is { } guest && !GuestIsValid(guest, lodging))
+            {
+                return Invalid($"Línea {line.LineNumber}: el huésped requiere nombre, documento, país del pasaporte y, en un hospedaje, residencia, fechas (salida no antes del ingreso) y días de permanencia; un paquete turístico no lleva los datos de la estadía.");
+            }
+
             if (fishing && line.Fishing is null)
             {
                 return Invalid($"La línea {line.LineNumber} requiere los datos de recursos hidrobiológicos (tipo de operación 1002).");
@@ -413,6 +432,61 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     /// <summary>Text of the length the rules ask for, without line breaks, tabs or other control characters.</summary>
     private static bool IsText(string? value, int minLength, int maxLength) =>
         value is not null && value.Trim().Length >= minLength && value.Trim().Length <= maxLength && !value.Any(char.IsControl);
+
+    private static bool IsCountry(string? value) => value is { Length: 2 } && value.All(char.IsAsciiLetterUpper);
+
+    private static bool GuestIsValid(UblGuest guest, bool lodging)
+    {
+        if (!IsText(guest.Name, 3, 200) || !IsText(guest.DocumentNumber, 3, 20) || guest.DocumentTypeCode is null
+            || !SecureFact.SharedKernel.Domain.IdentityDocuments.SupportedTypes.Contains(guest.DocumentTypeCode, StringComparer.Ordinal) || !IsCountry(guest.PassportCountryCode))
+        {
+            return false;
+        }
+
+        if (!lodging)
+        {
+            return guest.ResidenceCountryCode is null && guest.CountryEntryDate is null && guest.CheckInDate is null && guest.CheckOutDate is null && guest.ConsumptionDate is null && guest.StayDays is null;
+        }
+
+        return IsCountry(guest.ResidenceCountryCode) && guest.CountryEntryDate is not null && guest.CheckInDate is not null && guest.CheckOutDate is not null && guest.ConsumptionDate is not null
+            && guest.StayDays is >= 0 and <= 9999 && guest.CheckOutDate >= guest.CheckInDate;
+    }
+
+    private static XElement ItemProperty(string code, string name, params object[] content) =>
+        new(
+            Cac + "AdditionalItemProperty",
+            new XElement(Cbc + "Name", name),
+            new XElement(
+                Cbc + "NameCode",
+                new XAttribute("listName", "Propiedad del item"),
+                new XAttribute("listAgencyName", "PE:SUNAT"),
+                new XAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo55"),
+                code),
+            content);
+
+    /// <summary>The properties of the guest of a lodging or tourist package line (catalogue 55 codes 4000–4009); the Name is the description of the concept in the catalogue.</summary>
+    private static IEnumerable<XElement> GuestProperties(UblGuest guest)
+    {
+        static XElement Date(string code, string name, DateOnly? date) =>
+            ItemProperty(code, name, new XElement(Cac + "UsabilityPeriod", new XElement(Cbc + "StartDate", date!.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
+
+        yield return ItemProperty("4000", "Beneficio hospedajes: Código País de emisión del pasaporte", new XElement(Cbc + "Value", guest.PassportCountryCode));
+        if (guest.CheckInDate is not null)
+        {
+            yield return ItemProperty("4001", "Beneficio hospedajes: Código País de residencia del sujeto no domiciliado", new XElement(Cbc + "Value", guest.ResidenceCountryCode));
+            yield return Date("4002", "Beneficio Hospedajes: Fecha de ingreso al país", guest.CountryEntryDate);
+            yield return Date("4003", "Beneficio Hospedajes: Fecha de ingreso al establecimiento", guest.CheckInDate);
+            yield return Date("4004", "Beneficio Hospedajes: Fecha de salida del establecimiento", guest.CheckOutDate);
+            yield return ItemProperty(
+                "4005", "Beneficio Hospedajes: Número de días de permanencia",
+                new XElement(Cac + "UsabilityPeriod", new XElement(Cbc + "DurationMeasure", new XAttribute("unitCode", "DAY"), guest.StayDays!.Value.ToString(CultureInfo.InvariantCulture))));
+            yield return Date("4006", "Beneficio Hospedajes: Fecha de consumo", guest.ConsumptionDate);
+        }
+
+        yield return ItemProperty("4007", "Beneficio Hospedajes: Paquete turístico - Nombres y Apellidos del Huésped", new XElement(Cbc + "Value", guest.Name.Trim()));
+        yield return ItemProperty("4008", "Beneficio Hospedajes: Paquete turístico – Tipo documento identidad del huésped", new XElement(Cbc + "Value", guest.DocumentTypeCode));
+        yield return ItemProperty("4009", "Beneficio Hospedajes: Paquete turístico – Numero de documento identidad de huésped", new XElement(Cbc + "Value", guest.DocumentNumber.Trim()));
+    }
 
     private static bool IsUbigeo(string? value) => value is { Length: 6 } && value.All(char.IsAsciiDigit);
 
@@ -698,9 +772,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return badIvap;
         }
 
-        if (data.Lines.Any(l => l.Fishing is not null || l.Transport is not null))
+        if (data.Lines.Any(l => l.Fishing is not null || l.Transport is not null || l.Guest is not null))
         {
-            return Invalid("Una nota no lleva datos de recursos hidrobiológicos ni de transporte de carga.");
+            return Invalid("Una nota no lleva datos de recursos hidrobiológicos, de transporte de carga ni del huésped.");
         }
 
         if (data.Totals.TotalAllowances != 0 || data.Totals.TotalCharges != 0 || data.Totals.PayableRoundingAmount != 0 || data.Lines.Any(HasLineAdjustments))
@@ -1130,6 +1204,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         if (line.Fishing is { } fishing)
         {
             item.Add(FishingProperties(fishing));
+        }
+
+        if (line.Guest is { } guest)
+        {
+            item.Add(GuestProperties(guest));
         }
 
         element.Add(item);

@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Exportación de servicios de hospedaje (0202) y de paquete turístico (0205) en facturas, con el huésped no domiciliado y su estadía en cada línea (catálogo 55, códigos 4000–4009), en el UBL y en el PDF; aceptadas en el beta (ADR-033, R-058).
 - Leyendas de las ventas exoneradas 2001, 2002, 2003 (Amazonía) y 2008 (zona comercial de Tacna) en facturas y boletas (`legendCodes`): el documento debe tener operaciones exoneradas; aceptadas en el beta (ADR-032, R-057).
 - Billing rechaza al emitir las boletas y notas de boletas en soles de más de S/ 700 sin identificar al adquirente (regla 2514 del resumen); el monto es la regla versionada `billing.receipt_identification_threshold` y el generador del resumen ya no lo lleva fijo (R-056).
 - Boletas de exportación (0200, 0201, 0203, 0204, 0206, 0207 y 0208): el adquirente nunca lleva RUC y el resumen diario informa el valor de exportación bajo el código 04; aceptadas en el beta (ADR-031).

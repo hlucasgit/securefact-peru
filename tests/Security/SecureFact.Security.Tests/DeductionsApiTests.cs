@@ -338,7 +338,7 @@ public sealed class DeductionsApiTests(ApiFixture api)
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
         var note = await setup.Owner.SendAsync(request);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, note.StatusCode);
-        Assert.Contains("Notas sin datos de pesca ni de transporte", await note.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Contains("Notas sin datos de pesca, transporte ni huésped", await note.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     private static Task<HttpResponseMessage> SetDetractionAccountAsync(Setup setup, string? account) =>

@@ -15,6 +15,22 @@ public sealed record UblRetention(decimal Percentage, decimal BaseAmount, decima
 /// <summary>Fishing resource of a line of an operation 1002: vessel, species, place and date of unloading and the quantity in metric tonnes (catalogue 55 codes 3001–3006).</summary>
 public sealed record UblFishing(string VesselRegistration, string VesselName, string SpeciesType, string UnloadingPlace, DateOnly UnloadingDate, decimal SpeciesQuantity);
 
+/// <summary>
+/// The guest of a line of a lodging (0202) or tourist package (0205) export: name, identity document and passport country (codes 4007, 4008, 4009 and 4000), and in a lodging the residence
+/// country, the dates of entry to the country, check-in, check-out and consumption and the days of stay (4001, 4002, 4003, 4004, 4006 and 4005).
+/// </summary>
+public sealed record UblGuest(
+    string Name,
+    string DocumentTypeCode,
+    string DocumentNumber,
+    string PassportCountryCode,
+    string? ResidenceCountryCode = null,
+    DateOnly? CountryEntryDate = null,
+    DateOnly? CheckInDate = null,
+    DateOnly? CheckOutDate = null,
+    DateOnly? ConsumptionDate = null,
+    int? StayDays = null);
+
 /// <summary>Cargo transport of a line of an operation 1004: origin and destination (ubigeo and address), trip detail and the three reference values in soles.</summary>
 public sealed record UblCargoTransport(
     string OriginUbigeo,
@@ -46,7 +62,8 @@ public sealed record UblLine(
     decimal DiscountNotAffectingBase = 0m,
     decimal ChargeNotAffectingBase = 0m,
     UblFishing? Fishing = null,
-    UblCargoTransport? Transport = null);
+    UblCargoTransport? Transport = null,
+    UblGuest? Guest = null);
 
 /// <summary>
 /// Canonical input of the UBL generator. Amounts come from the TaxEngine result, never recomputed here: the XML must say exactly

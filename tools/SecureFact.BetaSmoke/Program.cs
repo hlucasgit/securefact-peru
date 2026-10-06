@@ -56,6 +56,14 @@ var detractionPercentage = detractionOperation == "1001" ? 12m : 4m;
 var exportSale = args.Contains("export", StringComparer.Ordinal);
 // SF_BETA_EXPORT_OPERATION: the export type (0200 goods by default; 0201, 0203, 0204, 0206, 0207 or 0208 for services); SF_BETA_USAGE_COUNTRY: the country of use of a 0201 or 0208.
 var exportOperation = Environment.GetEnvironmentVariable("SF_BETA_EXPORT_OPERATION") ?? "0200";
+// 0202 (lodging) and 0205 (tourist package) carry the non-domiciled guest in the line.
+var guestDay = DateOnly.FromDateTime(lima.DateTime);
+UblGuest? exportGuest = exportOperation switch
+{
+    "0202" => new UblGuest("JOHN SMITH", "7", "X1234567", "US", "US", guestDay.AddDays(-5), guestDay.AddDays(-4), guestDay.AddDays(-1), guestDay.AddDays(-2), 3),
+    "0205" => new UblGuest("JOHN SMITH", "7", "X1234567", "US"),
+    _ => null,
+};
 TaxableLine[] taxLines = exportSale
     ? [new TaxableLine(1, 100m, "40")]
     : exemptSale
@@ -66,7 +74,7 @@ TaxableLine[] taxLines = exportSale
     ? [new TaxableLine(2, 100m, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m), new TaxableLine(1, 50m, "20")]
     : [new TaxableLine(1, 100m, "10")];
 UblLine[] ublLines = exportSale
-    ? [new UblLine(1, "Bien de exportacion de prueba", "NIU", null, 1, 100m, null, "40")]
+    ? [new UblLine(1, "Bien de exportacion de prueba", "NIU", null, 1, 100m, null, "40", Guest: exportGuest)]
     : exemptSale
     ? [new UblLine(1, "Bien exonerado de prueba", "NIU", null, 1, 100m, null, "20")]
     : ivapSale

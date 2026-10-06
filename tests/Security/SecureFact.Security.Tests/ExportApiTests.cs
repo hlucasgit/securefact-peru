@@ -217,6 +217,115 @@ public sealed class ExportApiTests(ApiFixture api)
             detraction,
         });
 
+    private static object GuestData(bool lodging, string checkOut = "2026-09-29", string documentNumber = "X1234567") => lodging
+        ? new
+        {
+            name = "John Smith",
+            documentTypeCode = "7",
+            documentNumber,
+            passportCountryCode = "US",
+            residenceCountryCode = "CA",
+            countryEntryDate = "2026-09-25",
+            checkInDate = "2026-09-26",
+            checkOutDate = checkOut,
+            consumptionDate = "2026-09-28",
+            stayDays = (int?)3,
+        }
+        : new
+        {
+            name = "John Smith",
+            documentTypeCode = "7",
+            documentNumber,
+            passportCountryCode = "US",
+            residenceCountryCode = (string?)null,
+            countryEntryDate = (string?)null,
+            checkInDate = (string?)null,
+            checkOutDate = (string?)null,
+            consumptionDate = (string?)null,
+            stayDays = (int?)null,
+        };
+
+    private static Task<HttpResponseMessage> GuestSaleAsync(Setup setup, string operation, object? guest, bool receipt = false, string currency = "USD") =>
+        PostAsync(setup.Owner, "/api/v1/documents", new
+        {
+            seriesId = (receipt ? setup.Receipt : setup.Invoice).Id,
+            issueDate = Iso(TodayInLima()),
+            currency,
+            buyer = ForeignBuyer,
+            lines = new object[] { new { description = "Servicio de hospedaje", unitCode = "ZZ", tax = new { quantity = 2m, unitValue = 50m, igvAffectationCode = "40" }, guest } },
+            operationTypeCode = operation,
+        });
+
+    [Fact]
+    public async Task A_lodging_export_is_issued_with_the_guest_and_the_stay_stated_signed_accepted_and_printed()
+    {
+        var setup = await NewTenantAsync("Export Lodging SAC");
+
+        var response = await GuestSaleAsync(setup, "0202", GuestData(lodging: true));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{invoice.Id}", ApiFixture.JsonOptions))!;
+        Assert.Equal("0202", read.OperationTypeCode);
+        var guest = read.Lines[0].Guest!;
+        Assert.Equal(("John Smith", "CA", 3), (guest.Name, guest.ResidenceCountryCode, guest.StayDays));
+        Assert.Equal(new DateOnly(2026, 9, 29), guest.CheckOutDate);
+
+        var electronic = await AcceptAsync(setup, invoice);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var properties = XDocument.Parse(xml).Root!.Element(Cac + "InvoiceLine")!.Element(Cac + "Item")!.Elements(Cac + "AdditionalItemProperty").ToList();
+        Assert.Equal(["4000", "4001", "4002", "4003", "4004", "4005", "4006", "4007", "4008", "4009"], properties.Select(p => p.Element(Cbc + "NameCode")!.Value));
+        Assert.Contains("huésped no domiciliado", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_tourist_package_export_is_issued_with_the_guest_of_every_line()
+    {
+        var setup = await NewTenantAsync("Export Package SAC");
+
+        var response = await GuestSaleAsync(setup, "0205", GuestData(lodging: false));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var electronic = await AcceptAsync(setup, invoice);
+        var root = XDocument.Parse(await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml")).Root!;
+        Assert.Equal("0205", root.Element(Cbc + "InvoiceTypeCode")!.Attribute("listID")!.Value);
+        Assert.Equal(["4000", "4007", "4008", "4009"], root.Element(Cac + "InvoiceLine")!.Element(Cac + "Item")!.Elements(Cac + "AdditionalItemProperty").Select(p => p.Element(Cbc + "NameCode")!.Value));
+    }
+
+    [Fact]
+    public async Task The_guest_of_a_lodging_or_package_is_required_where_it_belongs_and_refused_elsewhere()
+    {
+        var setup = await NewTenantAsync("Export Guest Rules SAC");
+
+        var cases = new (string Name, Task<HttpResponseMessage> Response)[]
+        {
+            ("a lodging without a guest", GuestSaleAsync(setup, "0202", null)),
+            ("a package without a guest", GuestSaleAsync(setup, "0205", null)),
+            ("a lodging with a package guest", GuestSaleAsync(setup, "0202", GuestData(lodging: false))),
+            ("a package with the stay", GuestSaleAsync(setup, "0205", GuestData(lodging: true))),
+            ("a guest in another export type", GuestSaleAsync(setup, "0203", GuestData(lodging: false))),
+            ("a guest in an export of goods", GuestSaleAsync(setup, "0200", GuestData(lodging: false))),
+            ("check-out before check-in", GuestSaleAsync(setup, "0202", GuestData(lodging: true, checkOut: "2026-09-25"))),
+            ("a short document number", GuestSaleAsync(setup, "0205", GuestData(lodging: false, documentNumber: "ab"))),
+            ("a lodging on a receipt", GuestSaleAsync(setup, "0202", GuestData(lodging: true), receipt: true)),
+            ("a package on a receipt", GuestSaleAsync(setup, "0205", GuestData(lodging: false), receipt: true)),
+        };
+        foreach (var (name, pending) in cases)
+        {
+            var response = await pending;
+            Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
+            Assert.Equal("SF-BIL-006", ProblemCode(await response.Content.ReadAsStringAsync()));
+        }
+
+        var invoice = (await (await GuestSaleAsync(setup, "0202", GuestData(lodging: true))).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, invoice.Number); // nothing refused took a number
+        var note = await NoteAsync(setup, invoice, "01", [new { description = "Servicio de hospedaje", unitCode = "ZZ", tax = new { quantity = 1m, unitValue = 50m, igvAffectationCode = "40" }, guest = GuestData(lodging: true) }]);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, note.StatusCode);
+        Assert.Contains("huésped", await note.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task An_export_of_services_is_issued_with_its_country_signed_accepted_and_printed()
     {
