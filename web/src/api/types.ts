@@ -294,6 +294,8 @@ export interface TenantRow {
   resellerId: string | null
   createdAt: string
   planId: string
+  /** Who suspended the account, while it is suspended. */
+  suspendedBy: 'Platform' | 'Reseller' | null
 }
 
 /** What a plan allows; a null limit is unlimited. */

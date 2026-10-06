@@ -19,6 +19,8 @@ internal static class ResellerEndpoints
 
     public sealed record PlanChoiceBody(Guid PlanId);
 
+    public sealed record StatusBody(TenantStatus Status, string Reason);
+
     public static void MapResellerEndpoints(this IEndpointRouteBuilder app)
     {
         var api = app.MapGroup("/api/v1").WithTags("Resellers");
@@ -88,6 +90,10 @@ internal static class ResellerEndpoints
 
             return (await users.CreateTenantOwnerAsync(id, body.Email, body.DisplayName, body.Password, ct)).ToHttp(http, dto => Results.Created($"/api/v1/users/{dto.Id}", dto));
         }).RequireAuthorization(Permissions.ResellerTenantsCreate);
+
+        api.MapPost("/reseller/tenants/{id:guid}/status", async (Guid id, StatusBody body, ICurrentUser user, IResellerAdministration admin, HttpContext http, CancellationToken ct) =>
+            user.ResellerId is { } reseller ? (await admin.ChangeTenantStatusAsync(reseller, new TenantId(id), body.Status, body.Reason, ct)).ToHttp(http) : Results.Forbid())
+            .RequireAuthorization(Permissions.ResellerTenantsSuspend);
 
         api.MapGet("/reseller/plans", async (ICurrentUser user, IResellerAdministration admin, HttpContext http, CancellationToken ct) =>
             user.ResellerId is { } reseller ? (await admin.ListPlansAsync(reseller, ct)).ToHttp(http) : Results.Forbid()).RequireAuthorization(Permissions.ResellerTenantsRead);

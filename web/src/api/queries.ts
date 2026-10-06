@@ -218,6 +218,8 @@ export const useOpenTenant = () =>
   useAction((input: { name: string; environment: 'Sandbox' | 'Production'; planId: string | null }) => post<TenantRow>('/api/v1/reseller/tenants', input), [['reseller', 'tenants']])
 export const useAddOwner = (tenantId: string) =>
   useAction((input: { email: string; displayName: string; password: string }) => post<AppUser>(`/api/v1/reseller/tenants/${tenantId}/owner`, input), [])
+export const useChangeResellerStatus = (tenantId: string) =>
+  useAction((input: { status: 'Suspended' | 'Active'; reason: string }) => post<TenantRow>(`/api/v1/reseller/tenants/${tenantId}/status`, input), [keys.resellerTenant(tenantId), ['reseller', 'tenants']])
 export const useChangeResellerPlan = (tenantId: string) =>
   useAction((planId: string) => post<TenantRow>(`/api/v1/reseller/tenants/${tenantId}/plan`, { planId }), [keys.resellerTenant(tenantId), keys.resellerUsage(tenantId), ['reseller', 'tenants']])
 

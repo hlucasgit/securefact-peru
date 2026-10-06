@@ -5,6 +5,7 @@ import {
   useAddOwner,
   useAssignReseller,
   useChangeResellerPlan,
+  useChangeResellerStatus,
   useCreateReseller,
   useCreateResellerUser,
   useOpenTenant,
@@ -17,7 +18,7 @@ import {
 } from '../api/queries'
 import type { ResellerRow, TenantRow } from '../api/types'
 import { useSession } from '../auth/session'
-import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextField, useToast } from '../components/ui'
+import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextAreaField, TextField, useToast } from '../components/ui'
 import { dateTime } from '../lib/format'
 import { BrandEditor } from './Brand'
 import { UsagePanel } from './Plans'
@@ -350,6 +351,7 @@ export function ResellerAccountDetail() {
   const toast = useToast()
   const [choice, setChoice] = useState('')
   const [owner, setOwner] = useState(false)
+  const [statusChange, setStatusChange] = useState<'Suspended' | 'Active' | null>(null)
 
   if (tenant.isPending) return <Loading />
   if (!tenant.data) return <ErrorAlert error={tenant.error} />
@@ -361,14 +363,28 @@ export function ResellerAccountDetail() {
       <PageHeader title={t.name} subtitle={`Entorno ${ENVIRONMENTS[t.environment].toLowerCase()} · creada el ${dateTime(t.createdAt)}`}>
         <TenantStatusBadge status={t.status} />
       </PageHeader>
-      {t.status !== 'Active' && (
+      {t.status === 'Closed' && (
+        <div className="alert bad" role="status">
+          Esta cuenta está cerrada por la plataforma y no se puede reactivar.
+        </div>
+      )}
+      {t.status === 'Suspended' && (
         <div className="alert warn" role="status">
-          Esta cuenta está {t.status === 'Closed' ? 'cerrada' : 'suspendida'} por la plataforma. Para reactivarla, comuníquese con soporte.
+          {t.suspendedBy === 'Reseller'
+            ? 'Usted suspendió esta cuenta: sus usuarios no pueden ingresar ni usar la API.'
+            : 'La plataforma suspendió esta cuenta y solo ella puede reactivarla. Para hacerlo, comuníquese con soporte.'}
         </div>
       )}
       <div className="card">
         <h2>Cuenta</h2>
         <KeyValues items={[['Identificador', <span className="mono" key="i">{t.id}</span>], ['Entorno', ENVIRONMENTS[t.environment]]]} />
+        {(t.status === 'Active' || (t.status === 'Suspended' && t.suspendedBy === 'Reseller')) && (
+          <div className="actions" style={{ marginTop: 14 }}>
+            <button className="btn" type="button" onClick={() => setStatusChange(t.status === 'Active' ? 'Suspended' : 'Active')}>
+              {t.status === 'Active' ? 'Suspender' : 'Reactivar'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -409,7 +425,39 @@ export function ResellerAccountDetail() {
         <p className="hint">El propietario de la cuenta se crea una sola vez; después, la cuenta administra sus propios usuarios.</p>
       </div>
       {owner && <OwnerModal tenantId={t.id} onClose={() => setOwner(false)} />}
+      {statusChange && <StatusModal tenant={t} target={statusChange} onClose={() => setStatusChange(null)} />}
     </>
+  )
+}
+
+/** Suspends or reactivates an account of the reseller, with the reason that stays in the audit trail. */
+function StatusModal({ tenant, target, onClose }: { tenant: TenantRow; target: 'Suspended' | 'Active'; onClose: () => void }) {
+  const change = useChangeResellerStatus(tenant.id)
+  const toast = useToast()
+  const [reason, setReason] = useState('')
+  const label = target === 'Suspended' ? 'Suspender' : 'Reactivar'
+  return (
+    <Modal title={`${label}: ${tenant.name}`} onClose={onClose}>
+      <form
+        className="stack"
+        onSubmit={(event) => {
+          event.preventDefault()
+          change.mutate({ status: target, reason: reason.trim() }, { onSuccess: () => { toast.ok('Estado cambiado.'); onClose() } })
+        }}
+      >
+        <p>{target === 'Suspended' ? 'Los usuarios de la cuenta no podrán ingresar ni usar la API hasta que usted la reactive. No se pierde nada.' : 'Los usuarios de la cuenta vuelven a poder ingresar y usar la API.'}</p>
+        <ErrorAlert error={change.error} />
+        <TextAreaField label="Motivo" hint="queda en la auditoría de la cuenta" required minLength={3} maxLength={300} value={reason} onChange={(event) => setReason(event.target.value)} />
+        <div className="actions">
+          <button className="btn" type="button" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className={`btn ${target === 'Suspended' ? 'danger' : 'primary'}`} type="submit" disabled={change.isPending}>
+            {label}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

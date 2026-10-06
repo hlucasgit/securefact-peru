@@ -27,7 +27,7 @@ Su rol tiene **tres permisos propios** y ninguno de los de plataforma ni de cuen
 | `GET /api/v1/reseller/plans` | read | planes activos del catálogo público y los privados suyos |
 | `POST /api/v1/reseller/tenants/{id}/plan` | manage | cambia el plan de una cuenta suya a uno permitido |
 
-Un revendedor **no** suspende ni cierra cuentas, no lee sus usuarios, documentos ni auditoría, no edita planes y no mueve cuentas entre revendedores (eso es de la plataforma). Suspender por falta de pago es una necesidad real del revendedor, pero no se le da hasta decidir cómo se audita y cómo se evita el abuso.
+Un revendedor **no** cierra cuentas, no lee sus usuarios, documentos ni auditoría, no edita planes y no mueve cuentas entre revendedores (eso es de la plataforma). Suspender y reactivar sus cuentas sí puede, con las reglas del ADR-045.
 
 ### Aislamiento
 - El usuario de un revendedor trabaja en **ámbito de plataforma** a nivel de base de datos (necesita leer las filas de las cuentas de sus clientes). Eso **no** se confía a las rutas: lo que lo contiene es (1) su rol solo tiene permisos de revendedor, así que **toda ruta de plataforma o de cuenta le contesta 403**; y (2) `IResellerAdministration` toma el revendedor **del token**, nunca de la solicitud, y **filtra cada lectura y escritura por él**.
@@ -49,7 +49,7 @@ Un revendedor **no** suspende ni cierra cuentas, no lee sus usuarios, documentos
 ## Límites (P)
 - **Sin facturación ni comisiones**: no hay precios, márgenes, liquidaciones ni cobro entre la plataforma, el revendedor y sus clientes (ADR-042).
 - La **marca blanca** (nombre, color, logotipo y dominio del portal) es del ADR-044; siguen pendientes los correos y las plantillas por revendedor.
-- Un revendedor no suspende cuentas, no ve sus usuarios ni su actividad, y no entra «como» el cliente.
+- Un revendedor no ve los usuarios ni la actividad de sus cuentas, y no entra «como» el cliente. Suspender es del ADR-045.
 - Una cuenta tiene un solo revendedor, y un revendedor desactivado no puede transferir sus cuentas: la plataforma las mueve.
 - El revendedor opera en ámbito de plataforma a nivel de base de datos; el filtro por revendedor es de aplicación (probado), no una política RLS propia. Un ámbito de revendedor con su propia política sería una defensa más profunda, a cambio de tocar el ámbito de datos en todos los módulos.
 - Los usuarios de un revendedor no se listan en la interfaz (la API de usuarios no filtra por revendedor).

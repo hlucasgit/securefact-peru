@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, seriousViolations, signIn, test } from './fixtures.ts'
-import { adminCredentials, newPassword } from './helpers/api.ts'
+import { adminCredentials, login, newPassword } from './helpers/api.ts'
 import { createPrivatePlan, createReseller } from './helpers/resellers.ts'
 
 async function signInAsAdmin(page: Page): Promise<void> {
@@ -120,5 +120,73 @@ test.describe('revendedores', () => {
     await expect(resellerPage.getByRole('alert')).toBeVisible()
     await context.close()
     await tenant.api.get('/api/v1/companies')
+  })
+
+  test('el revendedor suspende y reactiva una cuenta suya, no puede levantar la suspensión de la plataforma y la plataforma puede tomar la suya', async ({ page, browser }) => {
+    const stamp = Date.now()
+    const reseller = await createReseller('cobra')
+    const resellerApi = await login(reseller.admin)
+    const account = `Cliente moroso ${stamp}`
+    const owner = { email: `moroso-${stamp}@e2e.test`, password: newPassword() }
+    const tenant = await resellerApi.post<{ id: string }>('/api/v1/reseller/tenants', { name: account, environment: 'Sandbox' })
+    await resellerApi.post(`/api/v1/reseller/tenants/${tenant.id}/owner`, { ...owner, displayName: 'Dueño moroso' })
+
+    const context = await browser.newContext()
+    const customer = await context.newPage()
+    await signIn(customer, owner)
+    await expect(customer.getByRole('heading', { name: 'Panel' })).toBeVisible()
+
+    await signIn(page, reseller.admin)
+    await page.getByRole('link', { name: account }).click()
+    await page.getByRole('button', { name: 'Suspender', exact: true }).click()
+    await page.getByRole('dialog').getByLabel('Motivo').fill('Dos facturas vencidas')
+    await page.getByRole('dialog').getByRole('button', { name: 'Suspender', exact: true }).click()
+    await expect(page.getByText('Usted suspendió esta cuenta')).toBeVisible()
+    expect(await seriousViolations(page)).toEqual([])
+
+    // El cliente queda fuera y el ingreso dice por qué.
+    await customer.getByRole('link', { name: 'Clientes' }).click()
+    await expect(customer).toHaveURL(/\/ingresar$/)
+    await signIn(customer, owner)
+    await expect(customer.getByRole('alert')).toContainText('SF-TEN-002')
+
+    await page.getByRole('button', { name: 'Reactivar', exact: true }).click()
+    await page.getByRole('dialog').getByLabel('Motivo').fill('Regularizó el pago')
+    await page.getByRole('dialog').getByRole('button', { name: 'Reactivar', exact: true }).click()
+    await expect(page.locator('.page-head .badge')).toHaveText('Activo')
+    await signIn(customer, owner)
+    await expect(customer.getByRole('heading', { name: 'Clientes' })).toBeVisible()
+    await context.close()
+
+    // La plataforma suspende por su cuenta: el revendedor lo ve y no puede levantarla.
+    const admin = await login(adminCredentials())
+    await admin.post(`/api/v1/platform/tenants/${tenant.id}/status`, { status: 'Suspended', reason: 'Uso indebido del servicio' })
+    await page.reload()
+    await expect(page.getByText('La plataforma suspendió esta cuenta')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Reactivar', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Suspender', exact: true })).toHaveCount(0)
+  })
+
+  test('la plataforma ve que la suspensión es del revendedor y puede tomarla para sí', async ({ page }) => {
+    const stamp = Date.now()
+    const reseller = await createReseller('toma')
+    const resellerApi = await login(reseller.admin)
+    const account = `Cuenta tomada ${stamp}`
+    const tenant = await resellerApi.post<{ id: string }>('/api/v1/reseller/tenants', { name: account, environment: 'Sandbox' })
+    await resellerApi.post(`/api/v1/reseller/tenants/${tenant.id}/status`, { status: 'Suspended', reason: 'Deuda pendiente' })
+
+    await signIn(page, adminCredentials())
+    await page.getByLabel('Buscar por nombre').fill(account)
+    await page.getByRole('link', { name: account }).click()
+    await expect(page.getByText('Cuenta suspendida por su revendedor')).toBeVisible()
+    await page.getByRole('button', { name: 'Suspender por la plataforma' }).click()
+    await page.getByRole('dialog').getByLabel('Motivo').fill('Cuenta en investigación')
+    await page.getByRole('dialog').getByRole('button', { name: 'Suspender por la plataforma' }).click()
+    await expect(page.getByText('Cuenta suspendida: sus usuarios')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Suspender por la plataforma' })).toHaveCount(0)
+
+    // El revendedor ya no puede reactivarla.
+    const refused = await resellerApi.post(`/api/v1/reseller/tenants/${tenant.id}/status`, { status: 'Active', reason: 'Quiero reactivarla' }).catch((failure: Error) => failure.message)
+    expect(String(refused)).toContain('SF-TEN-004')
   })
 })

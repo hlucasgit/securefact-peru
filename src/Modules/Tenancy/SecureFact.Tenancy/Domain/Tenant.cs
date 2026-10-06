@@ -20,12 +20,19 @@ internal sealed class Tenant
 
     public Guid PlanId { get; private set; }
 
+    /// <summary>Who suspended the tenant while it is suspended; null otherwise.</summary>
+    public SuspensionSource? SuspendedBy { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     /// <summary>Mapped to PostgreSQL <c>xmin</c> for optimistic concurrency.</summary>
     public uint Version { get; private set; }
 
-    public void ChangeStatus(TenantStatus status) => Status = status;
+    public void ChangeStatus(TenantStatus status, SuspensionSource? source = null)
+    {
+        Status = status;
+        SuspendedBy = status == TenantStatus.Suspended ? source ?? SuspensionSource.Platform : null;
+    }
 
     public void ChangePlan(Guid planId) => PlanId = planId;
 

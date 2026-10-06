@@ -114,11 +114,13 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
             return Error.NotFound(ErrorCodes.TenantNotFound, "Tenant no encontrado", "El tenant no existe o no es visible para este contexto.");
         }
 
-        // Active <-> Suspended, and either to Closed; a closed tenant is final (its documents and its audit trail stay).
+        // Active <-> Suspended, and either to Closed; a closed tenant is final (its documents and its audit trail stay). The platform may also suspend a tenant that its reseller
+        // suspended: from then on the suspension is the platform's, and the reseller cannot lift it.
         var allowed = (tenant.Status, target) switch
         {
             (TenantStatus.Active, TenantStatus.Suspended) => true,
             (TenantStatus.Suspended, TenantStatus.Active) => true,
+            (TenantStatus.Suspended, TenantStatus.Suspended) => tenant.SuspendedBy == SuspensionSource.Reseller,
             (TenantStatus.Active or TenantStatus.Suspended, TenantStatus.Closed) => true,
             _ => false,
         };
@@ -128,15 +130,16 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
         }
 
         var previous = tenant.Status;
-        tenant.ChangeStatus(target);
+        var previousSource = tenant.SuspendedBy;
+        tenant.ChangeStatus(target, SuspensionSource.Platform);
         await db.SaveChangesAsync(cancellationToken);
         cache.Remove(TenantStatusReader.Key(tenant.Id));
         var action = target switch { TenantStatus.Suspended => AuditActions.TenantSuspended, TenantStatus.Closed => AuditActions.TenantClosed, _ => AuditActions.TenantReactivated };
         await audit.RecordAsync(
             new AuditEvent(
                 action, "tenant", tenant.Id.ToString("D"), tenant.Id,
-                OldValues: new Dictionary<string, object?> { ["status"] = previous },
-                NewValues: new Dictionary<string, object?> { ["status"] = target, ["reason"] = why }),
+                OldValues: new Dictionary<string, object?> { ["status"] = previous, ["suspendedBy"] = previousSource },
+                NewValues: new Dictionary<string, object?> { ["status"] = target, ["reason"] = why, ["suspendedBy"] = tenant.SuspendedBy }),
             cancellationToken);
         return ToDto(tenant);
     }
@@ -145,5 +148,5 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
-    internal static TenantDto ToDto(Tenant t) => new(new TenantId(t.Id), t.Name, t.Status, t.Environment, t.ResellerId, t.CreatedAt, t.PlanId);
+    internal static TenantDto ToDto(Tenant t) => new(new TenantId(t.Id), t.Name, t.Status, t.Environment, t.ResellerId, t.CreatedAt, t.PlanId, t.SuspendedBy);
 }

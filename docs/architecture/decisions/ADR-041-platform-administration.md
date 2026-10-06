@@ -32,6 +32,7 @@ El personal de la plataforma solo podía crear un inquilino por la API; no podí
 - 10 recorridos de extremo a extremo (`platform.spec.ts`): menú de plataforma, crear un inquilino con su propietario (que ingresa), suspender expulsa y reactivar devuelve, con la auditoría y su integridad, cierre con nombre escrito, búsqueda y filtro, usuarios de la cuenta, soporte de solo lectura, vistas del propietario, accesibilidad (axe) de lista, detalle, diálogo y auditoría. Pruebas unitarias de la navegación por rol.
 
 ## Límites (P)
+- Un revendedor también puede suspender y reactivar sus cuentas, y la plataforma puede tomar esa suspensión (ADR-045).
 - **Los workers no envían por un inquilino suspendido, pero sí sondean y archivan**: un ticket ya emitido se consulta hasta tener respuesta y el archivo de lo ya aceptado continúa. Un envío que ya estaba en vuelo al suspender termina; el corte vale para lo que se descubre después.
 - La caché de estado es de proceso: con varias instancias de la API, la suspensión tarda hasta 10 s en llegar a las demás (el ingreso no usa la caché).
 - El cierre no borra datos (los documentos y la auditoría se conservan por obligación legal, pendiente de confirmar en fuente primaria); no hay exportación ni baja definitiva de la cuenta.

@@ -165,6 +165,12 @@ const ACTIONS: Record<TenantStatus, { status: TenantStatus; label: string; dange
   Closed: [],
 }
 
+/** What the platform can do with a tenant. A suspension of the reseller can also be taken over, so that the reseller cannot lift it. */
+function actionsOf(tenant: TenantRow): (typeof ACTIONS)[TenantStatus] {
+  const takeover = { status: 'Suspended' as const, label: 'Suspender por la plataforma', danger: false, text: 'La suspensión pasa a ser de la plataforma: el revendedor ya no podrá reactivar la cuenta.' }
+  return tenant.status === 'Suspended' && tenant.suspendedBy === 'Reseller' ? [...ACTIONS.Suspended, takeover] : ACTIONS[tenant.status]
+}
+
 export function TenantDetail() {
   const { id = '' } = useParams()
   const { hasRole } = useSession()
@@ -188,15 +194,19 @@ export function TenantDetail() {
       </PageHeader>
       {t.status !== 'Active' && (
         <div className={`alert ${t.status === 'Closed' ? 'bad' : 'warn'}`} role="status">
-          {t.status === 'Closed' ? 'Cuenta cerrada: sus usuarios no pueden ingresar y no se puede reactivar.' : 'Cuenta suspendida: sus usuarios no pueden ingresar ni usar la API.'}
+          {t.status === 'Closed'
+            ? 'Cuenta cerrada: sus usuarios no pueden ingresar y no se puede reactivar.'
+            : t.suspendedBy === 'Reseller'
+              ? 'Cuenta suspendida por su revendedor: sus usuarios no pueden ingresar ni usar la API. Usted puede reactivarla, o suspenderla por la plataforma para que el revendedor no pueda levantarla.'
+              : 'Cuenta suspendida: sus usuarios no pueden ingresar ni usar la API.'}
         </div>
       )}
       <div className="card">
         <h2>Cuenta</h2>
         <KeyValues items={[['Identificador', <span className="mono" key="i">{t.id}</span>], ['Estado', STATUS_LABELS[t.status]], ['Entorno', ENVIRONMENTS[t.environment]]]} />
-        {canManage && ACTIONS[t.status].length > 0 && (
+        {canManage && actionsOf(t).length > 0 && (
           <div className="actions" style={{ marginTop: 14 }}>
-            {ACTIONS[t.status].map((action) => (
+            {actionsOf(t).map((action) => (
               <button key={action.status} className={`btn${action.danger ? ' danger' : ''}`} type="button" onClick={() => setChange(action)}>
                 {action.label}
               </button>

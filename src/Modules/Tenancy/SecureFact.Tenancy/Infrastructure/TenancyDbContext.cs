@@ -30,6 +30,7 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             builder.Property(t => t.Environment).HasColumnName("environment").HasConversion<string>().HasMaxLength(20).IsRequired();
             builder.Property(t => t.ResellerId).HasColumnName("reseller_id");
             builder.Property(t => t.PlanId).HasColumnName("plan_id").IsRequired();
+            builder.Property(t => t.SuspendedBy).HasColumnName("suspended_by").HasConversion<string>().HasMaxLength(20);
             builder.Property(t => t.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(t => t.Version).IsRowVersion();
 

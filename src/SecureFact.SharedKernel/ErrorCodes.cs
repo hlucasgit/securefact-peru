@@ -16,6 +16,8 @@ public static class ErrorCodes
 
     public const string InvalidTenantStatusChange = "SF-TEN-003";
 
+    public const string SuspensionNotYours = "SF-TEN-004";
+
     public const string PlanLimitReached = "SF-PLAN-001";
 
     public const string PlanNotFound = "SF-PLAN-002";

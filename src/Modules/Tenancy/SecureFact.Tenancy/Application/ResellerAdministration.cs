@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SecureFact.Audit.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
@@ -11,11 +12,13 @@ using SecureFact.Tenancy.Infrastructure;
 
 namespace SecureFact.Tenancy.Application;
 
-internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope scope, ICurrentUser actor, TimeProvider clock, IAuditTrail audit) : IResellerAdministration
+internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope scope, ICurrentUser actor, TimeProvider clock, IAuditTrail audit, IMemoryCache cache) : IResellerAdministration
 {
     private const int MaxPageSize = 100;
     private const int MinNameLength = 3;
     private const int MaxNameLength = 120;
+    private const int MinReasonLength = 3;
+    private const int MaxReasonLength = 300;
 
     private static readonly Error ResellerMissing = Error.NotFound(ErrorCodes.ResellerNotFound, "Revendedor no encontrado", "El revendedor no existe.");
 
@@ -227,6 +230,62 @@ internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope sco
             cancellationToken);
         return TenantAdministration.ToDto(tenant);
     }
+
+    public async Task<Result<TenantDto>> ChangeTenantStatusAsync(Guid resellerId, TenantId tenantId, TenantStatus target, string reason, CancellationToken cancellationToken)
+    {
+        if (RequireReseller(resellerId) is { } denied)
+        {
+            return denied;
+        }
+
+        var why = reason?.Trim() ?? string.Empty;
+        if (why.Length is < MinReasonLength or > MaxReasonLength)
+        {
+            return Error.Validation(ErrorCodes.InvalidTenantStatusChange, "Motivo inválido", $"El motivo debe tener entre {MinReasonLength} y {MaxReasonLength} caracteres.");
+        }
+
+        var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Id == tenantId.Value && t.ResellerId == resellerId, cancellationToken);
+        if (tenant is null)
+        {
+            return TenantMissing;
+        }
+
+        // A reseller suspends and reactivates; closing an account is final and is the platform's.
+        if (target == TenantStatus.Closed)
+        {
+            return Error.Validation(ErrorCodes.InvalidTenantStatusChange, "Cambio de estado inválido", "Un revendedor suspende y reactiva cuentas; el cierre definitivo lo hace la plataforma.");
+        }
+
+        if (tenant.Status == TenantStatus.Suspended && tenant.SuspendedBy != SuspensionSource.Reseller && target == TenantStatus.Active)
+        {
+            return Error.Forbidden(ErrorCodes.SuspensionNotYours, "Suspensión de la plataforma", "La plataforma suspendió esta cuenta y solo ella puede reactivarla. Comuníquese con soporte.");
+        }
+
+        var allowed = (tenant.Status, target) switch
+        {
+            (TenantStatus.Active, TenantStatus.Suspended) => true,
+            (TenantStatus.Suspended, TenantStatus.Active) => true,
+            _ => false,
+        };
+        if (!allowed)
+        {
+            return Error.Validation(ErrorCodes.InvalidTenantStatusChange, "Cambio de estado inválido", $"Una cuenta {StatusName(tenant.Status)} no puede pasar a {StatusName(target)}.");
+        }
+
+        var previous = tenant.Status;
+        tenant.ChangeStatus(target, SuspensionSource.Reseller);
+        await db.SaveChangesAsync(cancellationToken);
+        cache.Remove(TenantStatusReader.Key(tenant.Id));
+        await audit.RecordAsync(
+            new AuditEvent(
+                target == TenantStatus.Suspended ? AuditActions.TenantSuspended : AuditActions.TenantReactivated, "tenant", tenant.Id.ToString("D"), tenant.Id,
+                OldValues: new Dictionary<string, object?> { ["status"] = previous },
+                NewValues: new Dictionary<string, object?> { ["status"] = target, ["reason"] = why, ["suspendedBy"] = tenant.SuspendedBy, ["byReseller"] = resellerId }),
+            cancellationToken);
+        return TenantAdministration.ToDto(tenant);
+    }
+
+    private static string StatusName(TenantStatus status) => status switch { TenantStatus.Active => "activa", TenantStatus.Suspended => "suspendida", _ => "cerrada" };
 
     // ---------- rules ----------
 

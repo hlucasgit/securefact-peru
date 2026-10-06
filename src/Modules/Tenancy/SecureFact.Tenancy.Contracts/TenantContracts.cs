@@ -11,6 +11,13 @@ public enum TenantStatus
     Closed,
 }
 
+/// <summary>Who suspended a tenant. A suspension of the platform can be lifted only by the platform; one of the reseller, by either.</summary>
+public enum SuspensionSource
+{
+    Platform,
+    Reseller,
+}
+
 public enum TenantEnvironment
 {
     Sandbox,
@@ -26,7 +33,8 @@ public sealed record TenantDto(
     TenantEnvironment Environment,
     Guid? ResellerId,
     DateTimeOffset CreatedAt,
-    Guid PlanId);
+    Guid PlanId,
+    SuspensionSource? SuspendedBy = null);
 
 /// <summary>Public surface of the Tenancy module. Creating tenants is a platform-scope operation.</summary>
 public interface ITenantAdministration
@@ -152,6 +160,12 @@ public interface IResellerAdministration
     Task<Result<IReadOnlyList<PlanDto>>> ListPlansAsync(Guid resellerId, CancellationToken cancellationToken);
 
     Task<Result<TenantDto>> AssignPlanAsync(Guid resellerId, TenantId tenantId, Guid planId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Suspends a tenant of the reseller, or reactivates one that the <b>reseller</b> suspended, with the reason (audited). A reseller never closes a tenant and never lifts a suspension of
+    /// the platform (<c>SF-TEN-004</c>): suspending for a debt is the reseller's to do, suspending for abuse is not its to undo.
+    /// </summary>
+    Task<Result<TenantDto>> ChangeTenantStatusAsync(Guid resellerId, TenantId tenantId, TenantStatus target, string reason, CancellationToken cancellationToken);
 }
 
 /// <summary>How the interface presents itself to the users of a reseller (white label). Only what any visitor may see: nothing here is secret.</summary>
