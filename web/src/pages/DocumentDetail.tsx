@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchBlob } from '../api/http'
-import { useArchive, useCompany, useCreateVoid, useDocument, useElectronic, useEvents, usePoll, usePrepare, useRecover, useRetry, useSend } from '../api/queries'
+import { useArchive, useCatalog, useCompany, useCreateVoid, useDocument, useElectronic, useEvents, usePoll, usePrepare, useRecover, useRetry, useSend } from '../api/queries'
 import type { Document, ElectronicDocument } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, StateBadge, TextAreaField, useToast } from '../components/ui'
@@ -37,6 +37,8 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
   const { hasRole } = useSession()
   const canIssue = hasRole(...BILLING_ROLES)
   const company = useCompany(doc.companyId)
+  const operationType = useCatalog('51')
+  const detractionCode = useCatalog('54')
   const prepare = usePrepare(doc.id)
   const send = useSend(doc.id)
   const poll = usePoll(doc.id)
@@ -180,6 +182,28 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
           </div>
         </div>
       </div>
+
+      {(doc.operationTypeCode !== '0101' || doc.detraction || doc.retention || doc.usageCountryCode) && (
+        <div className="card">
+          <h2>Operación</h2>
+          <KeyValues
+            items={[
+              ['Tipo de operación', operationType.data?.find((entry) => entry.code === doc.operationTypeCode)?.description ?? doc.operationTypeCode],
+              ...(doc.usageCountryCode ? ([['País del uso o aprovechamiento', doc.usageCountryCode]] as [string, React.ReactNode][]) : []),
+              ...(doc.detraction
+                ? ([
+                    ['Detracción', `${detractionCode.data?.find((entry) => entry.code === doc.detraction?.goodsOrServiceCode)?.description ?? doc.detraction.goodsOrServiceCode} (${doc.detraction.goodsOrServiceCode})`],
+                    ['Porcentaje y monto', `${doc.detraction.percentage} % · ${money(doc.detraction.amount, 'PEN')}`],
+                    ['Cuenta de detracciones', doc.detraction.accountNumber ?? '—'],
+                  ] as [string, React.ReactNode][])
+                : []),
+              ...(doc.retention
+                ? ([['Retención del IGV', `${doc.retention.percentage} % de ${money(doc.retention.baseAmount, doc.currency)} · ${money(doc.retention.amount, doc.currency)}`]] as [string, React.ReactNode][])
+                : []),
+            ]}
+          />
+        </div>
+      )}
 
       <div className="card">
         <h2>Ítems</h2>

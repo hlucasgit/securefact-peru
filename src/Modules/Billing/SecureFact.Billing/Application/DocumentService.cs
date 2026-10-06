@@ -80,6 +80,25 @@ internal sealed partial class DocumentService(
             return replay.Value;
         }
 
+        var prepared = await PrepareAsync(series, request, preview: false, cancellationToken);
+        if (!prepared.IsSuccess)
+        {
+            return prepared.Error;
+        }
+
+        return await IssueAsync(
+            tenant.Value, idempotencyKey, ReferenceEquals(prepared.Value.Effective, request) ? requestJson : JsonSerializer.Serialize(prepared.Value.Effective, Json), requestHash, series, request.IssueDate,
+            request.Currency, prepared.Value.Buyer, request.Lines, prepared.Value.Totals, null, cancellationToken);
+    }
+
+    private sealed record Prepared(BuyerSnapshot Buyer, CreateDocumentRequest Effective, TaxCalculationResult Totals);
+
+    /// <summary>
+    /// Everything that is checked and calculated before a document is numbered: the buyer, the rules of the document, the rates of the issue date, the totals and, unless it is a preview, the
+    /// detraction or retention and the installments (which need the final amounts). Issuing and previewing go through the same code, so a preview cannot say yes to what issuing refuses.
+    /// </summary>
+    private async Task<Result<Prepared>> PrepareAsync(Series series, CreateDocumentRequest request, bool preview, CancellationToken cancellationToken)
+    {
         var buyer = request.Buyer;
         if (request.CustomerId is { } customerId)
         {
@@ -139,19 +158,64 @@ internal sealed partial class DocumentService(
             effective = request with { Detraction = named with { AccountNumber = company.Value.DetractionAccount } };
         }
 
-        if (ValidateDeductions(series, effective, calculated.Value.PayableAmount, out var deducted) is { } badDeduction)
+        if (!preview)
         {
-            return badDeduction;
+            if (ValidateDeductions(series, effective, calculated.Value.PayableAmount, out var deducted) is { } badDeduction)
+            {
+                return badDeduction;
+            }
+
+            if (ValidateInstallments(series, request.IssueDate, request.Installments, request.InitialPayment, deducted, calculated.Value.PayableAmount) is { } badInstallments)
+            {
+                return badInstallments;
+            }
         }
 
-        if (ValidateInstallments(series, request.IssueDate, request.Installments, request.InitialPayment, deducted, calculated.Value.PayableAmount) is { } badInstallments)
+        return new Prepared(buyer!, effective, calculated.Value);
+    }
+
+    public async Task<Result<DocumentPreview>> PreviewAsync(PreviewRequest request, CancellationToken cancellationToken)
+    {
+        if (scope.Kind != DataScopeKind.Tenant)
         {
-            return badInstallments;
+            return Error.Forbidden(ErrorCodes.TenantNotResolved, "Tenant requerido", "Esta operación requiere un contexto de tenant.");
         }
 
-        return await IssueAsync(
-            tenant.Value, idempotencyKey, ReferenceEquals(effective, request) ? requestJson : JsonSerializer.Serialize(effective, Json), requestHash, series, request.IssueDate, request.Currency, buyer!, request.Lines,
-            calculated.Value, null, cancellationToken);
+        if (request?.Document is not { } document || document.Lines is not { Count: > 0 and <= MaxLines })
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Documento inválido", $"El documento requiere entre 1 y {MaxLines} líneas.");
+        }
+
+        if ((document.Buyer is null) == (document.CustomerId is null))
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Adquirente inválido", "Indique el adquirente en 'buyer' o por 'customerId', pero no ambos.");
+        }
+
+        if (request.DetractionPercentage is <= 0 or > 100 || request.RetentionPercentage is <= 0 or >= 100)
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Porcentaje inválido", "La detracción va de más de 0 a 100 y la retención de más de 0 a menos de 100.");
+        }
+
+        var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == document.SeriesId, cancellationToken);
+        if (series is null)
+        {
+            return Error.NotFound(ErrorCodes.SeriesNotFound, "Serie no encontrada", "La serie no existe o no es visible para este contexto.");
+        }
+
+        // The amounts of a detraction and of a retention depend on the total, so they are left out of what is calculated and offered afterwards.
+        var operation = document.OperationTypeCode?.Trim();
+        var bare = document with { Detraction = null, Retention = null, Installments = null, InitialPayment = null, OperationTypeCode = OperationTypes.IsDetraction(operation) ? null : operation };
+        var prepared = await PrepareAsync(series, bare, preview: true, cancellationToken);
+        if (!prepared.IsSuccess)
+        {
+            return prepared.Error;
+        }
+
+        var payable = prepared.Value.Totals.PayableAmount;
+        return new DocumentPreview(
+            prepared.Value.Totals,
+            request.DetractionPercentage is { } detraction ? decimal.Round(payable * detraction / 100m, 2, MidpointRounding.AwayFromZero) : null,
+            request.RetentionPercentage is { } retention ? RetainedAmount(payable, retention) : null);
     }
 
     private async Task<Result<DocumentDto>> IssueAsync(

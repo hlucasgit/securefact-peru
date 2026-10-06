@@ -63,9 +63,11 @@ export function toRequestLine(line: LineState, isFree: boolean) {
 interface Props {
   lines: LineState[]
   onChange: (lines: LineState[]) => void
+  /** Every line has this affectation and it cannot be changed (the lines of an export). */
+  fixedAffectation?: string
 }
 
-export function LinesEditor({ lines, onChange }: Props) {
+export function LinesEditor({ lines, onChange, fixedAffectation }: Props) {
   const affectations = useCatalog('07')
   const products = useProducts('')
   const isFree = (code: string) => affectations.data?.find((entry) => entry.code === code)?.metadata['Codigo de tributo'] === '9996'
@@ -103,12 +105,12 @@ export function LinesEditor({ lines, onChange }: Props) {
             <div className="form-grid">
               <TextField label="Cantidad" type="number" min="0" step="any" required value={line.quantity} onChange={(event) => update(line.key, { quantity: event.target.value })} />
               <TextField label="Unidad" hint="NIU, ZZ, KGM…" required maxLength={3} value={line.unitCode} onChange={(event) => update(line.key, { unitCode: event.target.value })} />
-              {isFree(line.affectation) ? (
+              {isFree(fixedAffectation ?? line.affectation) ? (
                 <TextField label="Valor referencial unitario" type="number" min="0" step="any" required value={line.referenceValue} onChange={(event) => update(line.key, { referenceValue: event.target.value })} />
               ) : (
                 <TextField label="Valor unitario" hint="sin impuestos" type="number" min="0" step="any" required value={line.unitValue} onChange={(event) => update(line.key, { unitValue: event.target.value })} />
               )}
-              <SelectField label="Afectación al IGV" value={line.affectation} onChange={(event) => update(line.key, { affectation: event.target.value })}>
+              <SelectField label="Afectación al IGV" value={fixedAffectation ?? line.affectation} disabled={fixedAffectation !== undefined} onChange={(event) => update(line.key, { affectation: event.target.value })}>
                 {(affectations.data ?? []).map((entry) => (
                   <option key={entry.code} value={entry.code}>
                     {entry.code} · {entry.description}

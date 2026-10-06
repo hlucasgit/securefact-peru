@@ -356,8 +356,20 @@ public interface IIneffectiveDocumentsProvider
     Task<IReadOnlySet<Guid>> FindAsync(IReadOnlyCollection<Guid> documentIds, CancellationToken cancellationToken);
 }
 
+/// <summary>A document to preview, with the percentage of the detraction or of the retention whose amount is wanted (it depends on the total).</summary>
+public sealed record PreviewRequest(CreateDocumentRequest Document, decimal? DetractionPercentage = null, decimal? RetentionPercentage = null);
+
+/// <summary>
+/// What issuing the document would calculate, without issuing it: the totals and, when a percentage was given, the amount of the detraction (a suggestion, to the cent, that the issuer may
+/// change within what the rules accept) or the exact amount of the IGV retention.
+/// </summary>
+public sealed record DocumentPreview(TaxCalculationResult Totals, decimal? DetractionAmount, decimal? RetentionAmount);
+
 public interface IDocumentService
 {
+    /// <summary>Calculates a document as issuing would, with the same checks, and issues nothing: no number, no idempotency key and nothing against the plan.</summary>
+    Task<Result<DocumentPreview>> PreviewAsync(PreviewRequest request, CancellationToken cancellationToken);
+
     /// <summary>How many documents the tenant issued from <paramref name="from"/> (inclusive) to <paramref name="to"/> (exclusive), notes and voided ones included: that is what a plan meters.</summary>
     Task<int> CountIssuedAsync(Guid tenantId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
 

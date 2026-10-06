@@ -206,6 +206,16 @@ export interface Document {
   note: NoteInfo | null
   installments: { amount: number; dueDate: string }[] | null
   operationTypeCode: string
+  detraction: { goodsOrServiceCode: string; percentage: number; amount: number; accountNumber: string | null } | null
+  retention: { percentage: number; baseAmount: number; amount: number } | null
+  usageCountryCode: string | null
+}
+
+/** What issuing a document would calculate, with the amounts of a detraction or of a withholding when their percentage was given. */
+export interface DocumentPreview {
+  totals: Totals
+  detractionAmount: number | null
+  retentionAmount: number | null
 }
 
 export interface CdrObservation {

@@ -1,9 +1,21 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCatalog, useCompanies, useCustomers, useIssueDocument, useSeries } from '../api/queries'
+import { useCatalog, useCompanies, useCustomers, useIssueDocument, usePreviewDocument, useSeries } from '../api/queries'
 import { emptyLine, lineIsFree, LinesEditor, toRequestLine, type LineState } from '../components/LinesEditor'
 import { ErrorAlert, Loading, PageHeader, SelectField, TextField, useToast } from '../components/ui'
-import { DOCUMENT_TYPES, todayInLima } from '../lib/format'
+import { DOCUMENT_TYPES, money, todayInLima } from '../lib/format'
+import {
+  buildDocumentRequest,
+  buyerMustBeForeign,
+  DETRACTION_NEEDS_LINE_DETAILS,
+  EXPORT_AFFECTATION,
+  EXPORT_TYPES,
+  FOREIGN_IDENTITY,
+  isExport,
+  needsUsageCountry,
+  noDeduction,
+  type DeductionInput,
+} from '../lib/operations'
 
 const SUPPORTED_IDENTITY = ['0', '1', '4', '6', '7', 'A']
 
@@ -17,13 +29,24 @@ interface BuyerState {
 
 const emptyBuyer = (code: string): BuyerState => ({ documentTypeCode: code, documentNumber: '', name: '', address: '', email: '' })
 
+/** What the API calculated for the document as it stands, with the percentages it was asked about. It is shown only while the form still says the same. */
+interface Calculation {
+  key: string
+  payable: number
+  detractionAmount: number | null
+  retentionAmount: number | null
+}
+
 export function NewDocument() {
   const companies = useCompanies()
   const navigate = useNavigate()
   const issue = useIssueDocument()
+  const preview = usePreviewDocument()
   const toast = useToast()
   const identity = useCatalog('06')
   const affectations = useCatalog('07')
+  const operations = useCatalog('51')
+  const detractionCodes = useCatalog('54')
   const customers = useCustomers('')
 
   const [companyId, setCompanyId] = useState('')
@@ -35,6 +58,10 @@ export function NewDocument() {
   const [lines, setLines] = useState<LineState[]>([emptyLine()])
   const [credit, setCredit] = useState(false)
   const [installments, setInstallments] = useState<{ amount: string; dueDate: string }[]>([{ amount: '', dueDate: '' }])
+  const [operation, setOperation] = useState('0101')
+  const [usageCountry, setUsageCountry] = useState('')
+  const [deduction, setDeduction] = useState<DeductionInput>(noDeduction())
+  const [calculation, setCalculation] = useState<Calculation | null>(null)
 
   const activeCompanies = useMemo(() => companies.data?.filter((company) => company.status === 'Active') ?? [], [companies.data])
   const selectedCompany = activeCompanies.find((company) => company.id === companyId) ?? activeCompanies[0]
@@ -45,16 +72,56 @@ export function NewDocument() {
   // What the user did not choose is derived: the currency of the company and the first series of the type.
   const currency = currencyChoice ?? selectedCompany?.defaultCurrency ?? 'PEN'
   const seriesId = typeSeries.some((item) => item.id === seriesChoice) ? seriesChoice : (typeSeries[0]?.id ?? '')
+  const exporting = isExport(operation)
+  // Detraction and withholding are of an invoice in soles, and an export has neither.
+  const canDeduct = type === '01' && currency === 'PEN' && !exporting
+  const activeDeduction: DeductionInput = canDeduct ? deduction : noDeduction()
 
   function changeType(next: '01' | '03') {
     setType(next)
     setBuyer((current) => (next === '01' && current.documentTypeCode !== '6' ? emptyBuyer('6') : next === '03' && current.documentTypeCode === '6' ? emptyBuyer('1') : current))
+    if (next === '03' && buyerMustBeForeign('03', operation)) setBuyer(emptyBuyer('7'))
+  }
+
+  function changeOperation(next: string) {
+    setOperation(next)
+    setUsageCountry('')
+    if (buyerMustBeForeign(type, next)) setBuyer((current) => (FOREIGN_IDENTITY.includes(current.documentTypeCode) ? current : emptyBuyer('7')))
+    else if (!isExport(next)) setBuyer((current) => (type === '01' && current.documentTypeCode !== '6' ? emptyBuyer('6') : current))
   }
 
   if (companies.isPending) return <Loading />
   if (activeCompanies.length === 0) return <div className="alert info">Registre una empresa antes de emitir comprobantes.</div>
 
   const noBuyer = buyer.documentTypeCode === '0'
+  const foreignOnly = buyerMustBeForeign(type, operation)
+
+  const requestLines = lines.map((line) => toRequestLine({ ...line, affectation: exporting ? EXPORT_AFFECTATION : line.affectation }, exporting ? false : lineIsFree(line.affectation, affectations.data)))
+  const buyerBody = {
+    documentTypeCode: buyer.documentTypeCode,
+    documentNumber: noBuyer ? '-' : buyer.documentNumber.trim(),
+    name: noBuyer ? 'CLIENTES VARIOS' : buyer.name.trim(),
+    address: buyer.address.trim() || null,
+    email: buyer.email.trim() || null,
+  }
+  const installmentsBody = credit && type === '01' ? installments.map((item) => ({ amount: Number(item.amount), dueDate: item.dueDate })) : undefined
+  const request = (deductionToSend: DeductionInput) =>
+    buildDocumentRequest({ seriesId, issueDate, currency, buyer: buyerBody, lines: requestLines, installments: installmentsBody, operation, usageCountry, deduction: deductionToSend })
+
+  // The document without its deduction is what the API previews: the amounts of a detraction and of a withholding depend on the total.
+  const previewBody = { document: request(noDeduction()), detractionPercentage: activeDeduction.kind === 'detraction' ? Number(activeDeduction.percentage) || null : null, retentionPercentage: activeDeduction.kind === 'retention' ? Number(activeDeduction.retentionPercentage) || null : null }
+  const previewKey = JSON.stringify(previewBody)
+  const shown = calculation && calculation.key === previewKey ? calculation : null
+  const canCalculate = Boolean(seriesId) && (previewBody.detractionPercentage !== null || previewBody.retentionPercentage !== null)
+
+  function calculate() {
+    preview.mutate(previewBody, {
+      onSuccess: (result) => {
+        setCalculation({ key: previewKey, payable: result.totals.payableAmount, detractionAmount: result.detractionAmount, retentionAmount: result.retentionAmount })
+        if (result.detractionAmount !== null) setDeduction((current) => ({ ...current, amount: String(result.detractionAmount) }))
+      },
+    })
+  }
 
   function fillFrom(customerId: string) {
     const customer = customers.data?.find((item) => item.id === customerId)
@@ -63,27 +130,16 @@ export function NewDocument() {
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    const body = {
-      seriesId,
-      issueDate,
-      currency,
-      buyer: {
-        documentTypeCode: buyer.documentTypeCode,
-        documentNumber: noBuyer ? '-' : buyer.documentNumber.trim(),
-        name: noBuyer ? 'CLIENTES VARIOS' : buyer.name.trim(),
-        address: buyer.address.trim() || null,
-        email: buyer.email.trim() || null,
-      },
-      lines: lines.map((line) => toRequestLine(line, lineIsFree(line.affectation, affectations.data))),
-      ...(credit && type === '01' ? { installments: installments.map((item) => ({ amount: Number(item.amount), dueDate: item.dueDate })) } : {}),
-    }
-    issue.mutate(body, {
+    issue.mutate(request(activeDeduction), {
       onSuccess: (document) => {
         toast.ok(`${DOCUMENT_TYPES[type]} ${document.series}-${document.number} emitida.`)
         void navigate(`/documentos/${document.id}`)
       },
     })
   }
+
+  const identityOptions = (identity.data ?? []).filter((entry) => SUPPORTED_IDENTITY.includes(entry.code) && (foreignOnly ? FOREIGN_IDENTITY.includes(entry.code) : type === '03' || entry.code !== '0' || exporting))
+  const describe = (code: string) => operations.data?.find((entry) => entry.code === code)?.description ?? code
 
   return (
     <>
@@ -110,7 +166,15 @@ export function NewDocument() {
               <option value="PEN">Soles (PEN)</option>
               <option value="USD">Dólares (USD)</option>
             </SelectField>
+            <SelectField label="Tipo de operación" value={operation} onChange={(event) => changeOperation(event.target.value)}>
+              <option value="0101">Venta interna</option>
+              {EXPORT_TYPES.map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {describe(entry.code)}</option>)}
+            </SelectField>
+            {needsUsageCountry(operation) && (
+              <TextField label="País del uso o aprovechamiento" hint="código de 2 letras, no PE" required maxLength={2} pattern="[A-Za-z]{2}" value={usageCountry} onChange={(event) => setUsageCountry(event.target.value.toUpperCase())} />
+            )}
           </div>
+          {exporting && <p className="muted">Una exportación lleva solo líneas con afectación {EXPORT_AFFECTATION} y no está sujeta a detracción ni a retención.</p>}
         </div>
 
         <div className="card">
@@ -124,21 +188,75 @@ export function NewDocument() {
             )}
             <div className="form-grid">
               <SelectField label="Tipo de documento" value={buyer.documentTypeCode} onChange={(event) => setBuyer({ ...buyer, documentTypeCode: event.target.value })}>
-                {(identity.data ?? []).filter((entry) => SUPPORTED_IDENTITY.includes(entry.code) && (type === '03' || entry.code !== '0')).map((entry) => <option key={entry.code} value={entry.code}>{entry.description}</option>)}
+                {identityOptions.map((entry) => <option key={entry.code} value={entry.code}>{entry.description}</option>)}
               </SelectField>
               <TextField label="Número" required={!noBuyer} disabled={noBuyer} value={noBuyer ? '' : buyer.documentNumber} onChange={(event) => setBuyer({ ...buyer, documentNumber: event.target.value })} />
               <TextField label="Nombre o razón social" required={!noBuyer} disabled={noBuyer} value={noBuyer ? 'CLIENTES VARIOS' : buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} />
               <TextField label="Dirección" value={buyer.address} onChange={(event) => setBuyer({ ...buyer, address: event.target.value })} />
               <TextField label="Correo" type="email" value={buyer.email} onChange={(event) => setBuyer({ ...buyer, email: event.target.value })} />
             </div>
-            {type === '03' && noBuyer && <p className="muted">Una boleta de más de S/ 700 exige identificar al cliente.</p>}
+            {foreignOnly && <p className="muted">El adquirente de esta operación está en el exterior: no se admite RUC.</p>}
+            {type === '03' && noBuyer && !exporting && <p className="muted">Una boleta de más de S/ 700 exige identificar al cliente.</p>}
           </div>
         </div>
 
         <div className="card">
           <h2>Ítems</h2>
-          <LinesEditor lines={lines} onChange={setLines} />
+          <LinesEditor lines={lines} onChange={setLines} fixedAffectation={exporting ? EXPORT_AFFECTATION : undefined} />
         </div>
+
+        {canDeduct && (
+          <div className="card stack">
+            <h2>Detracción o retención</h2>
+            <SelectField label="Esta factura tiene" value={deduction.kind} onChange={(event) => setDeduction({ ...deduction, kind: event.target.value as DeductionInput['kind'] })}>
+              <option value="none">Ninguna</option>
+              <option value="detraction">Detracción (SPOT)</option>
+              <option value="retention">Retención del IGV</option>
+            </SelectField>
+
+            {deduction.kind === 'detraction' && (
+              <>
+                <div className="form-grid">
+                  <SelectField label="Bien o servicio" hint="catálogo 54" required value={deduction.goodsOrServiceCode} onChange={(event) => setDeduction({ ...deduction, goodsOrServiceCode: event.target.value })}>
+                    <option value="">Elija…</option>
+                    {(detractionCodes.data ?? []).filter((entry) => !DETRACTION_NEEDS_LINE_DETAILS.includes(entry.code)).map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {entry.description}</option>)}
+                  </SelectField>
+                  <TextField label="Porcentaje" hint="% de la detracción" type="number" min="0" max="100" step="any" required value={deduction.percentage} onChange={(event) => setDeduction({ ...deduction, percentage: event.target.value })} />
+                  <TextField label="Monto de la detracción" hint="en soles" type="number" min="0" step="0.01" required value={deduction.amount} onChange={(event) => setDeduction({ ...deduction, amount: event.target.value })} />
+                  <TextField label="Cuenta en el Banco de la Nación" hint={selectedCompany?.detractionAccount ? 'vacía: se usa la de la empresa' : 'obligatoria si la empresa no la tiene registrada'} required={!selectedCompany?.detractionAccount} maxLength={100} value={deduction.account} onChange={(event) => setDeduction({ ...deduction, account: event.target.value })} />
+                </div>
+                <p className="muted">Los porcentajes y los montos de la detracción son datos del emisor: SUNAT revisa su estructura, no su valor. Los códigos 004 (recursos hidrobiológicos) y 027 (transporte de carga) piden datos en cada línea y se emiten por la API.</p>
+              </>
+            )}
+
+            {deduction.kind === 'retention' && (
+              <>
+                <div className="form-grid">
+                  <TextField label="Porcentaje de la retención" hint="% del importe total" type="number" min="0" max="99.99999" step="any" required value={deduction.retentionPercentage} onChange={(event) => setDeduction({ ...deduction, retentionPercentage: event.target.value })} />
+                </div>
+                <p className="muted">El comprador, como agente de retención, retiene ese porcentaje del importe total. Una operación sujeta a detracción queda fuera de la retención: se elige una u otra.</p>
+              </>
+            )}
+
+            {deduction.kind !== 'none' && (
+              <div className="stack">
+                <div className="actions">
+                  <button className="btn" type="button" disabled={!canCalculate || preview.isPending} onClick={calculate}>
+                    {preview.isPending ? 'Calculando…' : deduction.kind === 'detraction' ? 'Calcular el monto' : 'Calcular la retención'}
+                  </button>
+                </div>
+                <ErrorAlert error={preview.error} />
+                {shown && (
+                  <div className="alert info" role="status">
+                    Importe total del comprobante: <strong>{money(shown.payable, currency)}</strong>
+                    {shown.detractionAmount !== null && <> · detracción: <strong>{money(shown.detractionAmount, 'PEN')}</strong>. Puede ajustar el monto dentro de lo que SUNAT acepta.</>}
+                    {shown.retentionAmount !== null && <> · retención: <strong>{money(shown.retentionAmount, 'PEN')}</strong></>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {type === '01' && (
           <div className="card stack">
@@ -159,7 +277,7 @@ export function NewDocument() {
                   <button className="btn" type="button" onClick={() => setInstallments([...installments, { amount: '', dueDate: '' }])}>Agregar cuota</button>
                   {installments.length > 1 && <button className="btn" type="button" onClick={() => setInstallments(installments.slice(0, -1))}>Quitar última</button>}
                 </div>
-                <p className="muted">Las cuotas deben sumar el total del comprobante.</p>
+                <p className="muted">Las cuotas deben sumar el total del comprobante{activeDeduction.kind === 'none' ? '' : ', menos la detracción o la retención'}.</p>
               </>
             )}
           </div>

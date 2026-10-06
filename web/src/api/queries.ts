@@ -22,6 +22,7 @@ import type {
   Customer,
   CustomerDetails,
   Document,
+  DocumentPreview,
   ElectronicDocument,
   ElectronicDocumentEvent,
   Establishment,
@@ -161,6 +162,7 @@ export const useCreateUser = () =>
   useAction((input: { email: string; displayName: string; password: string; roles: string[] }) => post<AppUser>('/api/v1/users', input), [keys.users])
 export const useDeactivateUser = () => useAction((id: string) => post(`/api/v1/users/${id}/deactivate`), [keys.users])
 
+export const usePreviewDocument = () => useAction((body: object) => post<DocumentPreview>('/api/v1/documents/preview', body), [])
 export const useIssueDocument = () => useAction((body: object) => post<Document>('/api/v1/documents', body, newKey()), [['documents']])
 export const useIssueNote = () => useAction((body: object) => post<Document>('/api/v1/notes', body, newKey()), [['documents']])
 export const usePrepare = (documentId: string) => useAction(() => post<ElectronicDocument>(`/api/v1/documents/${documentId}/electronic`), [keys.electronic(documentId), ['documents']])
