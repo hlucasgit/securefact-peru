@@ -14,7 +14,7 @@ Plataforma SaaS de facturación electrónica peruana (monolito modular .NET 10 +
 9. No `catch (Exception) {}` vacíos, no TODO críticos, no código comentado, `CancellationToken` siempre, nullable habilitado.
 
 ## Estructura
-`src/SecureFact.SharedKernel`, `src/SecureFact.Api`, `src/SecureFact.Workers`, `src/Modules/<Módulo>/{SecureFact.<Módulo>,SecureFact.<Módulo>.Contracts}`, `tests/*`. Un módulo solo referencia `SharedKernel` y `Contracts` de otros (lo verifican `tests/Architecture`).
+`web/` (interfaz React, ADR-038; no calcula impuestos), `src/SecureFact.SharedKernel`, `src/SecureFact.Api`, `src/SecureFact.Workers`, `src/Modules/<Módulo>/{SecureFact.<Módulo>,SecureFact.<Módulo>.Contracts}`, `tests/*`. Un módulo solo referencia `SharedKernel` y `Contracts` de otros (lo verifican `tests/Architecture`).
 
 ## Comandos
 ```bash
@@ -22,6 +22,7 @@ docker compose up -d
 dotnet build SecureFact.slnx
 dotnet build SecureFact.slnx -c Release   # como el CI: en Release las advertencias son errores
 dotnet test SecureFact.slnx
+(cd web && npm ci && npm run lint && npm run typecheck && npm test && npm run build)   # interfaz web, como el trabajo `web` del CI
 # cobertura: ver docs/testing/README.md (coverage.runsettings; el CI exige 95 % de líneas y 84 % de ramas)
 ```
 

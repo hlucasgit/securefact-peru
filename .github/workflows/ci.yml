@@ -59,6 +59,31 @@ jobs:
           path: _manifest
           if-no-files-found: ignore
 
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Types
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Vulnerable packages (production dependencies)
+        run: npm audit --omit=dev --audit-level=high
+
   secret-scan:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -74,13 +99,15 @@ jobs:
   container-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: build-test
+    needs: [build-test, web]
     steps:
       - uses: actions/checkout@v4
       - name: Build API image
         run: docker build -f src/SecureFact.Api/Dockerfile -t securefact-api:ci .
       - name: Build workers image
         run: docker build -f src/SecureFact.Workers/Dockerfile -t securefact-workers:ci .
+      - name: Build web image
+        run: docker build -t securefact-web:ci web
       - name: Scan images (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -92,6 +119,13 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: securefact-workers:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: Scan web image (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: securefact-web:ci
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true

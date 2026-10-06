@@ -97,6 +97,12 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 - **La base sigue siendo la fuente** (fase 1 de ADR-005): los bytes siguen también en `signed_xml` y `cdr_zip`. Quitarlos es la fase 2, con condiciones en el ADR-036.
 - Pendiente: conciliación periódica del contenido, Object Lock y período de retención legal sin probar ni confirmar, fase 2.
 
+## Interfaz web (primera entrega)
+- **`web/`** (React + TypeScript + Vite, ADR-038): ingreso con segundo factor, panel, empresas (datos, establecimientos, series, certificado digital y credenciales SOL), clientes, productos, **emisión** de facturas y boletas (ítems con afectación, descuento, ISC y bolsas de plástico; venta al crédito), documentos (lista, detalle, generar y firmar, enviar, consultar, reintentar, XML, PDF, CDR, archivo conservado, baja), **notas** de crédito y débito, resumen diario, usuarios, segundo factor y reglas. Claro, oscuro y móvil.
+- La interfaz **no calcula impuestos**: muestra lo que calcula la API. Un solo origen (proxy de Vite / nginx), CSP estricta, sesión con el *access token* en memoria.
+- Empaquetada (`web/Dockerfile`, servicio `web` de `docker-compose.yml`) y en el CI (lint, tipos, 16 pruebas, compilación, `npm audit`, Trivy).
+- Pendiente: pruebas de extremo a extremo con navegador, envío a SUNAT probado desde la interfaz (la API local no tiene canal por omisión), exportaciones, detracciones, retenciones y transporte de carga desde la interfaz (siguen por API), administración de plataforma, importación masiva, planes, recuperación de contraseña, *refresh token* en cookie `HttpOnly`.
+
 ## ISC e ICBPER
 - **ISC** (al valor y de monto fijo) **e ICBPER** en el UBL de facturas, boletas, notas y resumen diario, y en el PDF (ADR-037): subtotales de línea y globales según las hojas de reglas; el ISC entra en la base del IGV de la línea. Aceptados por el beta de SUNAT (factura, boleta, notas y resumen).
 - El monto por bolsa del ICBPER es `Verified` con el calendario de la Ley 30884 (S26): el beta **no** valida ese monto.

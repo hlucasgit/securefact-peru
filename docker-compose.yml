@@ -132,6 +132,15 @@ services:
     ports:
       - "127.0.0.1:${SF_API_PORT:-5180}:8080"
 
+  # The web interface (React) behind nginx, which forwards /api to the API. http://localhost:${SF_WEB_PORT:-5173}
+  web:
+    build:
+      context: web
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${SF_WEB_PORT:-5173}:8080"
+
   workers:
     build:
       context: .

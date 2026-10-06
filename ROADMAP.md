@@ -44,6 +44,7 @@ Modelo canónico, generador UBL 2.1, validación XSD y reglas SUNAT, firma XMLDS
 Simulador SUNAT, `ICpeSubmissionChannel` + adapter inicial elegido por ADR (SUNAT directo / PSE / OSE), colas, workers, reintentos, circuit breaker, máquina de estados, webhooks. **Salida**: flujo end-to-end (§126) en Sandbox y, tras aprobación explícita, en beta de SUNAT.
 
 ## Fase 5 — MVP comercial
+**En curso**: primera interfaz web (`web/`, ADR-038): ingreso con segundo factor, empresas, certificado y SOL, series, clientes, productos, emisión de facturas y boletas (con ISC e ICBPER), notas, seguimiento y envío, baja, resumen diario, usuarios y reglas. Pendiente de la fase: búsqueda avanzada, importación masiva, planes y *metering*, portal de desarrollador y sandbox, administración de plataforma.
 Dashboard, emisión web, búsqueda, descarga, importación masiva, usuarios, planes básicos, metering, API pública estable + OpenAPI + colección Bruno, portal de desarrollador, sandbox. **Salida**: primeros clientes reales.
 
 ## Fase 6 — White label / Resellers
