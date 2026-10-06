@@ -64,7 +64,15 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             builder.Property(r => r.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
             builder.Property(r => r.IsActive).HasColumnName("is_active").IsRequired();
             builder.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
+            builder.Property(r => r.BrandName).HasColumnName("brand_name").HasMaxLength(60);
+            builder.Property(r => r.PrimaryColor).HasColumnName("primary_color").HasMaxLength(7);
+            builder.Property(r => r.SupportEmail).HasColumnName("support_email").HasMaxLength(254);
+            builder.Property(r => r.Host).HasColumnName("host").HasMaxLength(253);
+            builder.Property(r => r.Logo).HasColumnName("logo");
+            builder.Property(r => r.LogoContentType).HasColumnName("logo_content_type").HasMaxLength(30);
+            builder.Property(r => r.LogoVersion).HasColumnName("logo_version").HasMaxLength(16);
             builder.Property(r => r.Version).IsRowVersion();
+            builder.HasIndex(r => r.Host).IsUnique().HasFilter("host IS NOT NULL").HasDatabaseName("ux_reseller_host");
         });
     }
 }

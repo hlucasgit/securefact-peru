@@ -153,3 +153,43 @@ public interface IResellerAdministration
 
     Task<Result<TenantDto>> AssignPlanAsync(Guid resellerId, TenantId tenantId, Guid planId, CancellationToken cancellationToken);
 }
+
+/// <summary>How the interface presents itself to the users of a reseller (white label). Only what any visitor may see: nothing here is secret.</summary>
+public sealed record BrandingDto(Guid ResellerId, string BrandName, string PrimaryColor, string? SupportEmail, string? LogoVersion);
+
+/// <summary>What a reseller or the platform edits. <paramref name="Host"/> is the host name at which the portal of the reseller is served; only the platform sets it.</summary>
+public sealed record BrandingSettings(Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, string? LogoVersion);
+
+public sealed record BrandingInput(string? BrandName, string? PrimaryColor, string? SupportEmail);
+
+public sealed record BrandLogo(byte[] Data, string ContentType, string Version);
+
+/// <summary>
+/// White label (ADR-044). The first group is read by anyone, including a visitor who has not signed in; it answers only for an active reseller that has set its brand, and answers null
+/// otherwise so the interface keeps the default look. The second group is for platform staff and for the reseller itself, and every method checks it is one of them.
+/// </summary>
+public interface IBranding
+{
+    /// <summary>The brand of the reseller whose portal is served at <paramref name="host"/>, or null.</summary>
+    Task<BrandingDto?> ForHostAsync(string host, CancellationToken cancellationToken);
+
+    /// <summary>The brand of the reseller of a tenant, or null for a tenant without reseller (or whose reseller has no brand or is off).</summary>
+    Task<BrandingDto?> ForTenantAsync(TenantId tenantId, CancellationToken cancellationToken);
+
+    Task<BrandingDto?> ForResellerAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    Task<BrandLogo?> LogoAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    Task<Result<BrandingSettings>> GetAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    /// <summary>Sets name, colour and support e-mail. A null name removes the brand (the default look returns). The colour must keep the white text readable on it (WCAG contrast 4.5:1).</summary>
+    Task<Result<BrandingSettings>> UpdateAsync(Guid resellerId, BrandingInput input, CancellationToken cancellationToken);
+
+    /// <summary>Points a host name at the portal of the reseller (platform staff only): the DNS record and the certificate are the operator's. Null clears it.</summary>
+    Task<Result<BrandingSettings>> SetHostAsync(Guid resellerId, string? host, CancellationToken cancellationToken);
+
+    /// <summary>A PNG, JPEG or WebP of at most 200 KB, checked by its content and not by what the caller says it is.</summary>
+    Task<Result<BrandingSettings>> SetLogoAsync(Guid resellerId, byte[] data, CancellationToken cancellationToken);
+
+    Task<Result<BrandingSettings>> RemoveLogoAsync(Guid resellerId, CancellationToken cancellationToken);
+}

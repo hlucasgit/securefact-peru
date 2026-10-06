@@ -33,7 +33,7 @@ describe('the navigation follows the role', () => {
   })
 
   it('shows a reseller its accounts and nothing else of the platform or of a tenant', () => {
-    expect(links(['ResellerAdmin'])).toEqual(['Mis cuentas', 'Seguridad'])
+    expect(links(['ResellerAdmin'])).toEqual(['Mis cuentas', 'Marca', 'Seguridad'])
   })
 
   it('shows a tenant owner the operation, the audit and the failed messages, and no platform', () => {

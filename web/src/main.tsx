@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { ApiError } from './api/http'
 import { App } from './App'
 import { SessionProvider } from './auth/session'
+import { BrandingProvider } from './branding/BrandingProvider'
 import { ToastProvider } from './components/ui'
 import './index.css'
 
@@ -20,9 +21,11 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={client}>
       <BrowserRouter>
         <SessionProvider>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
+          <BrandingProvider>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </BrandingProvider>
         </SessionProvider>
       </BrowserRouter>
     </QueryClientProvider>

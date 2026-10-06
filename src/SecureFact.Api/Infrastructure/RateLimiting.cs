@@ -8,6 +8,9 @@ internal static class RateLimiting
 {
     public const string AuthPolicy = "auth";
 
+    /// <summary>Public reads that a page makes on every visit (the brand of the portal): looser than the credential endpoints.</summary>
+    public const string PublicPolicy = "public";
+
     /// <summary>Per-client-IP limiter for unauthenticated credential endpoints; account lockout complements it per account.</summary>
     public static IServiceCollection AddSecureFactRateLimiting(this IServiceCollection services, IConfiguration configuration) =>
         services.AddRateLimiter(options =>
@@ -29,5 +32,8 @@ internal static class RateLimiting
             options.AddPolicy(AuthPolicy, httpContext => RateLimitPartition.GetFixedWindowLimiter(
                 httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = configuration.GetValue("RateLimiting:AuthPermitPerMinute", 20), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(PublicPolicy, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = configuration.GetValue("RateLimiting:PublicPermitPerMinute", 240), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 }

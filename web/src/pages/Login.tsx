@@ -2,10 +2,12 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { ApiError, errorMessage } from '../api/http'
 import { useSession } from '../auth/session'
+import { BrandMark, useBrand } from '../branding/BrandingProvider'
 import { ErrorAlert, Loading, TextField } from '../components/ui'
 
 export function Login() {
   const { principal, restoring, login } = useSession()
+  const brand = useBrand()
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,7 +41,9 @@ export function Login() {
     <div className="login-wrap">
       <form className="card login-card stack" onSubmit={(event) => void submit(event)}>
         <div>
-          <h1>SecureFact Perú</h1>
+          <h1>
+            <BrandMark />
+          </h1>
           <p className="muted">Ingrese a su cuenta.</p>
         </div>
         <ErrorAlert error={error} />
@@ -51,6 +55,12 @@ export function Login() {
         <button className="btn primary" type="submit" disabled={busy}>
           {busy ? 'Ingresando…' : 'Ingresar'}
         </button>
+        {brand?.supportEmail && (
+          <p className="muted">
+            ¿Necesita ayuda? <a href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>
+          </p>
+        )}
+        {brand && <p className="muted powered">Con tecnología SecureFact</p>}
       </form>
     </div>
   )

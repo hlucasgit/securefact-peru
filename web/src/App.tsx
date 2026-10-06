@@ -14,6 +14,7 @@ import { Login } from './pages/Login'
 import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
 import { NewNote } from './pages/NewNote'
+import { ResellerBrand } from './pages/Brand'
 import { MyPlan, Plans } from './pages/Plans'
 import { ResellerAccountDetail, ResellerAccounts, Resellers } from './pages/Resellers'
 import { TenantDetail, Tenants } from './pages/Platform'
@@ -45,6 +46,7 @@ export function App() {
         <Route path="plataforma/planes" element={<Plans />} />
         <Route path="plataforma/revendedores" element={<Resellers />} />
         <Route path="revendedor/cuentas" element={<ResellerAccounts />} />
+        <Route path="revendedor/marca" element={<ResellerBrand />} />
         <Route path="revendedor/cuentas/:id" element={<ResellerAccountDetail />} />
         <Route path="plan" element={<MyPlan />} />
         <Route path="auditoria" element={<Audit />} />

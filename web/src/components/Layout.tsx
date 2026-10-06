@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useSession } from '../auth/session'
+import { BrandMark, useBrand } from '../branding/BrandingProvider'
 import { ADMIN_ROLES, AUDIT_ROLES, BILLING_ROLES, PLAN_ROLES, PLATFORM_ROLES, QUEUE_ROLES, RESELLER_ROLES, ROLE_LABELS } from '../lib/format'
 
 interface Item {
@@ -15,7 +16,7 @@ const PLATFORM_GROUPS: { title: string; items: Item[] }[] = [
 ]
 
 const RESELLER_GROUPS: { title: string; items: Item[] }[] = [
-  { title: 'Revendedor', items: [{ to: '/revendedor/cuentas', label: 'Mis cuentas' }] },
+  { title: 'Revendedor', items: [{ to: '/revendedor/cuentas', label: 'Mis cuentas' }, { to: '/revendedor/marca', label: 'Marca' }] },
   { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }] },
 ]
 
@@ -29,13 +30,14 @@ export function Layout() {
   const { principal, hasRole, logout } = useSession()
   const [open, setOpen] = useState(false)
   const role = principal?.roles[0]
+  const brand = useBrand()
 
   return (
     <div className="shell">
       <aside className={`sidebar${open ? ' open' : ''}`}>
         <div className="brand">
-          SecureFact Perú
-          <small>Facturación electrónica</small>
+          <BrandMark />
+          <small>{brand ? 'Facturación electrónica · con tecnología SecureFact' : 'Facturación electrónica'}</small>
         </div>
         <nav aria-label="Navegación principal">
           {(hasRole(...PLATFORM_ROLES) ? PLATFORM_GROUPS : hasRole(...RESELLER_ROLES) ? RESELLER_GROUPS : GROUPS).map((group) => {

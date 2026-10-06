@@ -48,7 +48,7 @@ Un revendedor **no** suspende ni cierra cuentas, no lee sus usuarios, documentos
 
 ## Límites (P)
 - **Sin facturación ni comisiones**: no hay precios, márgenes, liquidaciones ni cobro entre la plataforma, el revendedor y sus clientes (ADR-042).
-- **Sin marca blanca** (logotipo, colores, dominio propio, plantillas de correo y de PDF por revendedor): es el resto de la fase 6 del `ROADMAP.md`.
+- La **marca blanca** (nombre, color, logotipo y dominio del portal) es del ADR-044; siguen pendientes los correos y las plantillas por revendedor.
 - Un revendedor no suspende cuentas, no ve sus usuarios ni su actividad, y no entra «como» el cliente.
 - Una cuenta tiene un solo revendedor, y un revendedor desactivado no puede transferir sus cuentas: la plataforma las mueve.
 - El revendedor opera en ámbito de plataforma a nivel de base de datos; el filtro por revendedor es de aplicación (probado), no una política RLS propia. Un ámbito de revendedor con su propia política sería una defensa más profunda, a cambio de tocar el ámbito de datos en todos los módulos.

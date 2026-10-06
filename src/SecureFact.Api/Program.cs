@@ -202,6 +202,7 @@ app.MapAuthEndpoints();
 app.MapUserAndTenantEndpoints();
 app.MapPlanEndpoints();
 app.MapResellerEndpoints();
+app.MapBrandingEndpoints();
 app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
 app.MapBillingEndpoints();

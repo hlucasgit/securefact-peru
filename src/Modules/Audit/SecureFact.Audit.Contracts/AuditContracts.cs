@@ -11,6 +11,8 @@ public static class AuditActions
     public const string TenantResellerChanged = "tenancy.tenant.reseller_changed";
     public const string ResellerCreated = "tenancy.reseller.created";
     public const string ResellerUpdated = "tenancy.reseller.updated";
+    public const string ResellerBrandingUpdated = "tenancy.reseller.branding_updated";
+    public const string ResellerLogoChanged = "tenancy.reseller.logo_changed";
     public const string TenantReactivated = "tenancy.tenant.reactivated";
     public const string TenantClosed = "tenancy.tenant.closed";
 

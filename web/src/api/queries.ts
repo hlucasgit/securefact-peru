@@ -6,6 +6,9 @@ import type {
   AuditRecord,
   AuditVerification,
   DeadMessage,
+  BrandInput,
+  BrandScope,
+  BrandSettings,
   PlanInput,
   PlanRow,
   ResellerRow,
@@ -217,6 +220,19 @@ export const useAddOwner = (tenantId: string) =>
   useAction((input: { email: string; displayName: string; password: string }) => post<AppUser>(`/api/v1/reseller/tenants/${tenantId}/owner`, input), [])
 export const useChangeResellerPlan = (tenantId: string) =>
   useAction((planId: string) => post<TenantRow>(`/api/v1/reseller/tenants/${tenantId}/plan`, { planId }), [keys.resellerTenant(tenantId), keys.resellerUsage(tenantId), ['reseller', 'tenants']])
+
+// White label (ADR-044)
+const brandBase = (scope: BrandScope) => (scope.kind === 'own' ? '/api/v1/reseller/branding' : `/api/v1/platform/resellers/${scope.resellerId}/branding`)
+const brandKey = (scope: BrandScope) => ['brand-settings', scope.kind === 'own' ? 'own' : scope.resellerId] as const
+// The brand that the interface is showing now follows what was just saved.
+const brandInvalidations = (scope: BrandScope): (readonly unknown[])[] => [brandKey(scope), ['branding'], ['audit']]
+
+export const useBrandSettings = (scope: BrandScope) => useQuery({ queryKey: brandKey(scope), queryFn: () => get<BrandSettings>(brandBase(scope)) })
+export const useSaveBrand = (scope: BrandScope) => useAction((input: BrandInput) => put<BrandSettings>(brandBase(scope), input), brandInvalidations(scope))
+export const useSetLogo = (scope: BrandScope) => useAction((dataBase64: string) => put<BrandSettings>(`${brandBase(scope)}/logo`, { dataBase64 }), brandInvalidations(scope))
+export const useRemoveLogo = (scope: BrandScope) => useAction(() => del<BrandSettings>(`${brandBase(scope)}/logo`), brandInvalidations(scope))
+export const useSetHost = (resellerId: string) =>
+  useAction((host: string | null) => put<BrandSettings>(`/api/v1/platform/resellers/${resellerId}/host`, { host }), [brandKey({ kind: 'platform', resellerId }), ['branding'], ['audit']])
 
 export interface AuditFilters {
   tenantId: string

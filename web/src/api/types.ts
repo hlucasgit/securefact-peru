@@ -309,6 +309,26 @@ export interface PlanRow {
   resellerId: string | null
 }
 
+/** The brand of a reseller as its editor sees it; every field but the id and the name can be empty. */
+export interface BrandSettings {
+  resellerId: string
+  resellerName: string
+  brandName: string | null
+  primaryColor: string | null
+  supportEmail: string | null
+  host: string | null
+  logoUrl: string | null
+}
+
+export interface BrandInput {
+  brandName: string | null
+  primaryColor: string | null
+  supportEmail: string | null
+}
+
+/** The reseller edits its own brand; platform staff edit one by its id. */
+export type BrandScope = { kind: 'own' } | { kind: 'platform'; resellerId: string }
+
 export interface ResellerRow {
   id: string
   name: string

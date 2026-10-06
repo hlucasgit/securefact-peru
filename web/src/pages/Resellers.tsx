@@ -19,6 +19,7 @@ import type { ResellerRow, TenantRow } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextField, useToast } from '../components/ui'
 import { dateTime } from '../lib/format'
+import { BrandEditor } from './Brand'
 import { UsagePanel } from './Plans'
 import { TenantStatusBadge } from './Platform'
 
@@ -32,6 +33,7 @@ export function Resellers() {
   const { data, isPending, error } = useResellers()
   const [editing, setEditing] = useState<ResellerRow | 'new' | null>(null)
   const [adding, setAdding] = useState<ResellerRow | null>(null)
+  const [branding, setBranding] = useState<ResellerRow | null>(null)
   const canManage = hasRole('PlatformSuperAdmin')
 
   return (
@@ -76,9 +78,12 @@ export function Resellers() {
                           </button>{' '}
                           <button className="btn small" type="button" aria-label={`Agregar administrador a ${reseller.name}`} onClick={() => setAdding(reseller)}>
                             Agregar administrador
-                          </button>
+                          </button>{' '}
                         </>
                       )}
+                      <button className="btn small" type="button" aria-label={`Marca de ${reseller.name}`} onClick={() => setBranding(reseller)}>
+                        Marca
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -91,6 +96,11 @@ export function Resellers() {
       </div>
       {editing && <ResellerModal reseller={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
       {adding && <ResellerUserModal reseller={adding} onClose={() => setAdding(null)} />}
+      {branding && (
+        <Modal title={`Marca de ${branding.name}`} onClose={() => setBranding(null)}>
+          <BrandEditor scope={{ kind: 'platform', resellerId: branding.id }} canSetHost={canManage} />
+        </Modal>
+      )}
     </>
   )
 }

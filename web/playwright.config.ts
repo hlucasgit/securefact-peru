@@ -14,7 +14,16 @@ export default defineConfig({
   workers: process.env.CI ? 2 : 4,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   globalSetup: './e2e/global-setup.ts',
-  use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure', locale: 'es-PE', timezoneId: 'America/Lima', acceptDownloads: true },
+  // Any name under .e2e.test reaches the local server, so a reseller's portal can be opened at its own domain (white label, ADR-044).
+  use: {
+    baseURL,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    locale: 'es-PE',
+    timezoneId: 'America/Lima',
+    acceptDownloads: true,
+    launchOptions: { args: ['--host-resolver-rules=MAP *.e2e.test localhost'] },
+  },
   projects: [
     { name: 'chromium', testIgnore: /mobile\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile', testMatch: /mobile\.spec\.ts/, use: { ...devices['Pixel 7'] } },
