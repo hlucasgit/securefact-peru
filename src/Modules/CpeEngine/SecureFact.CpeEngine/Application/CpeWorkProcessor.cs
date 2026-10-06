@@ -80,7 +80,73 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
             }, cancellationToken);
         }
 
+        await QueueMissingArchivesAsync(onlyTenant, cancellationToken);
         return report;
+    }
+
+    private sealed record Unarchived(Guid TenantId, Guid Id, string EventType);
+
+    /// <summary>
+    /// Safety net of the archive (ADR-036): queues the event for every document that has a file to archive, no archived copy of it and no event waiting. Documents from before the archive existed
+    /// and events that were lost reach the object storage this way. A dead event still counts as waiting, so a document that cannot be archived does not queue a new event every pass: an operator
+    /// requeues the dead one.
+    /// </summary>
+    private async Task QueueMissingArchivesAsync(Guid? onlyTenant, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<Unarchived> missing;
+        await using (var scope = scopes.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<DataScope>().UsePlatform("cpe worker: find documents without an archived copy");
+            var context = scope.ServiceProvider.GetRequiredService<CpeDbContext>();
+            missing = await context.Database.SqlQuery<Unarchived>($"""
+                (SELECT e.tenant_id AS "TenantId", e.id AS "Id", {CpeEvents.DocumentPrepared} AS "EventType"
+                   FROM cpe.electronic_document e
+                  WHERE ({onlyTenant}::uuid IS NULL OR e.tenant_id = {onlyTenant}::uuid)
+                    AND NOT EXISTS (SELECT 1 FROM cpe.archived_file f WHERE f.electronic_document_id = e.id AND f.kind = {ArchiveKinds.SignedXml})
+                    AND NOT EXISTS (SELECT 1 FROM cpe.outbox_message m WHERE m.event_type = {CpeEvents.DocumentPrepared} AND m.payload ->> 'electronicDocumentId' = e.id::text)
+                  ORDER BY e.created_at LIMIT {BatchSize})
+                UNION ALL
+                (SELECT e.tenant_id, e.id, {CpeEvents.DocumentAnswered}
+                   FROM cpe.electronic_document e
+                  WHERE e.cdr_zip IS NOT NULL AND ({onlyTenant}::uuid IS NULL OR e.tenant_id = {onlyTenant}::uuid)
+                    AND NOT EXISTS (SELECT 1 FROM cpe.archived_file f WHERE f.electronic_document_id = e.id AND f.kind = {ArchiveKinds.CdrZip})
+                    AND NOT EXISTS (SELECT 1 FROM cpe.outbox_message m WHERE m.event_type = {CpeEvents.DocumentAnswered} AND m.payload ->> 'electronicDocumentId' = e.id::text)
+                  ORDER BY e.created_at LIMIT {BatchSize})
+                """).ToListAsync(cancellationToken);
+        }
+
+        var queued = 0;
+        foreach (var item in missing)
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                scope.ServiceProvider.GetRequiredService<DataScope>().UseTenant(new TenantId(item.TenantId));
+                var context = scope.ServiceProvider.GetRequiredService<CpeDbContext>();
+                var document = await context.ElectronicDocuments.AsNoTracking().SingleOrDefaultAsync(e => e.Id == item.Id, cancellationToken);
+                if (document is null)
+                {
+                    continue;
+                }
+
+                context.OutboxMessages.Add(DocumentArchiver.EventFor(document, item.EventType, clock.GetUtcNow()));
+                await context.SaveChangesAsync(cancellationToken);
+                queued++;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                LogItemFailed(logger, exception);
+            }
+        }
+
+        if (queued > 0)
+        {
+            LogArchivesQueued(logger, queued);
+        }
     }
 
     private WorkReport Count(WorkReport current, bool success, string? code, bool sent)
@@ -176,6 +242,9 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Worker left a {Kind} for a later pass: {Code}.")]
     private static partial void LogItemSkipped(ILogger logger, string kind, string code);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Queued the archive of {Count} electronic document file(s) that had none.")]
+    private static partial void LogArchivesQueued(ILogger logger, int count);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Worker item failed unexpectedly.")]
     private static partial void LogItemFailed(ILogger logger, Exception exception);

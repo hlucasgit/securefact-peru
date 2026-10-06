@@ -22,7 +22,7 @@ public static class BillingModule
         services.TryAddScoped<IVoidStatusProvider, NoVoidStatus>();
         services.TryAddScoped<IIneffectiveDocumentsProvider, NoIneffectiveDocuments>();
         services.AddScoped<IDocumentService, DocumentService>();
-        services.AddScoped<SecureFact.SharedKernel.Messaging.IOutboxSource, BillingOutboxSource>();
+        services.AddScoped<SecureFact.SharedKernel.Messaging.IOutboxSource>(sp => new SecureFact.Platform.Messaging.PostgresOutboxSource(sp.GetRequiredService<BillingDbContext>(), sp.GetRequiredService<TimeProvider>(), BillingDbContext.Schema, "billing"));
         return services;
     }
 

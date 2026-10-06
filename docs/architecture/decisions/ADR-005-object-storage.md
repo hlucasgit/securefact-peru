@@ -1,6 +1,6 @@
 # ADR-005: Object storage S3-compatible para archivos documentales
 
-- Estado: Aceptada · Fecha: 2026-09-30
+- Estado: Aceptada · Fecha: 2026-09-30 · Implementada en la fase 1 por ADR-036 (abstracción, adaptador S3, archivo del XML firmado y del CDR como copia duradera; la base sigue siendo la fuente hasta la fase 2)
 
 ## Decisión
 Los archivos (JSON original/normalizado, XML sin firmar y firmado, ZIP enviado, CDR ZIP/XML, PDF, eventos de transmisión) viven en object storage; la BD guarda solo metadatos (`storage_key`, SHA-256, tamaño, MIME, versión, timestamp).

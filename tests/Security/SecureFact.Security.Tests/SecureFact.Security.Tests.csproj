@@ -15,6 +15,7 @@
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\..\src\SecureFact.Platform\SecureFact.Platform.csproj" />
     <ProjectReference Include="..\..\..\src\SecureFact.Messaging.RabbitMq\SecureFact.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\..\src\SecureFact.Storage.S3\SecureFact.Storage.S3.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Tenancy\SecureFact.Tenancy\SecureFact.Tenancy.csproj" />
     <ProjectReference Include="..\..\..\src\SecureFact.Api\SecureFact.Api.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />

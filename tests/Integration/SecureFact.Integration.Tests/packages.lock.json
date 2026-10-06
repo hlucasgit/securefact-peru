@@ -46,6 +46,11 @@
         "resolved": "3.1.5",
         "contentHash": "tKi7dSTwP4m5m9eXPM2Ime4Kn7xNf4x4zT9sdLO/G4hZVnQCRiMTWoSZqI/pYTVeI27oPPqHBKYI/DjJ9GsYgA=="
       },
+      "AWSSDK.Core": {
+        "type": "Transitive",
+        "resolved": "4.0.102.8",
+        "contentHash": "90B9Skhl+ORbtWNXrrmGdGhGvAfZiPmZafRYrB/xHelZjePIwPvXioqz9UiiF1vo21eDLzTnXh5EC4RjbNWsFQ=="
+      },
       "Microsoft.AspNetCore.TestHost": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -488,6 +493,7 @@
           "SecureFact.Products": "[1.0.0, )",
           "SecureFact.Rules": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.Storage.S3": "[1.0.0, )",
           "SecureFact.TaxEngine": "[1.0.0, )",
           "SecureFact.Tenancy": "[1.0.0, )"
         }
@@ -673,6 +679,16 @@
       "securefact.sharedkernel": {
         "type": "Project"
       },
+      "securefact.storage.s3": {
+        "type": "Project",
+        "dependencies": {
+          "AWSSDK.S3": "[4.0.104.1, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.12, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "securefact.taxengine": {
         "type": "Project",
         "dependencies": {
@@ -700,6 +716,15 @@
         "type": "Project",
         "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "AWSSDK.S3": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.104.1, )",
+        "resolved": "4.0.104.1",
+        "contentHash": "syEbfUR1Qjy9WS0fmg5MWOq0aGghq+pBIyrvDP3BFLc5K2OITxMiwbPkZhEJeAq8SWRn2bfVaWWmNLp8hS9VwQ==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.8, 5.0.0)"
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {

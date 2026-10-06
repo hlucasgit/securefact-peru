@@ -9,6 +9,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <ProjectReference Include="..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
     <ProjectReference Include="..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\SecureFact.Storage.S3\SecureFact.Storage.S3.csproj" />
     <ProjectReference Include="..\Modules\Tenancy\SecureFact.Tenancy\SecureFact.Tenancy.csproj" />
     <ProjectReference Include="..\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
     <ProjectReference Include="..\Modules\Organizations\SecureFact.Organizations\SecureFact.Organizations.csproj" />

@@ -31,6 +31,10 @@ internal static class CpeEndpoints
         group.MapGet("/{id:guid}/cdr", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.GetCdrZipAsync(id, ct)).ToHttp(http, zip => Results.File(zip, "application/zip", $"R-{id:N}.zip"))).RequireAuthorization(Permissions.DocumentsRead);
 
+        // Files kept in object storage, each with a link that works for a few minutes and no credentials: the caller was authorised here, the store only serves the link.
+        group.MapGet("/{id:guid}/archive", async (Guid id, IDocumentArchive archive, HttpContext http, CancellationToken ct) =>
+            (await archive.ListAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
+
         group.MapPost("/{id:guid}/send", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.SendAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.CpeSend);
 

@@ -40,6 +40,13 @@ public static class CpeEngineModule
         services.AddScoped<SecureFact.Billing.Contracts.IVoidStatusProvider, VoidStatusProvider>();
         services.AddScoped<SecureFact.Billing.Contracts.IIneffectiveDocumentsProvider, IneffectiveDocumentsProvider>();
         services.AddScoped<SecureFact.SharedKernel.Messaging.IIntegrationEventConsumer, DocumentIssuedHandler>();
+
+        // The archive in object storage (ADR-036). The host registers the IObjectStorage (S3, or the in-memory one outside production); the events of the CPE engine travel through its own outbox.
+        services.AddScoped<DocumentArchiver>();
+        services.AddScoped<IDocumentArchive>(sp => sp.GetRequiredService<DocumentArchiver>());
+        services.AddScoped<SecureFact.SharedKernel.Messaging.IIntegrationEventConsumer>(sp => new ArchiveConsumer(CpeEvents.DocumentPrepared, ArchiveKinds.SignedXml, sp.GetRequiredService<DocumentArchiver>()));
+        services.AddScoped<SecureFact.SharedKernel.Messaging.IIntegrationEventConsumer>(sp => new ArchiveConsumer(CpeEvents.DocumentAnswered, ArchiveKinds.CdrZip, sp.GetRequiredService<DocumentArchiver>()));
+        services.AddScoped<SecureFact.SharedKernel.Messaging.IOutboxSource>(sp => new SecureFact.Platform.Messaging.PostgresOutboxSource(sp.GetRequiredService<CpeDbContext>(), sp.GetRequiredService<TimeProvider>(), CpeDbContext.Schema, "cpe"));
         services.AddSingleton<ICpeWorkProcessor, CpeWorkProcessor>();
         return services;
     }

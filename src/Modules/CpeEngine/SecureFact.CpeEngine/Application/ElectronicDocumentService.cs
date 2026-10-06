@@ -157,6 +157,9 @@ internal sealed class ElectronicDocumentService(
         }
 
         db.ElectronicDocuments.Add(entity);
+
+        // The archive of the signed XML is queued in the same transaction (ADR-036): it cannot be lost, and a document that was not stored queues nothing.
+        db.OutboxMessages.Add(DocumentArchiver.EventFor(entity, CpeEvents.DocumentPrepared, now));
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -653,6 +656,7 @@ internal sealed class ElectronicDocumentService(
         {
             // SUNAT answered but we cannot read it: keep the bytes, never guess an outcome.
             entity.KeepRawCdr(zip);
+            db.OutboxMessages.Add(DocumentArchiver.EventFor(entity, CpeEvents.DocumentAnswered, now));
             entity.RecordError(parsed.Error.Code, parsed.Error.Detail);
             return Fail(entity, children, "El CDR recibido no se pudo interpretar.", now);
         }
@@ -662,12 +666,14 @@ internal sealed class ElectronicDocumentService(
         if (cdr.ReferenceId != expectedReference || cdr.TaxpayerRuc != companyRuc)
         {
             entity.KeepRawCdr(zip);
+            db.OutboxMessages.Add(DocumentArchiver.EventFor(entity, CpeEvents.DocumentAnswered, now));
             entity.RecordError(ErrorCodes.CpeCdrMismatch, "El CDR no corresponde al documento enviado.");
             return Fail(entity, children, "El CDR recibido no corresponde al documento.", now);
         }
 
         var observations = JsonSerializer.Serialize(cdr.Observations, Json);
         entity.RecordCdr(zip, cdr, observations, now);
+        db.OutboxMessages.Add(DocumentArchiver.EventFor(entity, CpeEvents.DocumentAnswered, now));
         entity.RecordError(null, null);
         entity.ScheduleRetry(null);
         var @event = cdr.Status switch

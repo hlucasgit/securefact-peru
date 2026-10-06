@@ -29,7 +29,7 @@ Orden de trabajo (incremental, cada paso con pruebas):
 6. ✔ **Identity/RBAC**: usuarios, roles, permisos explícitos, sesiones, MFA, bloqueo, revocación.
 7. ✔ **Audit**: append-only con cadena de hash.
 8. ✔ **Organizations**: empresas (RUC), establecimientos.
-9. ✔ Outbox + `IMessageBus` (RabbitMQ). `IObjectStorage` (MinIO) pendiente.
+9. ✔ Outbox + `IMessageBus` (RabbitMQ) + `IObjectStorage` (S3; SeaweedFS en desarrollo, ADR-036).
 10. CI (build, tests, escaneos), SBOM, Dependabot/Renovate, gitleaks.
 
 **Salida**: `docker compose up` levanta todo; un usuario crea tenant → empresa → establecimiento vía API; las pruebas cross-tenant, de arquitectura e integración pasan en CI; todo cambio queda auditado. **Sin XML todavía.**

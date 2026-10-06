@@ -15,6 +15,10 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
 
     public DbSet<SummaryItem> SummaryItems => Set<SummaryItem>();
 
+    public DbSet<ArchivedFile> ArchivedFiles => Set<ArchivedFile>();
+
+    public DbSet<OutboxMessageRow> OutboxMessages => Set<OutboxMessageRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -92,6 +96,31 @@ internal sealed class CpeDbContext(DbContextOptions<CpeDbContext> options, IData
 
             // A receipt belongs to at most one active summary: two concurrent summaries cannot both report it.
             b.HasIndex(e => new { e.TenantId, e.ElectronicDocumentId, e.LineStatus }).IsUnique().HasFilter("released_at IS NULL").HasDatabaseName("ux_summary_item_active");
+            ConfigureTenantOwned(b);
+        });
+
+        modelBuilder.Entity<ArchivedFile>(b =>
+        {
+            b.ToTable("archived_file");
+            b.HasKey(f => f.Id);
+            b.Property(f => f.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(f => f.ElectronicDocumentId).HasColumnName("electronic_document_id");
+            b.Property(f => f.Kind).HasColumnName("kind").HasMaxLength(20).IsRequired();
+            b.Property(f => f.StorageKey).HasColumnName("storage_key").HasMaxLength(900).IsRequired();
+            b.Property(f => f.VersionId).HasColumnName("version_id").HasMaxLength(200);
+            b.Property(f => f.Sha256).HasColumnName("sha256").HasMaxLength(64).IsFixedLength().IsRequired();
+            b.Property(f => f.SizeBytes).HasColumnName("size_bytes");
+            b.Property(f => f.ContentType).HasColumnName("content_type").HasMaxLength(100).IsRequired();
+            b.Property(f => f.StoredAt).HasColumnName("stored_at");
+
+            // One file of each kind per document: the archive is idempotent and a document is never archived twice.
+            b.HasIndex(f => new { f.ElectronicDocumentId, f.Kind }).IsUnique();
+            ConfigureTenantOwned(b);
+        });
+
+        modelBuilder.Entity<OutboxMessageRow>(b =>
+        {
+            b.MapOutboxMessage();
             ConfigureTenantOwned(b);
         });
     }

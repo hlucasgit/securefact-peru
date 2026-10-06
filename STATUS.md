@@ -1,14 +1,14 @@
 # STATUS — 2026-10-01 (dos horas autónomas)
 
 ## Estado general
-Fase 0 completa. **Fase 1 casi completa** (falta el almacenamiento S3 de código; el CI de GitHub corre en cada push y pasa, ver «CI»). **Fase 2 en curso**: ya existen el motor tributario, las series, la numeración atómica y la emisión idempotente de facturas/boletas.
+Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento de objetos en código; el CI de GitHub corre en cada push y pasa, ver «CI»). **Fase 2 en curso**: ya existen el motor tributario, las series, la numeración atómica y la emisión idempotente de facturas/boletas.
 
 ## Novedades de las dos últimas horas
 - **Rules** (`IRuleProvider`): plazos y tasas como reglas versionadas con estado `Verified`/`Pending`; versiones publicadas inmutables; `GET /api/v1/rules`. **Billing ya no acepta tasas del cliente** (las resuelve por fecha de emisión); prueba con tasas falsas.
 - **Customers** y **Products**: datos maestros por tenant con validación contra los catálogos 06 y 07, identidad inmutable, sin borrado, búsqueda con comodines escapados. Los documentos pueden referenciar `customerId` (instantánea del adquirente).
 - **UBL**: generador de XML 2.1 sin firmar para factura y boleta (líneas gravadas, exoneradas, inafectas, gratuitas). **Valida contra el XSD oficial UBL 2.1** y contiene **todas las etiquetas obligatorias de las hojas `Factura2_0` y `Boleta2_0`** del libro oficial (la prueba lee el libro versionado). Todo lo demás falla con `SF-CPE-002` en lugar de emitir XML engañoso. **ADR-016**.
 - Hallazgos: el libro de reglas es la fuente más fiable (la guía PDF de 2017 usa una estructura anterior); el ejemplo de la guía firma con RSA-SHA1 (algoritmo vigente por confirmar, R-032); `EF.Functions.ILike` sin carácter de escape no escapa comodines.
-- **Pruebas: 714 pasan en Release con warnings-as-errors** (411 unitarias, 6 de arquitectura, 6 de integración, 291 de seguridad/API). Cobertura: 96.0 % de líneas y 85.5 % de ramas (ver «Cobertura»).
+- **Pruebas: 730 pasan en Release con warnings-as-errors** (411 unitarias, 6 de arquitectura, 6 de integración, 307 de seguridad/API). Cobertura: 95.8 % de líneas y 85.1 % de ramas (ver «Cobertura»).
 
 ## Novedades de la tercera tanda
 - **Firma XMLDSig** (SHA-256 por defecto, SHA-1 configurable): una firma envuelta en `ext:ExtensionContent`, certificado validado (clave privada, vigencia, RSA ≥ 2048). El XML firmado valida contra el XSD oficial. Expone el `DigestValue` para el QR.
@@ -87,18 +87,25 @@ Fase 0 completa. **Fase 1 casi completa** (falta el almacenamiento S3 de código
 - **Bus de mensajes** (ADR-035): `IMessageBus` en `SharedKernel` y su implementación sobre RabbitMQ (`SecureFact.Messaging.RabbitMq`, cliente oficial 7.2.2): un *exchange* `topic` durable, mensajes persistentes con el id del outbox y el tenant, confirmaciones del publicador y reconexión tras fallos. Los workers publican cada evento del outbox al bus **solo si `RabbitMq:Host` está configurado** (`docker-compose.yml` lo configura); sin él, el outbox entrega solo a los consumidores propios.
 - **Outbox con varios consumidores**: primero los consumidores del tipo de evento (CPE), después el bus; el primer fallo detiene la entrega y el reintento repite todo (los consumidores son idempotentes; los suscriptores externos descartan duplicados por `message-id`).
 - **Retención del outbox**: los mensajes entregados se purgan a los `Outbox:RetentionDays` días (30 por defecto) cada hora, por una función de PostgreSQL que es la única vía para borrar; pendientes y muertos nunca se borran y la tabla sigue siendo de solo anexar para todos los demás.
-- Pruebas con un RabbitMQ real (Testcontainers), de extremo a extremo con el host de los workers y de la purga contra PostgreSQL. Pruebas: 714 pasan (411 unitarias, 6 arquitectura, 6 integración, 291 seguridad/API).
+- Pruebas con un RabbitMQ real (Testcontainers), de extremo a extremo con el host de los workers y de la purga contra PostgreSQL. Pruebas: 714 pasan al cerrar esta etapa (730 con el archivo de objetos, ver «Almacenamiento de objetos»).
 - Pendiente: un solo origen (Billing) y un solo evento publicados; la auditoría por el outbox; suscriptores de referencia.
 
+## Almacenamiento de objetos
+- **`IObjectStorage` y adaptador S3** (ADR-036): escritura única, SHA-256 calculado antes de subir y comprobado al leer, enlaces de descarga prefirmados, cifrado y Object Lock configurables; validado contra un SeaweedFS real. Sin *bucket* configurado solo se admite el almacenamiento en memoria fuera de producción.
+- **Archivo del XML firmado y del CDR**: cada documento electrónico encola, en la misma transacción que lo guarda, un evento en el **outbox propio del módulo CPE**; un consumidor idempotente sube el archivo y lo registra en `cpe.archived_file` (solo inserción, un archivo por clase y documento). Una red de seguridad en el worker encola lo que no tenga copia (documentos anteriores y eventos perdidos). `GET /api/v1/electronic-documents/{id}/archive` lista los archivos con enlaces de 5 minutos.
+- **`PostgresOutboxSource`**: el SQL del outbox ya no se copia por módulo; Billing y CPE lo comparten.
+- **La base sigue siendo la fuente** (fase 1 de ADR-005): los bytes siguen también en `signed_xml` y `cdr_zip`. Quitarlos es la fase 2, con condiciones en el ADR-036.
+- Pendiente: conciliación periódica del contenido, Object Lock y período de retención legal sin probar ni confirmar, fase 2.
+
 ## Cobertura
-- Medida con coverlet (`coverage.runsettings`) sobre las cuatro suites juntas y unida con ReportGenerator: **96.0 % de líneas y 85.5 % de ramas**, 96.6 % de métodos (95.9 % y 85.4 % antes del bus de mensajes), el 2026-10-05. Excluye migraciones, fábricas de tiempo de diseño, herramientas y pruebas. El CI la mide en cada corrida, la publica en el resumen del job y como artefacto, y **falla bajo un piso de 95 % de líneas y 84 % de ramas** (`.github/scripts/check_coverage.py`; los pisos solo suben).
+- Medida con coverlet (`coverage.runsettings`) sobre las cuatro suites juntas y unida con ReportGenerator: **95.8 % de líneas y 85.1 % de ramas** (96.0 % y 85.5 % antes del archivo en el almacén de objetos), el 2026-10-06. Excluye migraciones, fábricas de tiempo de diseño, herramientas y pruebas. El CI la mide en cada corrida, la publica en el resumen del job y como artefacto, y **falla bajo un piso de 95 % de líneas y 84 % de ramas** (`.github/scripts/check_coverage.py`; los pisos solo suben).
 - Antes de este trabajo: 93.5 % y 82.3 %. Se agregaron pruebas donde la falta de cobertura era de riesgo: la guarda de inquilino de la capa de aplicación (`TenantDbContext`: escrituras y borrados de filas de otro inquilino, filas de la plataforma, API síncrona) y el intercepto de RLS, el manejador global de excepciones (que no filtra detalles internos), las reglas de entrada de empresas, establecimientos, clientes, productos, usuarios, series y notas, y los errores de refresco, MFA y restablecimiento de contraseña.
 - Lo que sigue bajo: `Program` de la API (arranque, migraciones, exportador OTLP; 77 %) y el ensamblado de los workers (78 %), ramas de la API (68 %) y de `Products` (62 %), y los caminos de error por servicio no disponible de `ElectronicDocumentService`, `VoidService` y `SummaryService`.
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
-- Auditoría fuera de la transacción de negocio (ADR-012; el outbox ya permitiría un origen propio para ella); sin S3 en código.
+- Auditoría fuera de la transacción de negocio (ADR-012; el outbox ya permitiría un origen propio para ella); la base conserva los bytes del XML y del CDR hasta la fase 2 del archivo (ADR-036).
 - ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.
 - Notas de crédito/débito esperan el CDR (Fase 4).
 
@@ -106,5 +113,5 @@ Fase 0 completa. **Fase 1 casi completa** (falta el almacenamiento S3 de código
 1. Commit y push.
 2. ISC, ICBPER, IVAP, exportación y operaciones gratuitas con valor referencial en el UBL.
 3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF.
-4. S3 de código (`IObjectStorage`).
+4. Fase 2 del archivo: leer el XML y el CDR desde el almacén y dejar solo metadatos en la base (condiciones en ADR-036).
 5. PDF y renderizado del QR.

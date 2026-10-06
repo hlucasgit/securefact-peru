@@ -154,7 +154,7 @@ public sealed class ApiFixture : IAsyncLifetime
 }
 
 [CollectionDefinition(Name)]
-public sealed class ApiTestGroup : ICollectionFixture<ApiFixture>, ICollectionFixture<RabbitFixture>
+public sealed class ApiTestGroup : ICollectionFixture<ApiFixture>, ICollectionFixture<RabbitFixture>, ICollectionFixture<S3Fixture>
 {
     public const string Name = "api";
 }

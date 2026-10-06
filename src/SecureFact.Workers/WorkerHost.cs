@@ -10,8 +10,10 @@ using SecureFact.Organizations;
 using SecureFact.Platform;
 using SecureFact.Platform.Messaging;
 using SecureFact.Platform.Security;
+using SecureFact.Platform.Storage;
 using SecureFact.Rules;
 using SecureFact.SharedKernel.Tenancy;
+using SecureFact.Storage.S3;
 using SecureFact.TaxEngine;
 using SecureFact.Workers.Infrastructure;
 
@@ -43,6 +45,20 @@ internal static class WorkerHost
 
             return LocalEnvelopeSecretProtector.FromBase64(builder.Configuration["Security:LocalDevKek"]);
         });
+        // Documents are archived in object storage (ADR-005, ADR-036): S3 when a bucket is configured. Without one only a development machine or a test may use the in-memory storage.
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["Storage:S3:Bucket"]))
+        {
+            builder.Services.AddS3ObjectStorage(builder.Configuration.GetSection(S3StorageOptions.SectionName));
+        }
+        else if (builder.Environment.IsProduction())
+        {
+            throw new InvalidOperationException("Storage:S3:Bucket is required in production: the documents cannot be archived in memory (ADR-005).");
+        }
+        else
+        {
+            builder.Services.AddInMemoryObjectStorage();
+        }
+
         builder.Services.AddScoped<ICurrentUser, SystemCurrentUser>();
         builder.Services.AddScoped<IRequestContext, WorkerRequestContext>();
 
