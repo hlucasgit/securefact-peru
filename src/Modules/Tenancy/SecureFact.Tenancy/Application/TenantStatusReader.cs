@@ -22,4 +22,7 @@ internal sealed class TenantStatusReader(TenancyDbContext db, IMemoryCache cache
         cache.Set(key, status, ITenantStatusReader.CacheLifetime);
         return status;
     }
+
+    public async Task<IReadOnlyList<Guid>> ListInactiveAsync(CancellationToken cancellationToken) =>
+        await db.Tenants.AsNoTracking().Where(t => t.Status != TenantStatus.Active).Select(t => t.Id).ToListAsync(cancellationToken);
 }

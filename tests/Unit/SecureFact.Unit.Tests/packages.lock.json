@@ -311,6 +311,7 @@
           "SecureFact.Rules.Contracts": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
           "SecureFact.TaxEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Tenancy.Contracts": "[1.0.0, )",
           "System.Security.Cryptography.Xml": "[10.0.12, )"
         }
       },

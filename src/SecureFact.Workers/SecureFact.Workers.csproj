@@ -7,6 +7,7 @@
     <ProjectReference Include="..\SecureFact.Messaging.RabbitMq\SecureFact.Messaging.RabbitMq.csproj" />
     <ProjectReference Include="..\SecureFact.Storage.S3\SecureFact.Storage.S3.csproj" />
     <ProjectReference Include="..\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
+    <ProjectReference Include="..\Modules\Tenancy\SecureFact.Tenancy\SecureFact.Tenancy.csproj" />
     <ProjectReference Include="..\Modules\Organizations\SecureFact.Organizations\SecureFact.Organizations.csproj" />
     <ProjectReference Include="..\Modules\Billing\SecureFact.Billing\SecureFact.Billing.csproj" />
     <ProjectReference Include="..\Modules\TaxEngine\SecureFact.TaxEngine\SecureFact.TaxEngine.csproj" />

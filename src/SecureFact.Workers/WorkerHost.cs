@@ -15,6 +15,7 @@ using SecureFact.Rules;
 using SecureFact.SharedKernel.Tenancy;
 using SecureFact.Storage.S3;
 using SecureFact.TaxEngine;
+using SecureFact.Tenancy;
 using SecureFact.Workers.Infrastructure;
 
 namespace SecureFact.Workers;
@@ -63,6 +64,7 @@ internal static class WorkerHost
         builder.Services.AddScoped<IRequestContext, WorkerRequestContext>();
 
         builder.Services.AddAuditModule(appConnection);
+        builder.Services.AddTenancyModule(appConnection);
         builder.Services.AddOrganizationsModule(appConnection);
         builder.Services.AddTaxEngineModule();
         builder.Services.AddCatalogsModule(appConnection);

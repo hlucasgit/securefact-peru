@@ -53,4 +53,7 @@ public interface ITenantStatusReader
 
     /// <summary>The status of the tenant, or null when it does not exist or is not visible to the current scope. <paramref name="fresh"/> skips the cache (sign-in).</summary>
     Task<TenantStatus?> GetStatusAsync(TenantId id, bool fresh, CancellationToken cancellationToken);
+
+    /// <summary>The tenants that are suspended or closed. Read in platform scope (a tenant scope sees only its own row); never cached: the background work asks once per pass.</summary>
+    Task<IReadOnlyList<Guid>> ListInactiveAsync(CancellationToken cancellationToken);
 }

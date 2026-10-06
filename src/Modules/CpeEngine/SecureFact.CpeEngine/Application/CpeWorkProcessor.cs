@@ -8,6 +8,7 @@ using SecureFact.CpeEngine.Infrastructure;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Domain;
+using SecureFact.Tenancy.Contracts;
 
 namespace SecureFact.CpeEngine.Application;
 
@@ -25,8 +26,11 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
         var now = clock.GetUtcNow();
         var report = WorkReport.Empty;
 
+        // A suspended or closed tenant (ADR-041) gets no new traffic to SUNAT: no summary and no send. What was already sent is still polled, and the archive is custody, not traffic.
+        var inactive = await InactiveTenantsAsync(cancellationToken);
+
         // 1. Summaries of closed days first, so that they can be sent in this same pass.
-        foreach (var group in await DiscoverClosedDaysAsync(now, onlyTenant, cancellationToken))
+        foreach (var group in await DiscoverClosedDaysAsync(now, onlyTenant, inactive, cancellationToken))
         {
             report = await InTenantAsync(group.TenantId, report, async (sp, current) =>
             {
@@ -46,7 +50,7 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
             }, cancellationToken);
         }
 
-        var work = await DiscoverDueAsync(now, onlyTenant, cancellationToken);
+        var work = await DiscoverDueAsync(now, onlyTenant, inactive, cancellationToken);
         report = report with { Stuck = work.Stuck };
         if (work.Stuck > 0)
         {
@@ -85,6 +89,19 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
     }
 
     private sealed record Unarchived(Guid TenantId, Guid Id, string EventType);
+
+    /// <summary>The tenants that must not be sent for. Without the tenancy module in the host nobody is excluded.</summary>
+    private async Task<IReadOnlyList<Guid>> InactiveTenantsAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        if (scope.ServiceProvider.GetService<ITenantStatusReader>() is not { } reader)
+        {
+            return [];
+        }
+
+        scope.ServiceProvider.GetRequiredService<DataScope>().UsePlatform("cpe worker: tenants that are not active");
+        return await reader.ListInactiveAsync(cancellationToken);
+    }
 
     /// <summary>
     /// Safety net of the archive (ADR-036): queues the event for every document that has a file to archive, no archived copy of it and no event waiting. Documents from before the archive existed
@@ -182,7 +199,7 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
 
     private sealed record DueWork(IReadOnlyList<Due> Sends, IReadOnlyList<Due> Polls, int Stuck);
 
-    private async Task<IReadOnlyList<Closed>> DiscoverClosedDaysAsync(DateTimeOffset now, Guid? onlyTenant, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Closed>> DiscoverClosedDaysAsync(DateTimeOffset now, Guid? onlyTenant, IReadOnlyList<Guid> inactive, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<DataScope>().UsePlatform("cpe worker: discover closed days");
@@ -194,7 +211,7 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
         // Receipts of closed days still waiting to be reported. Receipts already inside an unsent summary appear here too; creating
         // a summary for them answers "nothing to summarize", which is harmless.
         var closed = await db.ElectronicDocuments.AsNoTracking()
-            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.ReadyToSend && e.IssueDate < today
+            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && !inactive.Contains(e.TenantId) && e.State == EDocumentState.ReadyToSend && e.IssueDate < today
                 && (e.DocumentTypeCode == receipt || ((e.DocumentTypeCode == DocumentTypes.CreditNote || e.DocumentTypeCode == DocumentTypes.DebitNote) && e.ReferenceTypeCode == receipt)))
             .Select(e => new { e.TenantId, e.CompanyId, e.IssueDate })
             .Distinct()
@@ -204,7 +221,7 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
         return closed.Select(c => new Closed(c.TenantId, c.CompanyId, c.IssueDate)).ToList();
     }
 
-    private async Task<DueWork> DiscoverDueAsync(DateTimeOffset now, Guid? onlyTenant, CancellationToken cancellationToken)
+    private async Task<DueWork> DiscoverDueAsync(DateTimeOffset now, Guid? onlyTenant, IReadOnlyList<Guid> inactive, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<DataScope>().UsePlatform("cpe worker: discover due work");
@@ -212,7 +229,7 @@ internal sealed partial class CpeWorkProcessor(IServiceScopeFactory scopes, Time
         const string summary = ElectronicDocument.SummaryType;
 
         var sends = await db.ElectronicDocuments.AsNoTracking()
-            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && e.State == EDocumentState.ReadyToSend && (e.DocumentTypeCode == DocumentTypes.Invoice || e.DocumentTypeCode == summary || e.DocumentTypeCode == ElectronicDocument.VoidType
+            .Where(e => (onlyTenant == null || e.TenantId == onlyTenant) && !inactive.Contains(e.TenantId) && e.State == EDocumentState.ReadyToSend && (e.DocumentTypeCode == DocumentTypes.Invoice || e.DocumentTypeCode == summary || e.DocumentTypeCode == ElectronicDocument.VoidType
                     || ((e.DocumentTypeCode == DocumentTypes.CreditNote || e.DocumentTypeCode == DocumentTypes.DebitNote) && e.ReferenceTypeCode == DocumentTypes.Invoice))
                 && (e.NextAttemptAt == null || e.NextAttemptAt <= now))
             .OrderBy(e => e.CreatedAt)
