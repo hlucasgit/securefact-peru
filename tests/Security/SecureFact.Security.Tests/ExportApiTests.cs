@@ -217,32 +217,19 @@ public sealed class ExportApiTests(ApiFixture api)
             detraction,
         });
 
-    private static object GuestData(bool lodging, string checkOut = "2026-09-29", string documentNumber = "X1234567") => lodging
-        ? new
+    private static object GuestData(bool lodging, string checkOut = "2026-09-29", string documentNumber = "X1234567") =>
+        new
         {
             name = "John Smith",
             documentTypeCode = "7",
             documentNumber,
             passportCountryCode = "US",
-            residenceCountryCode = "CA",
-            countryEntryDate = "2026-09-25",
-            checkInDate = "2026-09-26",
-            checkOutDate = checkOut,
-            consumptionDate = "2026-09-28",
-            stayDays = (int?)3,
-        }
-        : new
-        {
-            name = "John Smith",
-            documentTypeCode = "7",
-            documentNumber,
-            passportCountryCode = "US",
-            residenceCountryCode = (string?)null,
-            countryEntryDate = (string?)null,
-            checkInDate = (string?)null,
-            checkOutDate = (string?)null,
-            consumptionDate = (string?)null,
-            stayDays = (int?)null,
+            residenceCountryCode = lodging ? "CA" : null,
+            countryEntryDate = lodging ? "2026-09-25" : null,
+            checkInDate = lodging ? "2026-09-26" : null,
+            checkOutDate = lodging ? checkOut : null,
+            consumptionDate = lodging ? "2026-09-28" : null,
+            stayDays = lodging ? 3 : (int?)null,
         };
 
     private static Task<HttpResponseMessage> GuestSaleAsync(Setup setup, string operation, object? guest, bool receipt = false, string currency = "USD") =>
