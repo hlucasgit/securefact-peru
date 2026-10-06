@@ -550,10 +550,19 @@ internal sealed partial class DocumentService(
             {
                 return Error.Validation(ErrorCodes.InvalidDocument, $"Línea {index + 1} inválida", "Cada línea requiere descripción (máx. 500), unidad (máx. 3) y datos de impuestos.");
             }
+
+            // The ICBPER states the bags of the line: as many as its units, in a field of up to five digits (SUNAT rules 3236 and 2892).
+            if (line.Tax.PlasticBagCount != 0 && (line.Tax.PlasticBagCount != line.Tax.Quantity || line.Tax.PlasticBagCount > MaxPlasticBags))
+            {
+                return Error.Validation(ErrorCodes.InvalidDocument, $"Línea {index + 1} inválida", "La cantidad de bolsas de plástico (ICBPER) es un entero de hasta 5 dígitos e igual a la cantidad de la línea.");
+            }
         }
 
         return null;
     }
+
+    /// <summary>Largest number of plastic bags of a line: the XML field has up to five digits.</summary>
+    private const int MaxPlasticBags = 99_999;
 
     public async Task<Result<DocumentDto>> GetAsync(Guid documentId, CancellationToken cancellationToken)
     {
@@ -691,17 +700,7 @@ internal sealed partial class DocumentService(
             return Error.Validation(ErrorCodes.InvalidDocument, "Fecha de emisión fuera de plazo", $"La fecha de emisión no puede tener más de {(int)maxAge.Value} días de antigüedad.");
         }
 
-        foreach (var (line, index) in request.Lines.Select((l, i) => (l, i)))
-        {
-            if (line is null || string.IsNullOrWhiteSpace(line.Description) || line.Description.Trim().Length > 500
-                || string.IsNullOrWhiteSpace(line.UnitCode) || line.UnitCode.Trim().Length > 3 || line.Tax is null
-                || line.ProductCode is { Length: > 50 })
-            {
-                return Error.Validation(ErrorCodes.InvalidDocument, $"Línea {index + 1} inválida", "Cada línea requiere descripción (máx. 500), unidad (máx. 3) y datos de impuestos.");
-            }
-        }
-
-        return null;
+        return ValidateLines(request.Lines);
     }
 
     private static DocumentDto ToDto(Document d)
@@ -716,7 +715,8 @@ internal sealed partial class DocumentService(
             var tax = storedLine?.Tax;
             return new DocumentLineDto(
                 l.LineNumber, l.Description, l.UnitCode, l.ProductCode, l.Quantity, l.LineExtensionAmount, l.TaxCode, l.TotalTaxAmount, l.UnitPriceIncludingTaxes, l.UnitValue, l.AffectationCode,
-                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m, storedLine?.Fishing, storedLine?.Transport, storedLine?.Guest);
+                tax?.DiscountAffectingBase ?? 0m, tax?.ChargeAffectingBase ?? 0m, tax?.DiscountNotAffectingBase ?? 0m, tax?.ChargeNotAffectingBase ?? 0m, storedLine?.Fishing, storedLine?.Transport, storedLine?.Guest,
+                tax?.Isc, tax?.PlasticBagCount ?? 0);
         }).ToList();
         var buyer = new BuyerSnapshot(d.BuyerDocumentTypeCode, d.BuyerDocumentNumber, d.BuyerName, d.BuyerAddress, d.BuyerEmail);
         var note = d.ReferencedDocumentId is { } referencedId

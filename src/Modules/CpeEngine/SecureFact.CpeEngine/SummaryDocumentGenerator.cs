@@ -156,7 +156,7 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Invalid($"{label}: moneda inválida.");
             }
 
-            if (new[] { line.TotalAmount, line.TaxedAmount, line.ExemptAmount, line.UnaffectedAmount, line.ExportAmount, line.IgvAmount, line.OtherCharges, line.OtherDiscounts }.Any(a => a < 0))
+            if (new[] { line.TotalAmount, line.TaxedAmount, line.ExemptAmount, line.UnaffectedAmount, line.ExportAmount, line.IgvAmount, line.IscAmount, line.IcbperAmount, line.OtherCharges, line.OtherDiscounts }.Any(a => a < 0))
             {
                 return Invalid($"{label}: los importes no pueden ser negativos.");
             }
@@ -166,9 +166,9 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                 return Unsupported($"{label}: solo se informan operaciones gravadas, exoneradas, inafectas o de exportación con valor de venta; las gratuitas aún no están soportadas.");
             }
 
-            if (Math.Abs(line.TotalAmount - (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.ExportAmount + line.IgvAmount + line.OtherCharges - line.OtherDiscounts)) > TotalTolerance)
+            if (Math.Abs(line.TotalAmount - (line.TaxedAmount + line.ExemptAmount + line.UnaffectedAmount + line.ExportAmount + line.IgvAmount + line.IscAmount + line.IcbperAmount + line.OtherCharges - line.OtherDiscounts)) > TotalTolerance)
             {
-                return Unsupported($"{label}: el importe total no coincide con la suma de valores de venta, IGV y otros cargos menos otros descuentos (ISC, ICBPER u otros tributos aún no están soportados).");
+                return Unsupported($"{label}: el importe total no coincide con la suma de valores de venta, IGV, ISC, ICBPER y otros cargos menos otros descuentos (otros tributos aún no están soportados).");
             }
 
             if (line.IgvRate <= 0 || line.IgvRate >= 1)
@@ -269,8 +269,35 @@ internal sealed partial class SummaryDocumentGenerator : ISummaryDocumentGenerat
                         new XElement(Cbc + "ID", taxCode),
                         new XElement(Cbc + "Name", taxName),
                         new XElement(Cbc + "TaxTypeCode", "VAT"))))));
+
+        // The ISC and the plastic bag tax are one more cac:TaxTotal each, with no rate (rules 133-156 of the sheet Resumen Diario1_1).
+        if (line.IscAmount > 0)
+        {
+            element.Add(OtherTax(line, line.IscAmount, "2000", "ISC", "EXC"));
+        }
+
+        if (line.IcbperAmount > 0)
+        {
+            element.Add(OtherTax(line, line.IcbperAmount, "7152", "ICBPER", "OTH"));
+        }
+
         return element;
     }
+
+    private static XElement OtherTax(SummaryLineData line, decimal amount, string code, string name, string typeCode) =>
+        new(
+            Cac + "TaxTotal",
+            new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", line.Currency), Money(amount)),
+            new XElement(
+                Cac + "TaxSubtotal",
+                new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", line.Currency), Money(amount)),
+                new XElement(
+                    Cac + "TaxCategory",
+                    new XElement(
+                        Cac + "TaxScheme",
+                        new XElement(Cbc + "ID", code),
+                        new XElement(Cbc + "Name", name),
+                        new XElement(Cbc + "TaxTypeCode", typeCode)))));
 
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

@@ -52,6 +52,12 @@ detractionSale |= fishingSale || passengerSale || cargoSale;
 var detractionOperation = fishingSale ? "1002" : passengerSale ? "1003" : cargoSale ? "1004" : "1001";
 var detractionCode = fishingSale ? "004" : passengerSale ? "028" : cargoSale ? "027" : "037";
 var detractionPercentage = detractionOperation == "1001" ? 12m : 4m;
+// "isc" (ad valorem 10 %) or "iscfixed" (S/ 1.50 per unit): a taxed line of three units with the ISC (tax 2000); "bags": the same line with three plastic bags (ICBPER, tax 7152).
+var iscSale = args.Contains("isc", StringComparer.Ordinal) || args.Contains("iscfixed", StringComparer.Ordinal);
+var iscInput = args.Contains("iscfixed", StringComparer.Ordinal) ? new IscInput(IscSystem.FixedAmount, 1.50m) : new IscInput(IscSystem.AdValorem, 0.10m);
+var bagSale = args.Contains("bags", StringComparer.Ordinal);
+// SF_BETA_ICBPER: amount per bag (0.50 by default, the one in force; another one makes SUNAT observe 4237).
+var icbperAmount = decimal.TryParse(Environment.GetEnvironmentVariable("SF_BETA_ICBPER"), NumberStyles.Number, CultureInfo.InvariantCulture, out var bagAmount) ? bagAmount : 0.50m;
 // "export": an export of goods (operation type 0200): affectation 40, tax 9995, a buyer abroad without RUC.
 var exportSale = args.Contains("export", StringComparer.Ordinal);
 // SF_BETA_EXPORT_OPERATION: the export type (0200 goods by default; 0201, 0203, 0204, 0206, 0207 or 0208 for services); SF_BETA_USAGE_COUNTRY: the country of use of a 0201 or 0208.
@@ -70,6 +76,8 @@ TaxableLine[] taxLines = exportSale
     ? [new TaxableLine(1, 100m, "20")]
     : ivapSale
     ? [new TaxableLine(1, 100m, "17")]
+    : iscSale || bagSale
+    ? [new TaxableLine(3, 100m, "10", Isc: iscSale ? iscInput : null, PlasticBagCount: bagSale ? 3 : 0)]
     : discount
     ? [new TaxableLine(2, 100m, "10", DiscountAffectingBase: 20m, ChargeAffectingBase: 5m, DiscountNotAffectingBase: 10m, ChargeNotAffectingBase: 3m), new TaxableLine(1, 50m, "20")]
     : [new TaxableLine(1, 100m, "10")];
@@ -79,6 +87,8 @@ UblLine[] ublLines = exportSale
     ? [new UblLine(1, "Bien exonerado de prueba", "NIU", null, 1, 100m, null, "20")]
     : ivapSale
     ? [new UblLine(1, "Arroz pilado de prueba", "KGM", null, 1, 100m, null, "17")]
+    : iscSale || bagSale
+    ? [new UblLine(1, "Bien con impuestos especiales de prueba", "NIU", null, 3, 100m, null, "10", Isc: iscSale ? iscInput : null, PlasticBagCount: bagSale ? 3 : 0)]
     : discount
     ? [new UblLine(1, "Servicio de prueba", "ZZ", null, 2, 100m, null, "10", 20m, 5m, 10m, 3m), new UblLine(2, "Servicio exonerado", "ZZ", null, 1, 50m, null, "20")]
     : [new UblLine(
@@ -88,7 +98,7 @@ UblLine[] ublLines = exportSale
             Environment.GetEnvironmentVariable("SF_BETA_LEGS") is null ? null : [new UblTransportLeg("150101", "020801", "C3", 15m, "TRAMO LIMA-CASMA", 12m, 1232.28m, 1078.25m), new UblTransportLeg("020801", "130101", "C4", 18m, "TRAMO CASMA-TRUJILLO", 12m, 395.64m, 415.42m, true)]) : null)];
 GlobalAdjustments? adjustments = discount ? new GlobalAdjustments(DiscountAffectingBase: 12m, ChargeAffectingBase: 4m, DiscountNotAffectingBase: 7m, ChargeNotAffectingBase: 2m) : null;
 var totals = provider.GetRequiredService<ITaxCalculator>()
-    .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m, 0.04m), adjustments)).Value;
+    .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m, 0.04m, icbperAmount), adjustments)).Value;
 var receipt = args.Contains("boleta", StringComparer.Ordinal);
 // "credit": an invoice sold on credit with two installments (the sheet's "Forma de pago al crédito").
 var credit = args.Contains("credit", StringComparer.Ordinal) && !receipt;
@@ -106,7 +116,8 @@ var data = new UblInvoiceData(
     detractionSale ? new UblDetraction(detractionCode, detractionPercentage, Math.Round(totals.PayableAmount * detractionPercentage / 100m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000") : null,
     retentionSale ? new UblRetention(3m, totals.PayableAmount, Math.Round(totals.PayableAmount * 0.03m, 2, MidpointRounding.AwayFromZero)) : null,
     exportSale ? Environment.GetEnvironmentVariable("SF_BETA_USAGE_COUNTRY") : null,
-    Environment.GetEnvironmentVariable("SF_BETA_LEGENDS")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    Environment.GetEnvironmentVariable("SF_BETA_LEGENDS")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+    bagSale ? icbperAmount : 0m);
 
 if (args.Contains("summary", StringComparer.Ordinal))
 {
@@ -188,12 +199,18 @@ static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certifi
 
     // Reason 13 (adjustment of the installments): nothing is sold, so the line is worth zero (rule 3315 asks for a payable amount of zero).
     var affectation = Environment.GetEnvironmentVariable("SF_BETA_NC13_AFFECTATION") ?? "10";
-    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10")], new TaxRates(0.18m, 0.04m))).Value;
+    // A note of a document with the ISC or the ICBPER repeats them in its line (SF_BETA_NOTE_SPECIAL).
+    var special = original.Lines[0].Isc is not null || original.Lines[0].PlasticBagCount > 0;
+    var noteQuantity = special ? original.Lines[0].Quantity : 1m;
+    var noteLine = special
+        ? new TaxableLine(noteQuantity, 100m, "10", Isc: original.Lines[0].Isc, PlasticBagCount: original.Lines[0].PlasticBagCount)
+        : new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10");
+    var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([noteLine], new TaxRates(0.18m, 0.04m, 0.50m))).Value;
     var note = new UblNoteData(
         credit ? "07" : "08", original.DocumentTypeCode == "03" ? "BC01" : "FC01", number, original.IssueDate, TimeOnly.FromDateTime(lima.DateTime), "PEN", reason,
         credit ? "Anulacion de la operacion" : "Aumento en el valor", original.DocumentTypeCode, original.Series, original.Number, original.Issuer, original.Buyer,
-        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", "ZZ", null, 1, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10")], totals, 0.18m,
-        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null, 0.04m);
+        [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", special ? "NIU" : "ZZ", null, noteQuantity, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10", Isc: noteLine.Isc, PlasticBagCount: noteLine.PlasticBagCount)], totals, 0.18m,
+        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null, 0.04m, original.IcbperUnitAmount);
     var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateNote(note);
     if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL note: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
     var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);
@@ -240,6 +257,12 @@ static async Task<int> SummaryRoundTripAsync(IServiceProvider provider, X509Cert
     {
         // A receipt of rice: 100 taxed with the IVAP at 4 % (tax 1016).
         line = line with { TotalAmount = 104m, TaxedAmount = 100m, IgvAmount = 4m, IgvRate = 0.04m, IsIvap = true };
+    }
+
+    if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_SPECIAL") is not null)
+    {
+        // A receipt of three units of 100 with an ISC of 10 % (30) and three plastic bags (1.50): the IGV is 18 % of 330.
+        line = line with { TotalAmount = 300m + 30m + 59.4m + 1.5m, TaxedAmount = 300m, IgvAmount = 59.4m, IscAmount = 30m, IcbperAmount = 1.5m };
     }
 
     if (Environment.GetEnvironmentVariable("SF_BETA_SUMMARY_EXPORT") is not null)

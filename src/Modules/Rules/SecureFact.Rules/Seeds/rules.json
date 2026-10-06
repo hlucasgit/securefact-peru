@@ -35,6 +35,46 @@
       "configuration": { "amount": 0.50 }
     },
     {
+      "code": "tax.icbper.unit_amount",
+      "version": 2,
+      "effectiveFrom": "2019-08-01",
+      "source": "Ley 30884 art. 12.5 (El Peruano, busquedas.elperuano.pe, norma 1724734-1): S/ 0.10 en el 2019, S/ 0.20 en el 2020, S/ 0.30 en el 2021, S/ 0.40 en el 2022 y S/ 0.50 en el 2023; the tax starts on 2019-08-01 (S16 rule 2949 refuses it before). Version 1 above was a 0.50 placeholder without date and stays only because loaded versions are immutable: from 2019-08-01 these versions govern.",
+      "verification": "Verified",
+      "configuration": { "amount": 0.10 }
+    },
+    {
+      "code": "tax.icbper.unit_amount",
+      "version": 3,
+      "effectiveFrom": "2020-01-01",
+      "source": "Ley 30884 art. 12.5 (El Peruano, busquedas.elperuano.pe, norma 1724734-1): S/ 0.10 en el 2019, S/ 0.20 en el 2020, S/ 0.30 en el 2021, S/ 0.40 en el 2022 y S/ 0.50 en el 2023; the tax starts on 2019-08-01 (S16 rule 2949 refuses it before). Version 1 above was a 0.50 placeholder without date and stays only because loaded versions are immutable: from 2019-08-01 these versions govern.",
+      "verification": "Verified",
+      "configuration": { "amount": 0.20 }
+    },
+    {
+      "code": "tax.icbper.unit_amount",
+      "version": 4,
+      "effectiveFrom": "2021-01-01",
+      "source": "Ley 30884 art. 12.5 (El Peruano, busquedas.elperuano.pe, norma 1724734-1): S/ 0.10 en el 2019, S/ 0.20 en el 2020, S/ 0.30 en el 2021, S/ 0.40 en el 2022 y S/ 0.50 en el 2023; the tax starts on 2019-08-01 (S16 rule 2949 refuses it before). Version 1 above was a 0.50 placeholder without date and stays only because loaded versions are immutable: from 2019-08-01 these versions govern.",
+      "verification": "Verified",
+      "configuration": { "amount": 0.30 }
+    },
+    {
+      "code": "tax.icbper.unit_amount",
+      "version": 5,
+      "effectiveFrom": "2022-01-01",
+      "source": "Ley 30884 art. 12.5 (El Peruano, busquedas.elperuano.pe, norma 1724734-1): S/ 0.10 en el 2019, S/ 0.20 en el 2020, S/ 0.30 en el 2021, S/ 0.40 en el 2022 y S/ 0.50 en el 2023; the tax starts on 2019-08-01 (S16 rule 2949 refuses it before). Version 1 above was a 0.50 placeholder without date and stays only because loaded versions are immutable: from 2019-08-01 these versions govern.",
+      "verification": "Verified",
+      "configuration": { "amount": 0.40 }
+    },
+    {
+      "code": "tax.icbper.unit_amount",
+      "version": 6,
+      "effectiveFrom": "2023-01-01",
+      "source": "Ley 30884 art. 12.5 (El Peruano, busquedas.elperuano.pe, norma 1724734-1): S/ 0.10 en el 2019, S/ 0.20 en el 2020, S/ 0.30 en el 2021, S/ 0.40 en el 2022 y S/ 0.50 en el 2023; the tax starts on 2019-08-01 (S16 rule 2949 refuses it before). Version 1 above was a 0.50 placeholder without date and stays only because loaded versions are immutable: from 2019-08-01 these versions govern.",
+      "verification": "Verified",
+      "configuration": { "amount": 0.50 }
+    },
+    {
       "code": "billing.issue_date_max_age_days",
       "version": 1,
       "effectiveFrom": "1900-01-01",

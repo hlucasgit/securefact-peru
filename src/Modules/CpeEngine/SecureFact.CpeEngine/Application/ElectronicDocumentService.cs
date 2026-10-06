@@ -87,6 +87,19 @@ internal sealed class ElectronicDocumentService(
             return ivap.Error;
         }
 
+        // The amount per plastic bag is stated in the XML (rule 4237) and is only needed when the document has the ICBPER.
+        var icbperUnitAmount = 0m;
+        if (d.Totals.TotalIcbper > 0)
+        {
+            var icbper = await rules.ResolveDecimalAsync(RuleCodes.IcbperUnitAmount, "amount", d.IssueDate, cancellationToken);
+            if (!icbper.IsSuccess)
+            {
+                return icbper.Error;
+            }
+
+            icbperUnitAmount = icbper.Value;
+        }
+
         var issuer = new UblParty(IdentityDocuments.Ruc, company.Value.Ruc, company.Value.LegalName, company.Value.TradeName);
         var buyer = new UblParty(d.Buyer.DocumentTypeCode, d.Buyer.DocumentNumber, d.Buyer.Name);
         var ublLines = d.Lines.Select(l => new UblLine(
@@ -105,19 +118,20 @@ internal sealed class ElectronicDocumentService(
                 ? new UblGuest(
                     guest.Name, guest.DocumentTypeCode, guest.DocumentNumber, guest.PassportCountryCode, guest.ResidenceCountryCode, guest.CountryEntryDate, guest.CheckInDate,
                     guest.CheckOutDate, guest.ConsumptionDate, guest.StayDays)
-                : null)).ToList();
+                : null,
+            l.Isc, l.PlasticBagCount)).ToList();
 
         var generated = d.Note is { } note
             ? ubl.GenerateNote(new UblNoteData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, note.ReasonCode, note.Reason,
                 note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value,
-                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value))
+                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, icbperUnitAmount))
             : ubl.GenerateInvoice(new UblInvoiceData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, d.OperationTypeCode, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,
                 d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, d.InitialPayment ?? 0m,
                 d.Detraction is { } detraction ? new UblDetraction(detraction.GoodsOrServiceCode, detraction.Percentage, detraction.Amount, detraction.AccountNumber ?? string.Empty) : null,
-                d.Retention is { } retention ? new UblRetention(retention.Percentage, retention.BaseAmount, retention.Amount) : null, d.UsageCountryCode, d.LegendCodes));
+                d.Retention is { } retention ? new UblRetention(retention.Percentage, retention.BaseAmount, retention.Amount) : null, d.UsageCountryCode, d.LegendCodes, icbperUnitAmount));
         if (!generated.IsSuccess)
         {
             return generated.Error;
@@ -480,7 +494,8 @@ internal sealed class ElectronicDocumentService(
             d.Lines.Select(l => new PrintedLine(l.UnitCode, l.Quantity, l.Description, l.UnitValue, l.UnitPriceIncludingTaxes, l.LineExtensionAmount, l.TotalTaxAmount)).ToList(),
             new PrintedTotals(
                 d.Totals.TotalTaxableGravado + d.Totals.TaxSubtotals.Where(t => t.TaxCode == TaxCodes.Ivap).Sum(t => t.TaxableAmount), d.Totals.TotalExempt, d.Totals.TotalUnaffected,
-                d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount, d.Totals.TotalAllowances, d.Totals.TotalCharges, d.Totals.TotalIvap, d.Totals.TotalExport),
+                d.Totals.TotalFree, d.Totals.TotalIgv, d.Totals.PayableAmount, d.Totals.TotalAllowances, d.Totals.TotalCharges, d.Totals.TotalIvap, d.Totals.TotalExport,
+                d.Totals.TotalIsc, d.Totals.TotalIcbper),
             payload.Value, entity.DigestValue,
             d.Note is { } note ? new PrintedNote($"{DocumentName(note.ReferencedDocumentTypeCode)} {note.ReferencedSeries}-{note.ReferencedNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}", note.Reason) : null,
             await IsVoidedAsync(entity.Id, cancellationToken),

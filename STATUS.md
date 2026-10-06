@@ -97,21 +97,26 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 - **La base sigue siendo la fuente** (fase 1 de ADR-005): los bytes siguen también en `signed_xml` y `cdr_zip`. Quitarlos es la fase 2, con condiciones en el ADR-036.
 - Pendiente: conciliación periódica del contenido, Object Lock y período de retención legal sin probar ni confirmar, fase 2.
 
+## ISC e ICBPER
+- **ISC** (al valor y de monto fijo) **e ICBPER** en el UBL de facturas, boletas, notas y resumen diario, y en el PDF (ADR-037): subtotales de línea y globales según las hojas de reglas; el ISC entra en la base del IGV de la línea. Aceptados por el beta de SUNAT (factura, boleta, notas y resumen).
+- El monto por bolsa del ICBPER es `Verified` con el calendario de la Ley 30884 (S26): el beta **no** valida ese monto.
+- Pendiente: sistema 03 del ISC (precio de venta al público), anticipos de ISC y otros tributos (9999).
+
 ## Cobertura
-- Medida con coverlet (`coverage.runsettings`) sobre las cuatro suites juntas y unida con ReportGenerator: **95.8 % de líneas y 85.1 % de ramas** (96.0 % y 85.5 % antes del archivo en el almacén de objetos), el 2026-10-06. Excluye migraciones, fábricas de tiempo de diseño, herramientas y pruebas. El CI la mide en cada corrida, la publica en el resumen del job y como artefacto, y **falla bajo un piso de 95 % de líneas y 84 % de ramas** (`.github/scripts/check_coverage.py`; los pisos solo suben).
+- Medida con coverlet (`coverage.runsettings`) sobre las cuatro suites juntas y unida con ReportGenerator: **95.8 % de líneas y 85.2 % de ramas** (96.0 % y 85.5 % antes del archivo en el almacén de objetos), el 2026-10-06. Excluye migraciones, fábricas de tiempo de diseño, herramientas y pruebas. El CI la mide en cada corrida, la publica en el resumen del job y como artefacto, y **falla bajo un piso de 95 % de líneas y 84 % de ramas** (`.github/scripts/check_coverage.py`; los pisos solo suben).
 - Antes de este trabajo: 93.5 % y 82.3 %. Se agregaron pruebas donde la falta de cobertura era de riesgo: la guarda de inquilino de la capa de aplicación (`TenantDbContext`: escrituras y borrados de filas de otro inquilino, filas de la plataforma, API síncrona) y el intercepto de RLS, el manejador global de excepciones (que no filtra detalles internos), las reglas de entrada de empresas, establecimientos, clientes, productos, usuarios, series y notas, y los errores de refresco, MFA y restablecimiento de contraseña.
 - Lo que sigue bajo: `Program` de la API (arranque, migraciones, exportador OTLP; 77 %) y el ensamblado de los workers (78 %), ramas de la API (68 %) y de `Products` (62 %), y los caminos de error por servicio no disponible de `ElectronicDocumentService`, `VoidService` y `SummaryService`.
 
 ## Riesgos y deuda (resumen actual)
-- Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
+- Valores `Pending` en reglas: plazo de boletas (ver `/api/v1/rules`). El monto del ICBPER ya es `Verified` (Ley 30884, ADR-037).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
 - Auditoría fuera de la transacción de negocio (ADR-012; el outbox ya permitiría un origen propio para ella); la base conserva los bytes del XML y del CDR hasta la fase 2 del archivo (ADR-036).
-- ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.
+- ISC (sistemas al valor y de monto fijo) e ICBPER se emiten en el UBL (ADR-037); faltan el sistema 03 del ISC (precio de venta al público), los anticipos de ISC y otros tributos (9999).
 - Notas de crédito/débito esperan el CDR (Fase 4).
 
 ## Pendientes
 1. Commit y push.
-2. ISC, ICBPER, IVAP, exportación y operaciones gratuitas con valor referencial en el UBL.
+2. Sistema 03 del ISC, anticipos y otros tributos (9999) en el UBL.
 3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF.
 4. Fase 2 del archivo: leer el XML y el CDR desde el almacén y dejar solo metadatos en la base (condiciones en ADR-036).
 5. PDF y renderizado del QR.

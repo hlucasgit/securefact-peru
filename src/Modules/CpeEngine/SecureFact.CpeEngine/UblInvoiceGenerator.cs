@@ -35,6 +35,8 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         [TaxCodes.Exempt] = ("E", "EXO", "VAT"),
         [TaxCodes.Unaffected] = ("O", "INA", "FRE"),
         [TaxCodes.Free] = ("Z", "GRA", "FRE"),
+        [TaxCodes.Isc] = ("S", "ISC", "EXC"),
+        [TaxCodes.Icbper] = ("S", "ICBPER", "OTH"),
     };
 
     internal static IReadOnlyDictionary<string, (string Letter, string Name, string TypeCode)> SupportedSchemes => Schemes;
@@ -118,7 +120,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         for (var i = 0; i < data.Lines.Count; i++)
         {
-            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, data.IvapRate, currency));
+            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, data.IvapRate, data.IcbperUnitAmount, currency));
         }
 
         var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
@@ -634,6 +636,61 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             : Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de nota inválidos", "Una nota no mezcla líneas de exportación con otras.");
     }
 
+    /// <summary>First day the ICBPER is due (Ley 30884; rule 2949 refuses it on earlier dates).</summary>
+    private static readonly DateOnly IcbperStart = new(2019, 8, 1);
+
+    /// <summary>Largest number of plastic bags a line can state: <c>cbc:BaseUnitMeasure</c> has up to 5 digits (rule 2892).</summary>
+    private const int MaxPlasticBags = 99_999;
+
+    /// <summary>
+    /// The ISC and the ICBPER of the lines agree with what the TaxEngine calculated: an ISC line states its system and rate, a line with bags has as many bags as units and a bag amount
+    /// (rules 3236, 3238, 2373, 3104) and the ICBPER does not exist before its start date (rule 2949).
+    /// </summary>
+    private static Error? CheckSpecialTaxes(IReadOnlyList<UblLine> lines, TaxCalculationResult totals, DateOnly issueDate, decimal icbperUnitAmount, string subject)
+    {
+        Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de documento inválidos", $"El {subject}: {detail}");
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            var result = totals.Lines[i];
+            if (result.IscAmount > 0 && (line.Isc is null || line.Isc.RateOrUnitAmount <= 0 || result.LineExtensionAmount <= 0))
+            {
+                return Invalid($"la línea {i + 1} tiene ISC y no declara su sistema y tasa, o su valor de venta es cero.");
+            }
+
+            if (result.IscAmount == 0 && line.Isc is not null)
+            {
+                return Invalid($"la línea {i + 1} declara ISC pero el cálculo no lo tiene.");
+            }
+
+            if (result.IcbperAmount > 0 && (line.PlasticBagCount is < 1 or > MaxPlasticBags || line.PlasticBagCount != line.Quantity))
+            {
+                return Invalid($"la línea {i + 1} tiene ICBPER: la cantidad de bolsas es un entero de hasta 5 dígitos y es igual a la cantidad de la línea.");
+            }
+
+            if (result.IcbperAmount == 0 && line.PlasticBagCount != 0)
+            {
+                return Invalid($"la línea {i + 1} declara bolsas de plástico pero el cálculo no tiene ICBPER.");
+            }
+        }
+
+        if (totals.TotalIcbper > 0)
+        {
+            if (icbperUnitAmount is <= 0 or >= 1000)
+            {
+                return Invalid("lleva ICBPER y requiere el monto unitario por bolsa vigente.");
+            }
+
+            if (issueDate < IcbperStart)
+            {
+                return Invalid("lleva ICBPER con fecha de emisión anterior al 2019-08-01, cuando el impuesto aún no existía.");
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Reason of a credit note that adjusts operations taxed with the IVAP (catalogue 09, code 12).</summary>
     private const string IvapAdjustmentReason = "12";
 
@@ -759,7 +816,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
 
         for (var i = 0; i < data.Lines.Count; i++)
         {
-            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, data.IvapRate, currency, credit ? "CreditNoteLine" : "DebitNoteLine", credit ? "CreditedQuantity" : "DebitedQuantity"));
+            root.Add(Line(data.Lines[i], totals.Lines[i], data.IgvRate, data.IvapRate, data.IcbperUnitAmount, currency, credit ? "CreditNoteLine" : "DebitNoteLine", credit ? "CreditedQuantity" : "DebitedQuantity"));
         }
 
         var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
@@ -834,9 +891,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return badInstallments;
         }
 
-        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0)
+        if (CheckSpecialTaxes(data.Lines, data.Totals, data.IssueDate, data.IcbperUnitAmount, "nota") is { } badSpecialTaxes)
         {
-            return Unsupported("ISC e ICBPER aún no están soportados por el generador UBL.");
+            return badSpecialTaxes;
         }
 
         if (CheckNoteExport(data) is { } badExport)
@@ -885,9 +942,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             return Unsupported($"El tipo de documento '{data.DocumentTypeCode}' no está soportado (solo 01 y 03).");
         }
 
-        if (data.Totals.TotalIsc != 0 || data.Totals.TotalIcbper != 0)
+        if (CheckSpecialTaxes(data.Lines, data.Totals, data.IssueDate, data.IcbperUnitAmount, "documento") is { } badSpecialTaxes)
         {
-            return Unsupported("ISC e ICBPER aún no están soportados por el generador UBL.");
+            return badSpecialTaxes;
         }
 
         if (CheckOperationType(data) is { } badOperation)
@@ -1166,9 +1223,10 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         var element = new XElement(Cac + "TaxTotal", Amount("TaxAmount", totals.TotalTaxAmount, currency));
         foreach (var subtotal in totals.TaxSubtotals)
         {
+            // The ICBPER is a tax per bag, not on an amount: its subtotal has no taxable amount (rule 3003 does not ask for one).
             element.Add(new XElement(
                 Cac + "TaxSubtotal",
-                Amount("TaxableAmount", subtotal.TaxableAmount, currency),
+                subtotal.TaxCode == TaxCodes.Icbper ? null : Amount("TaxableAmount", subtotal.TaxableAmount, currency),
                 Amount("TaxAmount", subtotal.TaxAmount, currency),
                 Category(subtotal.TaxCode, igvRate, null)));
         }
@@ -1227,7 +1285,7 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             totals.TotalCharges > 0 ? Amount("ChargeTotalAmount", totals.TotalCharges, currency) : null,
             Amount("PayableAmount", totals.PayableAmount, currency));
 
-    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, decimal ivapRate, string currency, string lineName = "InvoiceLine", string quantityName = "InvoicedQuantity")
+    private static XElement Line(UblLine line, LineTaxResult result, decimal igvRate, decimal ivapRate, decimal icbperUnitAmount, string currency, string lineName = "InvoiceLine", string quantityName = "InvoicedQuantity")
     {
         var rate = result.TaxCode == TaxCodes.Ivap ? ivapRate : igvRate;
         var isFree = result.TaxCode == TaxCodes.Free;
@@ -1262,15 +1320,27 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         }
 
         // Free operations report the informational IGV (11–16) under tax 9996 but the line total tax stays 0 (S16, rule 3302).
+        // The line total adds up every tax of the line (rule 3292); the ISC is part of the IGV base (rule 3272).
         var lineTax = isFree ? result.IgvOrIvapAmount : result.TotalTaxAmount;
-        element.Add(new XElement(
+        var taxTotal = new XElement(
             Cac + "TaxTotal",
             Amount("TaxAmount", lineTax, currency),
             new XElement(
                 Cac + "TaxSubtotal",
-                Amount("TaxableAmount", result.LineExtensionAmount, currency),
-                Amount("TaxAmount", lineTax, currency),
-                Category(result.TaxCode, rate, line.IgvAffectationCode))));
+                Amount("TaxableAmount", result.LineExtensionAmount + result.IscAmount, currency),
+                Amount("TaxAmount", result.IgvOrIvapAmount, currency),
+                Category(result.TaxCode, rate, line.IgvAffectationCode)));
+        if (result.IscAmount > 0 && line.Isc is { } isc)
+        {
+            taxTotal.Add(IscSubtotal(isc, result, currency));
+        }
+
+        if (result.IcbperAmount > 0)
+        {
+            taxTotal.Add(IcbperSubtotal(line.PlasticBagCount, icbperUnitAmount, result, currency));
+        }
+
+        element.Add(taxTotal);
 
         var item = new XElement(Cac + "Item", new XElement(Cbc + "Description", line.Description));
         if (!string.IsNullOrWhiteSpace(line.ProductCode))
@@ -1291,6 +1361,44 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         element.Add(item);
         element.Add(new XElement(Cac + "Price", new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", currency), Decimal(isFree ? 0m : line.UnitValue))));
         return element;
+    }
+
+    /// <summary>
+    /// ISC subtotal of a line (rules 2992, 3050, 3104, 3108, 2373, 2041): the base is the value of the line, the rate is stated in <c>cbc:Percent</c> (never zero) and the system of the
+    /// tax (catalogue 08) in <c>cbc:TierRange</c>. A fixed-amount ISC has no rate: the percent that results from the amount over the base is stated, so the amount stays
+    /// the rate times the base.
+    /// </summary>
+    private static XElement IscSubtotal(IscInput isc, LineTaxResult result, string currency)
+    {
+        var percent = isc.System == IscSystem.AdValorem ? isc.RateOrUnitAmount * 100m : result.IscAmount / result.LineExtensionAmount * 100m;
+        var category = Category(TaxCodes.Isc, 0m, null);
+        var scheme = category.Element(Cac + "TaxScheme")!;
+        scheme.AddBeforeSelf(
+            new XElement(Cbc + "Percent", percent.ToString("0.00###", CultureInfo.InvariantCulture)),
+            new XElement(Cbc + "TierRange", IscSystemCode(isc.System)));
+        return new XElement(
+            Cac + "TaxSubtotal",
+            Amount("TaxableAmount", result.LineExtensionAmount, currency),
+            Amount("TaxAmount", result.IscAmount, currency),
+            category);
+    }
+
+    /// <summary>Catalogue 08 code of the ISC system.</summary>
+    private static string IscSystemCode(IscSystem system) => system == IscSystem.AdValorem ? "01" : "02";
+
+    /// <summary>
+    /// ICBPER subtotal of a line (rules 3236–3238, 4318, 4320, 4237): no taxable amount and no rate; the number of bags goes in <c>cbc:BaseUnitMeasure</c> (unit NIU) and the amount
+    /// per bag in <c>cbc:PerUnitAmount</c>.
+    /// </summary>
+    private static XElement IcbperSubtotal(int bags, decimal unitAmount, LineTaxResult result, string currency)
+    {
+        var category = Category(TaxCodes.Icbper, 0m, null);
+        category.Element(Cac + "TaxScheme")!.AddBeforeSelf(new XElement(Cbc + "PerUnitAmount", new XAttribute("currencyID", currency), unitAmount.ToString("0.00###", CultureInfo.InvariantCulture)));
+        return new XElement(
+            Cac + "TaxSubtotal",
+            Amount("TaxAmount", result.IcbperAmount, currency),
+            new XElement(Cbc + "BaseUnitMeasure", new XAttribute("unitCode", "NIU"), bags.ToString(CultureInfo.InvariantCulture)),
+            category);
     }
 
     /// <summary>Attributes of a catalogue 06 identity number, with the values the validation rules expect (observations 4255–4257 otherwise).</summary>

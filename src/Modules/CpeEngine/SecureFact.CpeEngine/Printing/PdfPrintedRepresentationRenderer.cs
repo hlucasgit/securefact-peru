@@ -278,6 +278,16 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             rows.Add(("IVAP", totals.IvapAmount, false));
         }
 
+        if (totals.IscAmount != 0)
+        {
+            rows.Add(("ISC", totals.IscAmount, false));
+        }
+
+        if (totals.IcbperAmount != 0)
+        {
+            rows.Add(("ICBPER", totals.IcbperAmount, false));
+        }
+
         if (totals.OtherCharges != 0)
         {
             rows.Add(("Otros cargos", totals.OtherCharges, false));

@@ -61,6 +61,8 @@ public sealed record UblParty(string DocumentTypeCode, string DocumentNumber, st
 /// <param name="ChargeAffectingBase">Line charge, code 47.</param>
 /// <param name="DiscountNotAffectingBase">Line discount, code 01 (the base is untouched; the unit price with taxes reflects it).</param>
 /// <param name="ChargeNotAffectingBase">Line charge, code 48.</param>
+/// <param name="Isc">Selective consumption tax of the line as given to the TaxEngine (system and rate or unit amount); the amount comes from the calculated totals.</param>
+/// <param name="PlasticBagCount">Plastic bags of the line subject to the ICBPER; it equals the quantity of the line (rule 3236).</param>
 public sealed record UblLine(
     int LineNumber,
     string Description,
@@ -76,7 +78,9 @@ public sealed record UblLine(
     decimal ChargeNotAffectingBase = 0m,
     UblFishing? Fishing = null,
     UblCargoTransport? Transport = null,
-    UblGuest? Guest = null);
+    UblGuest? Guest = null,
+    IscInput? Isc = null,
+    int PlasticBagCount = 0);
 
 /// <summary>
 /// Canonical input of the UBL generator. Amounts come from the TaxEngine result, never recomputed here: the XML must say exactly
@@ -92,6 +96,7 @@ public sealed record UblLine(
 /// <param name="LegendCodes">Legends of the exonerated sales (catalogue 52: 2001, 2002, 2003, 2008), each stated as a <c>cbc:Note</c> with its catalogue text; the document then has exonerated operations.</param>
 /// <param name="InitialPayment">Part of a credit sale paid on the issue date (not stated in the XML: the net pending amount, the sum of the installments, already excludes it).</param>
 /// <param name="Adjustments">Global discounts and charges (catalogue 53 codes 02, 03, 49, 50) exactly as given to the TaxEngine; the generator states them and checks that they agree with <paramref name="Totals"/>.</param>
+/// <param name="IcbperUnitAmount">Amount per plastic bag of the ICBPER in force on the issue date (rule 4237); needed when a line has bags.</param>
 public sealed record UblInvoiceData(
     string DocumentTypeCode,
     string Series,
@@ -113,7 +118,8 @@ public sealed record UblInvoiceData(
     UblDetraction? Detraction = null,
     UblRetention? Retention = null,
     string? UsageCountryCode = null,
-    IReadOnlyList<string>? LegendCodes = null);
+    IReadOnlyList<string>? LegendCodes = null,
+    decimal IcbperUnitAmount = 0m);
 
 /// <summary>An unsigned UBL 2.1 document and the file names SUNAT expects for it.</summary>
 public sealed record UblDocument(string Xml, string FileBaseName)
@@ -146,7 +152,8 @@ public sealed record UblNoteData(
     TaxCalculationResult Totals,
     decimal IgvRate,
     IReadOnlyList<UblInstallment>? Installments = null,
-    decimal IvapRate = 0m);
+    decimal IvapRate = 0m,
+    decimal IcbperUnitAmount = 0m);
 
 public interface IUblDocumentGenerator
 {

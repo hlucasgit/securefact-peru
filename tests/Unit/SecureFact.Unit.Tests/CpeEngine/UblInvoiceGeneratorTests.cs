@@ -1170,4 +1170,125 @@ public class UblInvoiceGeneratorTests
             Assert.Equal(scheme.TypeCode, official[code].Extra["Código internacional"]);
         }
     }
+
+    private static readonly TaxRates BagRates = new(0.18m, IcbperUnitAmount: 0.50m);
+
+    /// <summary>An invoice with one line of three units that carries the ISC, the plastic bag tax, or both.</summary>
+    private static UblInvoiceData SpecialTaxes(IscInput? isc, int bags, string type = "01")
+    {
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(3, 100m, "10", Isc: isc, PlasticBagCount: bags)], BagRates)).Value;
+        return Data(type, ("10", 3m, 100m)) with
+        {
+            Lines = [new UblLine(1, "Producto con impuestos", "NIU", "P001", 3, 100m, null, "10", Isc: isc, PlasticBagCount: bags)],
+            Totals = totals,
+            IcbperUnitAmount = bags > 0 ? 0.50m : 0m,
+        };
+    }
+
+    [Theory]
+    [InlineData("01")]
+    [InlineData("03")]
+    public void An_isc_line_states_the_base_the_rate_and_the_system_and_adds_to_the_igv_base(string type)
+    {
+        var data = SpecialTaxes(new IscInput(IscSystem.AdValorem, 0.10m), 0, type);
+
+        var result = _generator.GenerateInvoice(data);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var subtotals = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal", Namespaces).ToList();
+        string Text(XElement e, string path) => e.XPathSelectElement(path, Namespaces)!.Value;
+
+        // 300 of value, ISC 30 (10 %), IGV 18 % of 330 = 59.40; the line adds up the three: 89.40.
+        Assert.Equal("89.40", xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Equal(["1000", "2000"], subtotals.Select(s => Text(s, "cac:TaxCategory/cac:TaxScheme/cbc:ID")));
+        Assert.Equal("330.00", Text(subtotals[0], "cbc:TaxableAmount"));
+        Assert.Equal("59.40", Text(subtotals[0], "cbc:TaxAmount"));
+        Assert.Equal("300.00", Text(subtotals[1], "cbc:TaxableAmount"));
+        Assert.Equal("30.00", Text(subtotals[1], "cbc:TaxAmount"));
+        Assert.Equal("10.00", Text(subtotals[1], "cac:TaxCategory/cbc:Percent"));
+        Assert.Equal("01", Text(subtotals[1], "cac:TaxCategory/cbc:TierRange"));
+        Assert.Equal("ISC", Text(subtotals[1], "cac:TaxCategory/cac:TaxScheme/cbc:Name"));
+        Assert.Equal("EXC", Text(subtotals[1], "cac:TaxCategory/cac:TaxScheme/cbc:TaxTypeCode"));
+        Assert.Null(subtotals[1].XPathSelectElement("cac:TaxCategory/cbc:TaxExemptionReasonCode", Namespaces));
+
+        // Globally: the IGV base is the value only (rule 3277), the ISC has its base and amount, the total tax is 89.40.
+        var global = xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal", Namespaces).ToList();
+        Assert.Equal("89.40", xml.XPathSelectElement("/inv:Invoice/cac:TaxTotal/cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Equal("300.00", Text(global[0], "cbc:TaxableAmount"));
+        Assert.Equal("300.00", Text(global[1], "cbc:TaxableAmount"));
+        Assert.Equal("30.00", Text(global[1], "cbc:TaxAmount"));
+        Assert.Equal("389.40", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void A_fixed_amount_isc_states_the_system_02_and_the_percent_that_results()
+    {
+        var data = SpecialTaxes(new IscInput(IscSystem.FixedAmount, 1.50m), 0);
+
+        var xml = Parse(_generator.GenerateInvoice(data).Value);
+
+        Assert.Empty(SchemaErrors(xml));
+        var isc = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal", Namespaces).Last();
+        Assert.Equal("4.50", isc.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Equal("02", isc.XPathSelectElement("cac:TaxCategory/cbc:TierRange", Namespaces)!.Value);
+        Assert.Equal("1.50", isc.XPathSelectElement("cac:TaxCategory/cbc:Percent", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void Plastic_bags_state_their_count_the_amount_per_bag_and_no_base()
+    {
+        var data = SpecialTaxes(null, 3);
+
+        var xml = Parse(_generator.GenerateInvoice(data).Value);
+
+        Assert.Empty(SchemaErrors(xml));
+        var bags = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal", Namespaces).Last();
+        Assert.Equal("1.50", bags.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Null(bags.XPathSelectElement("cbc:TaxableAmount", Namespaces));
+        Assert.Equal("3", bags.XPathSelectElement("cbc:BaseUnitMeasure", Namespaces)!.Value);
+        Assert.Equal("NIU", Xml(xml, "/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal/cbc:BaseUnitMeasure/@unitCode"));
+        Assert.Equal("0.50", bags.XPathSelectElement("cac:TaxCategory/cbc:PerUnitAmount", Namespaces)!.Value);
+        Assert.Null(bags.XPathSelectElement("cac:TaxCategory/cbc:Percent", Namespaces));
+        Assert.Equal("7152", bags.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("ICBPER", bags.XPathSelectElement("cac:TaxCategory/cac:TaxScheme/cbc:Name", Namespaces)!.Value);
+
+        // The tax stays out of the IGV base and in the total: 300 + 54 IGV + 1.50.
+        var global = xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal", Namespaces).Last();
+        Assert.Null(global.XPathSelectElement("cbc:TaxableAmount", Namespaces));
+        Assert.Equal("1.50", global.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Equal("355.50", xml.XPathSelectElement("/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void The_isc_and_the_plastic_bags_can_share_a_line()
+    {
+        var xml = Parse(_generator.GenerateInvoice(SpecialTaxes(new IscInput(IscSystem.AdValorem, 0.10m), 3)).Value);
+
+        Assert.Empty(SchemaErrors(xml));
+        Assert.Equal(["1000", "2000", "7152"], xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces).Select(e => e.Value));
+        Assert.Equal("90.90", xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cbc:TaxAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void Special_taxes_that_do_not_match_the_lines_are_refused()
+    {
+        var withBags = SpecialTaxes(null, 3);
+        var withIsc = SpecialTaxes(new IscInput(IscSystem.AdValorem, 0.10m), 0);
+
+        // Bags as many as the units of the line (rule 3236), and the amount per bag in force is needed (rule 4237).
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(withBags with { Lines = [withBags.Lines[0] with { PlasticBagCount = 2 }] }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(withBags with { IcbperUnitAmount = 0m }).Error.Code);
+
+        // The line has to say its system and rate, and must not say what the calculation does not have.
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(withIsc with { Lines = [withIsc.Lines[0] with { Isc = null }] }).Error.Code);
+        var plain = Data("01", ("10", 1m, 100m));
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(plain with { Lines = [plain.Lines[0] with { Isc = new IscInput(IscSystem.AdValorem, 0.10m) }] }).Error.Code);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(plain with { Lines = [plain.Lines[0] with { PlasticBagCount = 1 }] }).Error.Code);
+
+        // The ICBPER does not exist before 2019-08-01 (rule 2949).
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(withBags with { IssueDate = new DateOnly(2019, 7, 31) }).Error.Code);
+        Assert.True(_generator.GenerateInvoice(withBags with { IssueDate = new DateOnly(2019, 8, 1) }).IsSuccess);
+    }
 }

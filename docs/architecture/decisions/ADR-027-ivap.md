@@ -19,5 +19,5 @@ Hojas `Factura2_0`, `Boleta2_0`, `NotaCredito2_0` y `Resumen Diario1_1` de las r
 
 ## Límites
 - **Código QR**: el campo del Anexo N.° 6 §6.4.3 d) es «Sumatoria IGV, de ser el caso» y el anexo no menciona el IVAP (texto releído el 2026-10-02): un comprobante IVAP lleva 0.00 en ese campo y el importe total en el siguiente; el IVAP nunca ocupa el lugar del IGV. `QrFields.From` lo fija y las pruebas lo cubren. Si SUNAT publicara otra indicación, es un cambio de esa función.
-- Sin ISC, ICBPER ni exportación; los motivos 11 (exportación) siguen pendientes.
+- Sin ISC ni ICBPER en esta decisión (el ADR-037 los emite después, sin mezclarlos con el IVAP); los motivos 11 (exportación) siguen pendientes.
 - Los comprobantes IVAP no se han probado en producción ni con descuentos o crédito combinados en el beta.

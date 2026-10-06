@@ -42,7 +42,7 @@ public sealed class RulesTests(ApiFixture api)
 
         Assert.Subset(rules.Select(r => r.Code).ToHashSet(StringComparer.Ordinal), AllCodes.ToHashSet(StringComparer.Ordinal));
         Assert.Equal(RuleVerification.Verified, rules.Single(r => r.Code == RuleCodes.IgvRate).Verification);
-        Assert.Equal(RuleVerification.Pending, rules.Single(r => r.Code == RuleCodes.IcbperUnitAmount).Verification);
+        Assert.Equal(RuleVerification.Verified, rules.Single(r => r.Code == RuleCodes.IcbperUnitAmount).Verification);
         Assert.Equal(RuleVerification.Verified, rules.Single(r => r.Code == RuleCodes.ReceiptIdentificationThreshold).Verification);
         Assert.All(rules, r => Assert.False(string.IsNullOrWhiteSpace(r.Source)));
     }
@@ -83,6 +83,27 @@ public sealed class RulesTests(ApiFixture api)
         Assert.Equal(0.18m, igv.Value);
         Assert.Equal(3m, window.Value);
         Assert.Equal(RuleCodes.IgvRate, (await provider.ResolveAsync(RuleCodes.IgvRate, new DateOnly(1950, 1, 1), CancellationToken.None)).Value.Code);
+    }
+
+    [Fact]
+    public async Task The_icbper_amount_follows_the_schedule_of_the_law_by_year()
+    {
+        await using var db = OwnerContext();
+        var provider = new RuleProvider(db);
+
+        // Ley 30884, art. 12.5: S/ 0.10 in 2019, 0.20 in 2020, 0.30 in 2021, 0.40 in 2022 and 0.50 from 2023; the tax starts on 2019-08-01.
+        (DateOnly Date, decimal Amount)[] schedule =
+        [
+            (new DateOnly(2019, 8, 1), 0.10m), (new DateOnly(2019, 12, 31), 0.10m), (new DateOnly(2020, 1, 1), 0.20m), (new DateOnly(2021, 6, 15), 0.30m),
+            (new DateOnly(2022, 12, 31), 0.40m), (new DateOnly(2023, 1, 1), 0.50m), (new DateOnly(2026, 10, 6), 0.50m),
+        ];
+        foreach (var (date, amount) in schedule)
+        {
+            var resolved = await provider.ResolveDecimalAsync(RuleCodes.IcbperUnitAmount, "amount", date, CancellationToken.None);
+
+            Assert.True(resolved.IsSuccess);
+            Assert.Equal(amount, resolved.Value);
+        }
     }
 
     [Fact]

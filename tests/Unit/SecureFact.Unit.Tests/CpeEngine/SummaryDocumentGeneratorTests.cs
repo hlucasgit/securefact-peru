@@ -421,4 +421,31 @@ public class SummaryDocumentGeneratorTests
 
         Assert.Equal("EMISORA <DEMO> & \"HIJOS\" SAC", xml.XPathSelectElement("//cbc:RegistrationName", Namespaces)!.Value);
     }
+
+    [Fact]
+    public void A_receipt_with_isc_and_plastic_bags_adds_one_tax_total_for_each()
+    {
+        // Three units of 100 with an ISC of 10 % (30), IGV 18 % of 330 (59.40) and three bags (1.50).
+        var line = Taxed(1, "B001", 1) with { TotalAmount = 390.9m, TaxedAmount = 300m, IgvAmount = 59.4m, IscAmount = 30m, IcbperAmount = 1.5m };
+
+        var result = _generator.Generate(Data(line));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml));
+        var totals = xml.XPathSelectElements("//sac:SummaryDocumentsLine/cac:TaxTotal", Namespaces).ToList();
+        Assert.Equal(["1000", "2000", "7152"], totals.Select(t => t.XPathSelectElement("cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces)!.Value));
+        Assert.Equal(["59.40", "30.00", "1.50"], totals.Select(t => t.XPathSelectElement("cbc:TaxAmount", Namespaces)!.Value));
+        Assert.Equal(["IGV", "ISC", "ICBPER"], totals.Select(t => t.XPathSelectElement("cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:Name", Namespaces)!.Value));
+        Assert.Equal("390.90", xml.XPathSelectElement("//sac:SummaryDocumentsLine/sac:TotalAmount", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void A_total_that_leaves_out_the_isc_or_the_bags_is_refused()
+    {
+        var line = Taxed(1, "B001", 1) with { TotalAmount = 359.4m, TaxedAmount = 300m, IgvAmount = 59.4m, IscAmount = 30m, IcbperAmount = 1.5m };
+
+        Assert.False(_generator.Generate(Data(line)).IsSuccess);
+        Assert.False(_generator.Generate(Data(line with { TotalAmount = 390.9m, IscAmount = -30m })).IsSuccess);
+    }
 }

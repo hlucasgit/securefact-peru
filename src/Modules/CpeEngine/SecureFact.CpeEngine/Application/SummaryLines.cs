@@ -20,6 +20,6 @@ internal static class SummaryLines
             lineNumber, d.Series, d.Number, identified ? d.Buyer.DocumentTypeCode : null, identified ? d.Buyer.DocumentNumber : null, d.Currency,
             d.Totals.PayableAmount, taxed, d.Totals.TotalExempt, d.Totals.TotalUnaffected, ivap ? d.Totals.TotalIvap : d.Totals.TotalIgv, ivap ? ivapRate : igvRate,
             d.DocumentTypeCode, d.Note?.ReferencedDocumentTypeCode, d.Note?.ReferencedSeries, d.Note?.ReferencedNumber, status,
-            d.Totals.TotalCharges, d.Totals.TotalAllowances, ivap, d.Totals.TotalExport);
+            d.Totals.TotalCharges, d.Totals.TotalAllowances, ivap, d.Totals.TotalExport, d.Totals.TotalIsc, d.Totals.TotalIcbper);
     }
 }

@@ -340,4 +340,30 @@ public class UblNoteGeneratorTests
         Assert.False(result.IsSuccess, name);
         Assert.Equal(code, result.Error.Code);
     }
+
+    [Theory]
+    [InlineData("07", "cn", "CreditNote", "CreditNoteLine")]
+    [InlineData("08", "dn", "DebitNote", "DebitNoteLine")]
+    public void A_note_states_the_isc_and_the_plastic_bags_of_its_lines(string type, string prefix, string root, string line)
+    {
+        var rates = new TaxRates(0.18m, IcbperUnitAmount: 0.50m);
+        var isc = new IscInput(IscSystem.AdValorem, 0.10m);
+        var totals = new TaxCalculator().Calculate(new TaxCalculationRequest([new TaxableLine(2, 100m, "10", Isc: isc, PlasticBagCount: 2)], rates)).Value;
+        var data = Note(type) with
+        {
+            Lines = [new UblLine(1, "Producto", "NIU", "P001", 2, 100m, null, "10", Isc: isc, PlasticBagCount: 2)],
+            Totals = totals,
+            IcbperUnitAmount = 0.50m,
+        };
+
+        var result = _generator.GenerateNote(data);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml, type));
+        var ids = xml.XPathSelectElements($"/{prefix}:{root}/cac:{line}/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces).Select(e => e.Value);
+        Assert.Equal(["1000", "2000", "7152"], ids);
+        Assert.Equal(["1000", "2000", "7152"], xml.XPathSelectElements($"/{prefix}:{root}/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces).Select(e => e.Value));
+        Assert.Equal("2", xml.XPathSelectElement($"/{prefix}:{root}/cac:{line}/cac:TaxTotal/cac:TaxSubtotal/cbc:BaseUnitMeasure", Namespaces)!.Value);
+    }
 }

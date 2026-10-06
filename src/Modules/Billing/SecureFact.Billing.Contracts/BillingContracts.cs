@@ -305,7 +305,9 @@ public sealed record DocumentLineDto(
     decimal ChargeNotAffectingBase = 0m,
     FishingDetail? Fishing = null,
     CargoTransportDetail? Transport = null,
-    GuestDetail? Guest = null);
+    GuestDetail? Guest = null,
+    IscInput? Isc = null,
+    int PlasticBagCount = 0);
 
 public sealed record DocumentDto(
     Guid Id,
