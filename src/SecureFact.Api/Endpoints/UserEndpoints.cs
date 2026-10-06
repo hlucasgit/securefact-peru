@@ -9,7 +9,7 @@ internal static class UserEndpoints
 {
     public sealed record RoleBody(string Role);
 
-    public sealed record CreateTenantBody(string Name, TenantEnvironment Environment, Guid? PlanId = null);
+    public sealed record CreateTenantBody(string Name, TenantEnvironment Environment, Guid? PlanId = null, Guid? ResellerId = null);
 
     public sealed record TenantStatusBody(TenantStatus Status, string Reason);
 
@@ -42,7 +42,7 @@ internal static class UserEndpoints
         var tenants = app.MapGroup("/api/v1").WithTags("Tenants");
 
         tenants.MapPost("/platform/tenants", async (CreateTenantBody body, ITenantAdministration admin, HttpContext http, CancellationToken ct) =>
-            (await admin.CreateAsync(new CreateTenantRequest(body.Name, body.Environment, null, body.PlanId), ct))
+            (await admin.CreateAsync(new CreateTenantRequest(body.Name, body.Environment, body.ResellerId, body.PlanId), ct))
                 .ToHttp(http, dto => Results.Created($"/api/v1/platform/tenants/{dto.Id}", dto)))
             .RequireAuthorization(Permissions.TenantsCreate);
 

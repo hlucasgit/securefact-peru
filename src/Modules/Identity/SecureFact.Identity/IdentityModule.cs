@@ -42,6 +42,8 @@ public static class IdentityModule
 
     public static string TenantClaim => TokenService.TenantClaim;
 
+    public static string ResellerClaim => TokenService.ResellerClaim;
+
     public static string RoleClaim => TokenService.RoleClaim;
 
     /// <summary>Applies pending migrations. Must run with the schema-owner connection, never the runtime role.</summary>

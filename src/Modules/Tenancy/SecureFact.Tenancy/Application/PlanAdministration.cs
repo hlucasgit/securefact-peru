@@ -53,7 +53,12 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
             return Error.Conflict(ErrorCodes.PlanCodeInUse, "Código en uso", "Ya existe un plan con ese código.");
         }
 
-        var plan = Plan.Create(Guid.CreateVersion7(), code, input.Name.Trim(), input.MaxCompanies, input.MaxUsers, input.MaxDocumentsPerMonth, clock.GetUtcNow());
+        if (await CheckResellerAsync(input.ResellerId, cancellationToken) is { } badReseller)
+        {
+            return badReseller;
+        }
+
+        var plan = Plan.Create(Guid.CreateVersion7(), code, input.Name.Trim(), input.MaxCompanies, input.MaxUsers, input.MaxDocumentsPerMonth, input.ResellerId, clock.GetUtcNow());
         db.Plans.Add(plan);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.PlanCreated, "plan", plan.Id.ToString("D"), null, NewValues: Values(plan)), cancellationToken);
@@ -78,8 +83,13 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
             return PlanMissing;
         }
 
+        if (await CheckResellerAsync(input.ResellerId, cancellationToken) is { } badReseller)
+        {
+            return badReseller;
+        }
+
         var before = Values(plan);
-        plan.Update(input.Name.Trim(), input.MaxCompanies, input.MaxUsers, input.MaxDocumentsPerMonth, input.IsActive);
+        plan.Update(input.Name.Trim(), input.MaxCompanies, input.MaxUsers, input.MaxDocumentsPerMonth, input.ResellerId, input.IsActive);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.PlanUpdated, "plan", plan.Id.ToString("D"), null, OldValues: before, NewValues: Values(plan)), cancellationToken);
         return ToDto(plan);
@@ -121,7 +131,7 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
         return TenantAdministration.ToDto(tenant);
     }
 
-    internal static PlanDto ToDto(Plan p) => new(p.Id, p.Code, p.Name, p.MaxCompanies, p.MaxUsers, p.MaxDocumentsPerMonth, p.IsActive);
+    internal static PlanDto ToDto(Plan p) => new(p.Id, p.Code, p.Name, p.MaxCompanies, p.MaxUsers, p.MaxDocumentsPerMonth, p.IsActive, p.ResellerId);
 
     private static Error? Validate(PlanInput input)
     {
@@ -150,7 +160,13 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
         ["maxUsers"] = p.MaxUsers,
         ["maxDocumentsPerMonth"] = p.MaxDocumentsPerMonth,
         ["isActive"] = p.IsActive,
+        ["resellerId"] = p.ResellerId,
     };
+
+    private async Task<Error?> CheckResellerAsync(Guid? resellerId, CancellationToken cancellationToken) =>
+        resellerId is { } id && !await db.Resellers.AnyAsync(r => r.Id == id, cancellationToken)
+            ? Error.Validation(ErrorCodes.InvalidPlan, "Revendedor inexistente", "El revendedor del plan no existe.")
+            : null;
 
     private Error? RequirePlatform() =>
         scope.Kind == DataScopeKind.Platform ? null : Error.Forbidden(ErrorCodes.Forbidden, "Operación no permitida", "Solo la plataforma administra los planes.");

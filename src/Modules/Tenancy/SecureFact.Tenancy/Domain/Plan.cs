@@ -22,13 +22,16 @@ internal sealed class Plan
 
     public int? MaxDocumentsPerMonth { get; private set; }
 
+    /// <summary>Null for a plan of the public catalogue; otherwise the plan is a private offer that only this reseller (and the platform) can assign.</summary>
+    public Guid? ResellerId { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 
     public uint Version { get; private set; }
 
-    public static Plan Create(Guid id, string code, string name, int? maxCompanies, int? maxUsers, int? maxDocumentsPerMonth, DateTimeOffset now) => new()
+    public static Plan Create(Guid id, string code, string name, int? maxCompanies, int? maxUsers, int? maxDocumentsPerMonth, Guid? resellerId, DateTimeOffset now) => new()
     {
         Id = id,
         Code = code,
@@ -36,12 +39,14 @@ internal sealed class Plan
         MaxCompanies = maxCompanies,
         MaxUsers = maxUsers,
         MaxDocumentsPerMonth = maxDocumentsPerMonth,
+        ResellerId = resellerId,
         IsActive = true,
         CreatedAt = now,
     };
 
-    public void Update(string name, int? maxCompanies, int? maxUsers, int? maxDocumentsPerMonth, bool isActive)
+    public void Update(string name, int? maxCompanies, int? maxUsers, int? maxDocumentsPerMonth, Guid? resellerId, bool isActive)
     {
+        ResellerId = resellerId;
         Name = name;
         MaxCompanies = maxCompanies;
         MaxUsers = maxUsers;

@@ -11,6 +11,7 @@ internal sealed class TokenService(IOptions<IdentityOptions> options, TimeProvid
 {
     public const string SessionClaim = "sid";
     public const string TenantClaim = "tid";
+    public const string ResellerClaim = "rid";
     public const string RoleClaim = "role";
 
     private readonly JsonWebTokenHandler _handler = new();
@@ -35,6 +36,11 @@ internal sealed class TokenService(IOptions<IdentityOptions> options, TimeProvid
         if (user.TenantId is { } tenantId)
         {
             claims[TenantClaim] = tenantId.ToString("D");
+        }
+
+        if (user.ResellerId is { } resellerId)
+        {
+            claims[ResellerClaim] = resellerId.ToString("D");
         }
 
         var key = new SymmetricSecurityKey(Convert.FromBase64String(opts.SigningKey)) { KeyId = opts.SigningKeyId };

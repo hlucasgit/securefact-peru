@@ -18,6 +18,9 @@ public interface ICurrentUser
 
     bool IsPlatform { get; }
 
+    /// <summary>The reseller of a reseller user (from the signed token); null for everyone else.</summary>
+    Guid? ResellerId { get; }
+
     IReadOnlySet<string> Roles { get; }
 
     IReadOnlySet<string> Permissions { get; }

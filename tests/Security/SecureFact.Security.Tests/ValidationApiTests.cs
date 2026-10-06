@@ -240,7 +240,7 @@ public sealed class ValidationApiTests(ApiFixture api)
         await ExpectRefusedAsync("no roles", setup.Owner.PostAsJsonAsync("/api/v1/users", NewUser(roles: [])));
         await ExpectRefusedAsync("an unknown role", setup.Owner.PostAsJsonAsync("/api/v1/users", NewUser(roles: ["Wizard"])));
         await ExpectRefusedAsync("platform and tenant roles together", setup.Owner.PostAsJsonAsync("/api/v1/users", NewUser(roles: [Roles.Sales, Roles.PlatformSupport])));
-        await ExpectRefusedAsync("a reseller role", setup.Owner.PostAsJsonAsync("/api/v1/users", NewUser(roles: [Roles.ResellerAdmin])));
+        await ExpectRefusedAsync("a reseller role", setup.Owner.PostAsJsonAsync("/api/v1/users", NewUser(roles: [Roles.ResellerAdmin])), HttpStatusCode.Forbidden); // only platform staff create reseller users
 
         var created = await setup.Owner.PostAsJsonAsync("/api/v1/users", NewUser());
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);

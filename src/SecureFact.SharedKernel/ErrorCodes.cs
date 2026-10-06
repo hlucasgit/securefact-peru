@@ -24,6 +24,12 @@ public static class ErrorCodes
 
     public const string PlanCodeInUse = "SF-PLAN-004";
 
+    public const string ResellerNotFound = "SF-RES-001";
+
+    public const string InvalidReseller = "SF-RES-002";
+
+    public const string ResellerInactive = "SF-RES-003";
+
     public const string InvalidSeriesConfiguration = "SF-BIL-001";
     public const string SeriesNotFound = "SF-BIL-002";
     public const string SeriesAlreadyExists = "SF-BIL-003";

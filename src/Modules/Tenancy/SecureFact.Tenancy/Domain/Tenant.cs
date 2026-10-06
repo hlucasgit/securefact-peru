@@ -29,6 +29,8 @@ internal sealed class Tenant
 
     public void ChangePlan(Guid planId) => PlanId = planId;
 
+    public void AssignReseller(Guid? resellerId) => ResellerId = resellerId;
+
     public static Tenant Create(Guid id, string name, TenantEnvironment environment, Guid? resellerId, Guid planId, DateTimeOffset now) => new()
     {
         Id = id,

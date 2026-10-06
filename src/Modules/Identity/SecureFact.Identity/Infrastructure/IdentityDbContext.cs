@@ -27,6 +27,7 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
             b.ToTable("app_user");
             b.HasKey(u => u.Id);
             b.Property(u => u.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(u => u.ResellerId).HasColumnName("reseller_id");
             b.Property(u => u.Email).HasColumnName("email").HasMaxLength(254).IsRequired();
             b.Property(u => u.EmailNormalized).HasColumnName("email_normalized").HasMaxLength(254).IsRequired();
             b.Property(u => u.DisplayName).HasColumnName("display_name").HasMaxLength(120).IsRequired();

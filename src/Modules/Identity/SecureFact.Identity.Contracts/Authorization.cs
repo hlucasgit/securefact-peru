@@ -22,12 +22,15 @@ public static class Permissions
     public const string CertificatesRead = "certificates.read";
     public const string CertificatesManage = "certificates.manage";
     public const string CpeSend = "cpe.send";
+    public const string ResellerTenantsRead = "reseller.tenants.read";
+    public const string ResellerTenantsCreate = "reseller.tenants.create";
+    public const string ResellerTenantsManage = "reseller.tenants.manage";
 
     public static IReadOnlyList<string> All { get; } =
     [
         TenantsCreate, TenantsRead, TenantsManage, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
         SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
-        CertificatesRead, CertificatesManage, CpeSend,
+        CertificatesRead, CertificatesManage, CpeSend, ResellerTenantsRead, ResellerTenantsCreate, ResellerTenantsManage,
     ];
 }
 
@@ -61,7 +64,7 @@ public static class RoleCatalog
         [Roles.PlatformSuperAdmin] = (RoleLevel.Platform, [.. Permissions.All]),
         // Support never reads tenant business data directly: that requires an explicit, audited delegation (future).
         [Roles.PlatformSupport] = (RoleLevel.Platform, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead]),
-        [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.TenantsRead]),
+        [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.ResellerTenantsRead, Permissions.ResellerTenantsCreate, Permissions.ResellerTenantsManage]),
         [Roles.TenantOwner] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,

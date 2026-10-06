@@ -19,6 +19,8 @@ internal sealed class SystemCurrentUser : ICurrentUser
 
     public bool IsPlatform => false;
 
+    public Guid? ResellerId => null;
+
     public IReadOnlySet<string> Roles { get; } = new HashSet<string>();
 
     public IReadOnlySet<string> Permissions { get; } = new HashSet<string>();

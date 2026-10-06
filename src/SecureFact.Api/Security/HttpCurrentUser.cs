@@ -26,6 +26,8 @@ public sealed class HttpCurrentUser(Func<ClaimsPrincipal?> principal) : ICurrent
 
     public bool IsPlatform => Roles.Any(r => RoleCatalog.LevelOf(r) == RoleLevel.Platform);
 
+    public Guid? ResellerId => Roles.Any(r => RoleCatalog.LevelOf(r) == RoleLevel.Reseller) ? ParseGuid(IdentityModule.ResellerClaim) : null;
+
     public IReadOnlySet<string> Permissions => RoleCatalog.PermissionsOf(Roles);
 
     public bool HasPermission(string permission) => Permissions.Contains(permission);

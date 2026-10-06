@@ -18,7 +18,8 @@ internal sealed class UserAdministration(
     PasswordHasher hasher,
     TimeProvider clock,
     IAuditTrail audit,
-    IPlanLimits plans) : IUserAdministration
+    IPlanLimits plans,
+    IResellerAdministration resellers) : IUserAdministration
 {
     private const int MaxPageSize = 200;
 
@@ -49,7 +50,7 @@ internal sealed class UserAdministration(
             return Error.Validation(ErrorCodes.UnknownRole, "Rol requerido", "Indique al menos un rol.");
         }
 
-        var tenantResult = ResolveTargetTenant(request.TenantId, roles);
+        var tenantResult = ResolveTargetTenant(request.TenantId, roles, request.ResellerId);
         if (!tenantResult.IsSuccess)
         {
             return tenantResult.Error;
@@ -61,6 +62,11 @@ internal sealed class UserAdministration(
             {
                 return denied;
             }
+        }
+
+        if (await CheckResellerOfUserAsync(roles, request.ResellerId, cancellationToken) is { } badReseller)
+        {
+            return badReseller;
         }
 
         var normalized = User.Normalize(email);
@@ -80,7 +86,7 @@ internal sealed class UserAdministration(
         }
 
         var now = clock.GetUtcNow();
-        var user = User.Create(Guid.CreateVersion7(), tenantResult.Value, email, name, hasher.Hash(request.Password), now);
+        var user = User.Create(Guid.CreateVersion7(), tenantResult.Value, email, name, hasher.Hash(request.Password), now, request.ResellerId);
         foreach (var role in roles)
         {
             user.AddRole(role, actor.UserId, now);
@@ -115,6 +121,52 @@ internal sealed class UserAdministration(
         return users.Select(ToDto).ToList();
     }
 
+    public async Task<Result<UserDto>> CreateTenantOwnerAsync(Guid tenantId, string email, string displayName, string password, CancellationToken cancellationToken)
+    {
+        if (!actor.IsPlatform && actor.ResellerId is null)
+        {
+            return Error.Forbidden(ErrorCodes.Forbidden, "Operación no permitida", "Solo la plataforma o un revendedor crea el propietario de una cuenta nueva.");
+        }
+
+        var mail = email?.Trim() ?? string.Empty;
+        if (!IsValidEmail(mail))
+        {
+            return Error.Validation(ErrorCodes.InvalidEmail, "Correo inválido", "Ingrese un correo electrónico válido.");
+        }
+
+        var name = displayName?.Trim() ?? string.Empty;
+        if (name.Length is < 2 or > 120)
+        {
+            return Error.Validation(ErrorCodes.InvalidRequest, "Nombre inválido", "El nombre debe tener entre 2 y 120 caracteres.");
+        }
+
+        if (PasswordPolicy.Validate(password, mail) is { } weak)
+        {
+            return weak;
+        }
+
+        var normalized = User.Normalize(mail);
+        if (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.EmailNormalized == normalized, cancellationToken))
+        {
+            return Error.Conflict(ErrorCodes.EmailInUse, "Correo en uso", "Ya existe un usuario con ese correo.");
+        }
+
+        var allowed = await plans.EnsureCanAddAsync(
+            new TenantId(tenantId), PlanResource.Users, await db.Users.CountAsync(u => u.TenantId == tenantId && u.IsActive, cancellationToken), cancellationToken);
+        if (!allowed.IsSuccess)
+        {
+            return allowed.Error;
+        }
+
+        var now = clock.GetUtcNow();
+        var user = User.Create(Guid.CreateVersion7(), tenantId, mail, name, hasher.Hash(password), now);
+        user.AddRole(Roles.TenantOwner, actor.UserId, now);
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+        await RecordAsync(AuditActions.UserCreated, user, new Dictionary<string, object?> { ["email"] = user.Email, ["roles"] = new[] { Roles.TenantOwner } }, cancellationToken);
+        return ToDto(user);
+    }
+
     public async Task<int> CountActiveAsync(Guid tenantId, CancellationToken cancellationToken) =>
         await db.Users.CountAsync(u => u.TenantId == tenantId && u.IsActive, cancellationToken);
 
@@ -131,7 +183,7 @@ internal sealed class UserAdministration(
             return denied;
         }
 
-        var levelCheck = ResolveTargetTenant(user.TenantId, [.. user.Roles.Select(r => r.RoleCode), role]);
+        var levelCheck = ResolveTargetTenant(user.TenantId, [.. user.Roles.Select(r => r.RoleCode), role], user.ResellerId);
         if (!levelCheck.IsSuccess)
         {
             return levelCheck.Error;
@@ -232,7 +284,7 @@ internal sealed class UserAdministration(
     }
 
     /// <summary>Platform and reseller roles cannot be mixed with tenant roles. Tenant users always belong to the actor's tenant.</summary>
-    private Result<Guid?> ResolveTargetTenant(Guid? requestedTenant, IReadOnlyCollection<string> roles)
+    private Result<Guid?> ResolveTargetTenant(Guid? requestedTenant, IReadOnlyCollection<string> roles, Guid? resellerId)
     {
         var unknown = roles.FirstOrDefault(r => !RoleCatalog.Exists(r));
         if (unknown is not null)
@@ -248,7 +300,10 @@ internal sealed class UserAdministration(
 
         if (levels[0] == RoleLevel.Reseller)
         {
-            return Error.Validation(ErrorCodes.RoleNotAssignable, "Rol no disponible", "Los roles de reseller se habilitan con el módulo de resellers.");
+            // A reseller user belongs to no tenant and to exactly one reseller, named when the user is created.
+            return actor.IsPlatform && requestedTenant is null && resellerId is not null
+                ? (Guid?)null
+                : Error.Forbidden(ErrorCodes.RoleNotAssignable, "Rol no asignable", "Solo el personal de plataforma crea usuarios de un revendedor, indicando el revendedor.");
         }
 
         if (levels[0] == RoleLevel.Platform)
@@ -273,6 +328,20 @@ internal sealed class UserAdministration(
         return own.Value;
     }
 
+    /// <summary>A reseller id goes with the ResellerAdmin role and with nothing else, and it must name a reseller that exists and is on.</summary>
+    private async Task<Error?> CheckResellerOfUserAsync(IReadOnlyCollection<string> roles, Guid? resellerId, CancellationToken cancellationToken)
+    {
+        var isResellerUser = roles.Any(r => RoleCatalog.LevelOf(r) == RoleLevel.Reseller);
+        if (!isResellerUser)
+        {
+            return resellerId is null ? null : Error.Validation(ErrorCodes.InvalidRequest, "Revendedor no permitido", "El revendedor solo se indica para el rol ResellerAdmin.");
+        }
+
+        return resellerId is { } id && await resellers.IsActiveAsync(id, cancellationToken)
+            ? null
+            : Error.NotFound(ErrorCodes.ResellerNotFound, "Revendedor no encontrado", "El revendedor no existe o está desactivado.");
+    }
+
     private Error? CheckAssignable(string role) =>
         RoleCatalog.CanAssign(actor.Roles, actor.IsPlatform, role)
             ? null
@@ -289,6 +358,6 @@ internal sealed class UserAdministration(
     }
 
     private static UserDto ToDto(User u) => new(
-        u.Id, u.TenantId, u.Email, u.DisplayName, [.. u.Roles.Select(r => r.RoleCode).Order(StringComparer.Ordinal)],
+        u.Id, u.TenantId, u.ResellerId, u.Email, u.DisplayName, [.. u.Roles.Select(r => r.RoleCode).Order(StringComparer.Ordinal)],
         u.IsActive, u.MfaEnabled, u.CreatedAt);
 }

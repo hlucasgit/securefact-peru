@@ -25,6 +25,7 @@ internal sealed partial class AuthenticationService(
     TimeProvider clock,
     IAuditTrail audit,
     ITenantStatusReader tenantStatus,
+    IResellerAdministration resellers,
     ILogger<AuthenticationService> logger) : IAuthenticationService
 {
     private static readonly Error InvalidCredentials = Error.Validation(
@@ -38,9 +39,18 @@ internal sealed partial class AuthenticationService(
 
     private IdentityOptions Options => options.Value;
 
-    /// <summary>A user of a suspended or closed tenant cannot start or renew a session. Platform staff belong to no tenant.</summary>
-    private async Task<bool> TenantIsActiveAsync(User user, CancellationToken cancellationToken) =>
-        user.TenantId is not { } tenantId || await tenantStatus.GetStatusAsync(new TenantId(tenantId), fresh: true, cancellationToken) == TenantStatus.Active;
+    /// <summary>
+    /// A user of a suspended or closed tenant cannot start or renew a session, nor can a user of a reseller that was switched off. Platform staff belong to neither.
+    /// </summary>
+    private async Task<bool> TenantIsActiveAsync(User user, CancellationToken cancellationToken)
+    {
+        if (user.ResellerId is { } resellerId)
+        {
+            return await resellers.IsActiveAsync(resellerId, cancellationToken);
+        }
+
+        return user.TenantId is not { } tenantId || await tenantStatus.GetStatusAsync(new TenantId(tenantId), fresh: true, cancellationToken) == TenantStatus.Active;
+    }
 
     /// <summary>
     /// Two sign-ins of the same account at once (two devices, a retried request) update the same user row; the second one loses the concurrency check. The sign-in is repeated from

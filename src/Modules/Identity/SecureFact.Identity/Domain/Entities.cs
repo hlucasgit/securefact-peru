@@ -15,6 +15,9 @@ internal sealed class User : IOptionalTenantOwned
     /// <summary>Null for platform staff.</summary>
     public Guid? TenantId { get; private set; }
 
+    /// <summary>Set for the users of a reseller (role ResellerAdmin); they belong to no tenant. Null for everyone else.</summary>
+    public Guid? ResellerId { get; private set; }
+
     public string Email { get; private set; } = string.Empty;
 
     public string EmailNormalized { get; private set; } = string.Empty;
@@ -47,10 +50,11 @@ internal sealed class User : IOptionalTenantOwned
 
     public static string Normalize(string email) => email.Trim().ToUpperInvariant();
 
-    public static User Create(Guid id, Guid? tenantId, string email, string displayName, string passwordHash, DateTimeOffset now) => new()
+    public static User Create(Guid id, Guid? tenantId, string email, string displayName, string passwordHash, DateTimeOffset now, Guid? resellerId = null) => new()
     {
         Id = id,
         TenantId = tenantId,
+        ResellerId = resellerId,
         Email = email.Trim(),
         EmailNormalized = Normalize(email),
         DisplayName = displayName.Trim(),

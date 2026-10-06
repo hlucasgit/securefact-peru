@@ -10,11 +10,13 @@ public sealed record AuthTokens(string AccessToken, string RefreshToken, int Exp
 
 public sealed record MfaEnrollment(string Secret, string OtpAuthUri);
 
-public sealed record CreateUserRequest(string Email, string DisplayName, string Password, IReadOnlyList<string> Roles, Guid? TenantId = null);
+/// <summary><paramref name="ResellerId"/> names the reseller of a ResellerAdmin user; it is required for that role and refused for any other.</summary>
+public sealed record CreateUserRequest(string Email, string DisplayName, string Password, IReadOnlyList<string> Roles, Guid? TenantId = null, Guid? ResellerId = null);
 
 public sealed record UserDto(
     Guid Id,
     Guid? TenantId,
+    Guid? ResellerId,
     string Email,
     string DisplayName,
     IReadOnlyList<string> Roles,
@@ -50,6 +52,12 @@ public interface IUserAdministration
 
     /// <summary>How many active users the tenant has (for plan consumption). Platform staff may ask about any tenant; a tenant user only about its own.</summary>
     Task<int> CountActiveAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates the first owner of a tenant that a reseller has just opened. It needs no role of the actor beyond the reseller permission that the endpoint demands, because a reseller
+    /// holds none of the permissions of the owner it creates; the tenant must be one of its own, which the caller has already checked.
+    /// </summary>
+    Task<Result<UserDto>> CreateTenantOwnerAsync(Guid tenantId, string email, string displayName, string password, CancellationToken cancellationToken);
 
     Task<Result<UserDto>> AssignRoleAsync(Guid userId, string role, CancellationToken cancellationToken);
 

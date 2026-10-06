@@ -60,10 +60,10 @@ public interface ITenantStatusReader
     Task<IReadOnlyList<Guid>> ListInactiveAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>What a plan allows. A null limit means unlimited.</summary>
-public sealed record PlanDto(Guid Id, string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive);
+/// <summary>What a plan allows. A null limit means unlimited. A plan with a <paramref name="ResellerId"/> is a private offer of that reseller; without one it is of the public catalogue.</summary>
+public sealed record PlanDto(Guid Id, string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive, Guid? ResellerId = null);
 
-public sealed record PlanInput(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive = true);
+public sealed record PlanInput(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive = true, Guid? ResellerId = null);
 
 /// <summary>The plan catalogue and the plan of each tenant, for platform staff. A tenant reads only its own plan, through <see cref="IPlanLimits"/>: it never sees the other plans.</summary>
 public interface IPlanAdministration
@@ -113,4 +113,43 @@ public interface IPlanLimits
         PlanResource.Users => "usuarios",
         _ => "comprobantes por mes",
     };
+}
+
+public sealed record ResellerDto(Guid Id, string Name, bool IsActive, int TenantCount, DateTimeOffset CreatedAt);
+
+/// <summary>A tenant that a reseller opens for one of its customers. Without a plan it starts on the default one.</summary>
+public sealed record ResellerTenantRequest(string Name, TenantEnvironment Environment, Guid? PlanId = null);
+
+/// <summary>
+/// Resellers (ADR-043). The first group is platform staff; the second is the reseller's own view, and every method there takes the reseller from the token (never from the request) and
+/// answers "not found" for a tenant or plan that is not its own, so it cannot tell whether another reseller's tenant exists.
+/// </summary>
+public interface IResellerAdministration
+{
+    Task<Result<IReadOnlyList<ResellerDto>>> ListAsync(CancellationToken cancellationToken);
+
+    Task<Result<ResellerDto>> CreateAsync(string name, CancellationToken cancellationToken);
+
+    /// <summary>Renames a reseller or switches it off. A reseller that is off cannot sign in and cannot act; its tenants keep working.</summary>
+    Task<Result<ResellerDto>> UpdateAsync(Guid id, string name, bool isActive, CancellationToken cancellationToken);
+
+    /// <summary>Moves a tenant to a reseller, or to none (null). Audited with the previous reseller.</summary>
+    Task<Result<TenantDto>> AssignTenantAsync(TenantId tenantId, Guid? resellerId, CancellationToken cancellationToken);
+
+    /// <summary>True when the reseller exists and is on (sign-in and every request of a reseller user).</summary>
+    Task<bool> IsActiveAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    Task<Result<ResellerDto>> GetOwnAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    Task<Result<IReadOnlyList<TenantDto>>> ListTenantsAsync(Guid resellerId, string? search, int skip, int take, CancellationToken cancellationToken);
+
+    Task<Result<TenantDto>> GetTenantAsync(Guid resellerId, TenantId tenantId, CancellationToken cancellationToken);
+
+    /// <summary>Opens a tenant for the reseller, on a plan it may assign. The owner of the tenant is created next, by Identity.</summary>
+    Task<Result<TenantDto>> CreateTenantAsync(Guid resellerId, ResellerTenantRequest request, CancellationToken cancellationToken);
+
+    /// <summary>The active plans a reseller may assign: the public catalogue and its own private plans.</summary>
+    Task<Result<IReadOnlyList<PlanDto>>> ListPlansAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    Task<Result<TenantDto>> AssignPlanAsync(Guid resellerId, TenantId tenantId, Guid planId, CancellationToken cancellationToken);
 }

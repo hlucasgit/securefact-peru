@@ -58,6 +58,12 @@ public static class AuthenticationSetup
         {
             scope.UsePlatform($"platform-staff:{user.UserId}");
         }
+        else if (user.ResellerId is { } reseller && user.TenantId is null)
+        {
+            // A reseller has no tenant of its own and reaches the tenants of its customers through the platform scope. Nothing else is open to it: its role has only the reseller permissions,
+            // and the reseller services filter every read and write by the reseller of the token (ADR-043).
+            scope.UsePlatform($"reseller:{reseller}:{user.UserId}");
+        }
         else
         {
             context.Fail("The token does not identify a valid scope.");
@@ -68,6 +74,14 @@ public static class AuthenticationSetup
             || !await services.GetRequiredService<IAuthenticationService>().IsSessionActiveAsync(sessionId, context.HttpContext.RequestAborted))
         {
             context.Fail("The session is no longer active.");
+            return;
+        }
+
+        // A reseller that was switched off is refused on every request.
+        if (user.ResellerId is { } activeReseller
+            && !await services.GetRequiredService<IResellerAdministration>().IsActiveAsync(activeReseller, context.HttpContext.RequestAborted))
+        {
+            context.Fail("The reseller is not active.");
             return;
         }
 

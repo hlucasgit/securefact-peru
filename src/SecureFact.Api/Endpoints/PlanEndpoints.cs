@@ -11,7 +11,7 @@ namespace SecureFact.Api.Endpoints;
 
 internal static class PlanEndpoints
 {
-    public sealed record PlanBody(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool? IsActive);
+    public sealed record PlanBody(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool? IsActive, Guid? ResellerId = null);
 
     public sealed record AssignPlanBody(Guid PlanId);
 
@@ -48,7 +48,7 @@ internal static class PlanEndpoints
 
     public static IServiceCollection AddPlanUsage(this IServiceCollection services) => services.AddScoped<TenantUsageReader>();
 
-    private static PlanInput ToInput(PlanBody body) => new(body.Code, body.Name, body.MaxCompanies, body.MaxUsers, body.MaxDocumentsPerMonth, body.IsActive ?? true);
+    private static PlanInput ToInput(PlanBody body) => new(body.Code, body.Name, body.MaxCompanies, body.MaxUsers, body.MaxDocumentsPerMonth, body.IsActive ?? true, body.ResellerId);
 
     /// <summary>The plan of a tenant and what it has used, composed from the modules that own each count: Tenancy does not know companies, users or documents.</summary>
     internal sealed class TenantUsageReader(

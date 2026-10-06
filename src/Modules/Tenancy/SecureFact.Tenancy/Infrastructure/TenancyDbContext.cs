@@ -14,6 +14,8 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
 
     public DbSet<Domain.Plan> Plans => Set<Domain.Plan>();
 
+    public DbSet<Domain.Reseller> Resellers => Set<Domain.Reseller>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -46,10 +48,23 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             builder.Property(p => p.MaxCompanies).HasColumnName("max_companies");
             builder.Property(p => p.MaxUsers).HasColumnName("max_users");
             builder.Property(p => p.MaxDocumentsPerMonth).HasColumnName("max_documents_per_month");
+            builder.Property(p => p.ResellerId).HasColumnName("reseller_id");
             builder.Property(p => p.IsActive).HasColumnName("is_active").IsRequired();
             builder.Property(p => p.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(p => p.Version).IsRowVersion();
             builder.HasIndex(p => p.Code).IsUnique();
+        });
+
+        // Resellers belong to the platform: only the platform scope reads or writes them (RLS platform_only). A reseller user acts in platform scope and the services filter by its reseller.
+        modelBuilder.Entity<Domain.Reseller>(builder =>
+        {
+            builder.ToTable("reseller");
+            builder.HasKey(r => r.Id);
+            builder.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            builder.Property(r => r.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
+            builder.Property(r => r.IsActive).HasColumnName("is_active").IsRequired();
+            builder.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
+            builder.Property(r => r.Version).IsRowVersion();
         });
     }
 }

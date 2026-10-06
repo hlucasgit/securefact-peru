@@ -201,6 +201,7 @@ if (app.Environment.IsDevelopment())
 app.MapAuthEndpoints();
 app.MapUserAndTenantEndpoints();
 app.MapPlanEndpoints();
+app.MapResellerEndpoints();
 app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
 app.MapBillingEndpoints();

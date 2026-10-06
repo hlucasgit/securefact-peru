@@ -64,6 +64,21 @@ public static partial class RlsSql
             """;
     }
 
+    /// <summary>Data of the platform that no tenant may read or write (for example the resellers): only the explicit platform scope sees it.</summary>
+    public static string EnablePlatformOnly(string schema, string table)
+    {
+        Validate(schema);
+        Validate(table);
+        return $"""
+            ALTER TABLE {schema}.{table} ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE {schema}.{table} FORCE ROW LEVEL SECURITY;
+            DROP POLICY IF EXISTS platform_only ON {schema}.{table};
+            CREATE POLICY platform_only ON {schema}.{table} FOR ALL
+              USING (current_setting('app.scope', true) = 'platform')
+              WITH CHECK (current_setting('app.scope', true) = 'platform');
+            """;
+    }
+
     /// <summary>
     /// Grants runtime privileges to the application role when it exists. The role is created by infrastructure
     /// (not by migrations) and has neither ownership of the tables nor BYPASSRLS.

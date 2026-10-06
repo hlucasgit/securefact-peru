@@ -8,6 +8,9 @@ public static class AuditActions
     public const string TenantPlanChanged = "tenancy.tenant.plan_changed";
     public const string PlanCreated = "tenancy.plan.created";
     public const string PlanUpdated = "tenancy.plan.updated";
+    public const string TenantResellerChanged = "tenancy.tenant.reseller_changed";
+    public const string ResellerCreated = "tenancy.reseller.created";
+    public const string ResellerUpdated = "tenancy.reseller.updated";
     public const string TenantReactivated = "tenancy.tenant.reactivated";
     public const string TenantClosed = "tenancy.tenant.closed";
 

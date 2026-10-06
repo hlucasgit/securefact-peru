@@ -32,6 +32,11 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
                 $"El nombre debe tener entre {MinNameLength} y {MaxNameLength} caracteres.");
         }
 
+        if (request.ResellerId is { } resellerId && !await db.Resellers.AnyAsync(r => r.Id == resellerId, cancellationToken))
+        {
+            return Error.NotFound(ErrorCodes.ResellerNotFound, "Revendedor no encontrado", "El revendedor no existe.");
+        }
+
         // A tenant starts on the plan that was asked for, or on the default one (which limits nothing).
         var planId = request.PlanId ?? Plan.DefaultId;
         var plan = await db.Plans.AsNoTracking().SingleOrDefaultAsync(p => p.Id == planId, cancellationToken);
