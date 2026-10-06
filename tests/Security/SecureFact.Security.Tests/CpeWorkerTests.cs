@@ -120,6 +120,14 @@ public sealed class CpeWorkerTests(ApiFixture api)
         await command.ExecuteNonQueryAsync();
     }
 
+    private async Task<string?> ExecuteScalarAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(api.Postgres.OwnerConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        return (string?)await command.ExecuteScalarAsync();
+    }
+
     // ---------- invoices ----------
 
     [Fact]
@@ -174,6 +182,75 @@ public sealed class CpeWorkerTests(ApiFixture api)
         Assert.Equal("SF-CRT-004", untouched.LastErrorCode);
         Assert.True(untouched.NextAttemptAt > DateTimeOffset.UtcNow); // ...but it steps aside, so broken documents cannot starve the batch
         Assert.Equal(0, (await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId)).Skipped);
+    }
+
+    // ---------- suspended tenants (ADR-041) ----------
+
+    private async Task SetTenantStatusAsync(Guid tenantId, string status)
+    {
+        using var admin = await api.AdminClientAsync();
+        var response = await admin.PostAsJsonAsync($"/api/v1/platform/tenants/{tenantId}/status", new { status, reason = "Prueba de trabajo en segundo plano" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_suspended_tenant_gets_no_send_while_an_active_one_does_and_reactivating_resumes_it()
+    {
+        var suspended = await NewTenantAsync("Worker Suspended SAC");
+        var active = await NewTenantAsync("Worker Active SAC");
+        var suspendedDocument = await NewDocumentAsync(suspended.Owner, suspended.InvoiceSeries, receipt: false);
+        var suspendedElectronic = await PrepareAsync(suspended.Owner, suspendedDocument.Id);
+        var activeDocument = await NewDocumentAsync(active.Owner, active.InvoiceSeries, receipt: false);
+        var activeElectronic = await PrepareAsync(active.Owner, activeDocument.Id);
+        api.Sunat.RespondToBills(call => call.ZipFileName.StartsWith(active.Company.Ruc, StringComparison.Ordinal)
+            ? ChannelReply.Cdr(FakeSunatChannel.CdrZip(active.Company.Ruc, $"{activeDocument.Series}-{activeDocument.Number}"))
+            : ChannelReply.Cdr(FakeSunatChannel.CdrZip(suspended.Company.Ruc, $"{suspendedDocument.Series}-{suspendedDocument.Number}")));
+        await SetTenantStatusAsync(suspended.TenantId, "Suspended");
+
+        var skippedReport = await Processor().RunOnceAsync(CancellationToken.None, suspended.TenantId);
+        var report = await Processor().RunOnceAsync(CancellationToken.None, active.TenantId);
+
+        Assert.Equal(0, skippedReport.Sent);
+        Assert.Equal(EDocumentState.Accepted, (await GetAsync(active.Owner, activeElectronic.Id)).State);
+        var untouched = await ExecuteScalarAsync($"SELECT state || '/' || attempts FROM cpe.electronic_document WHERE id = '{suspendedElectronic.Id}'");
+        Assert.Equal("ReadyToSend/0", untouched);
+        Assert.DoesNotContain(api.Sunat.Calls, call => call.ZipFileName.StartsWith(suspended.Company.Ruc, StringComparison.Ordinal));
+        Assert.Equal(1, report.Sent);
+
+        await SetTenantStatusAsync(suspended.TenantId, "Active");
+        await Processor().RunOnceAsync(CancellationToken.None, suspended.TenantId);
+
+        Assert.Equal(EDocumentState.Accepted, (await GetAsync(suspended.Owner, suspendedElectronic.Id)).State);
+    }
+
+    [Fact]
+    public async Task A_closed_tenant_gets_no_summary_and_a_summary_already_sent_is_still_followed()
+    {
+        var setup = await NewTenantAsync("Worker Closed SAC");
+        var yesterday = TodayInLima().AddDays(-1);
+        var receipt = await PrepareAsync(setup.Owner, (await NewDocumentAsync(setup.Owner, setup.ReceiptSeries, receipt: true, yesterday)).Id);
+        await SetTenantStatusAsync(setup.TenantId, "Suspended");
+
+        var suspended = await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId);
+
+        Assert.Equal(0, suspended.SummariesCreated);
+        Assert.Empty(api.Sunat.SummaryCalls);
+        Assert.Equal("ReadyToSend", await ExecuteScalarAsync($"SELECT state FROM cpe.electronic_document WHERE id = '{receipt.Id}'"));
+
+        await SetTenantStatusAsync(setup.TenantId, "Active");
+        api.Sunat.EnqueueSummary(ChannelReply.Issued("T-200"));
+        Assert.Equal(1, (await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId)).SummariesCreated);
+        Assert.Equal(EDocumentState.AwaitingTicket, (await GetAsync(setup.Owner, receipt.Id)).State);
+
+        // Suspended after the summary left: its ticket is still polled, because that is the answer to something already sent.
+        await SetTenantStatusAsync(setup.TenantId, "Suspended");
+        var summaryName = Assert.Single(api.Sunat.SummaryCalls).ZipFileName[..^".zip".Length];
+        api.Sunat.EnqueueStatus(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, summaryName[(setup.Company.Ruc.Length + 1)..])));
+
+        var polled = await Processor(TimeSpan.FromMinutes(2)).RunOnceAsync(CancellationToken.None, setup.TenantId);
+
+        Assert.Equal(1, polled.Polled);
+        Assert.Equal("Accepted", await ExecuteScalarAsync($"SELECT state FROM cpe.electronic_document WHERE id = '{receipt.Id}'")); // the owner's token is refused while suspended, so read the row
     }
 
     // ---------- daily summaries ----------

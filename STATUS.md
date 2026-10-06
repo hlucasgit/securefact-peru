@@ -107,7 +107,8 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 ## Administración de plataforma
 - **Inquilinos** (ADR-041): lista con búsqueda y estado, alta con su propietario, detalle con usuarios, y **suspender, reactivar y cerrar** con motivo (el cierre es definitivo y pide escribir el nombre). Un inquilino suspendido o cerrado no ingresa, no renueva y no usa la API (el estado se cachea 10 s por proceso); todo cambio queda en la auditoría. El soporte lee y no cambia.
 - **Auditoría** con filtros y **verificación de la cadena**, y **mensajes fallidos** con reencolado, en la interfaz.
-- Pendiente: los workers siguen procesando lo ya encolado de un inquilino suspendido, revendedores, planes y métricas por inquilino, «entrar como», exportar o dar de baja definitiva una cuenta.
+- **Workers**: un inquilino suspendido o cerrado no recibe envíos ni resúmenes nuevos hacia SUNAT; el sondeo de tickets y el archivo continúan.
+- Pendiente: revendedores, planes y métricas por inquilino, «entrar como», exportar o dar de baja definitiva una cuenta.
 
 ## ISC e ICBPER
 - **ISC** (al valor y de monto fijo) **e ICBPER** en el UBL de facturas, boletas, notas y resumen diario, y en el PDF (ADR-037): subtotales de línea y globales según las hojas de reglas; el ISC entra en la base del IGV de la línea. Aceptados por el beta de SUNAT (factura, boleta, notas y resumen).
