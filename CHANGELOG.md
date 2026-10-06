@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- CI de GitHub en verde: acciones de terceros fijadas a un commit (Trivy `v0.36.0`, gitleaks), escaneo de la imagen de los workers, runner `ubuntu-24.04` fijo, tiempo límite y cancelación de corridas obsoletas; documentado en `docs/testing/README.md`.
 - Tramos y vehículos del transporte de carga (1004) en cada línea (`transport.legs`, hasta 99): origen, destino, configuración vehicular, cargas y valores referenciales, en el UBL y en el PDF; aceptados en el beta (ADR-034, R-059, S25).
 - Exportación de servicios de hospedaje (0202) y de paquete turístico (0205) en facturas, con el huésped no domiciliado y su estadía en cada línea (catálogo 55, códigos 4000–4009), en el UBL y en el PDF; aceptadas en el beta (ADR-033, R-058).
 - Leyendas de las ventas exoneradas 2001, 2002, 2003 (Amazonía) y 2008 (zona comercial de Tacna) en facturas y boletas (`legendCodes`): el documento debe tener operaciones exoneradas; aceptadas en el beta (ADR-032, R-057).
@@ -42,3 +43,6 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - Identity/RBAC (login, sesiones con rotación y detección de reutilización, MFA TOTP, recuperación de contraseña, usuarios y roles con anti-escalada), módulo Audit (cadena de hashes append-only con verificación), módulo Organizations (empresas y establecimientos), OpenTelemetry y logging estructurado sin datos sensibles, `SecretProtector` con cifrado de envoltura, stack completo en `docker compose` con migraciones y bootstrap.
 - Tenancy: `SecureFact.Platform` (ámbito de datos, RLS), módulo `Tenancy` con registro de tenants, migración inicial con RLS forzado y 21 pruebas de seguridad cross-tenant contra PostgreSQL real.
 - Fase 0: baseline normativo, matriz, C4, ERD, ADR-001…010, documentación PSE, roadmap.
+
+### Fixed
+- El worker consulta solo los documentos que tienen ticket: antes consultaba también los comprobantes de un resumen, que esperan sin ticket propio, y el conteo del pase dependía de qué marca de tiempo era más reciente (prueba intermitente en el CI).

@@ -1,7 +1,7 @@
 # STATUS — 2026-10-01 (dos horas autónomas)
 
 ## Estado general
-Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almacenamiento S3 de código; el CI no se ha ejecutado). **Fase 2 en curso**: ya existen el motor tributario, las series, la numeración atómica y la emisión idempotente de facturas/boletas. Último commit en `origin/main`: `3bfc54b`. El trabajo de esta hora está **sin commitear**.
+Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almacenamiento S3 de código; el CI de GitHub corre en cada push y pasa, ver «CI»). **Fase 2 en curso**: ya existen el motor tributario, las series, la numeración atómica y la emisión idempotente de facturas/boletas.
 
 ## Novedades de las dos últimas horas
 - **Rules** (`IRuleProvider`): plazos y tasas como reglas versionadas con estado `Verified`/`Pending`; versiones publicadas inmutables; `GET /api/v1/rules`. **Billing ya no acepta tasas del cliente** (las resuelve por fecha de emisión); prueba con tasas falsas.
@@ -78,10 +78,15 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - La empresa guarda su cuenta de detracciones (`detractionAccount`); una detracción sin cuenta propia usa la de la empresa y la factura conserva la usada. Pruebas: 629 pasan (374 unitarias, 6 arquitectura, 6 integración, 243 seguridad/API).
 - Tipos de operación de detracción 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte): el tipo sigue al código de la detracción, con datos de pesca o de viaje por línea (ADR-030); una factura de cada tipo aceptada en el beta. Pruebas: 640 pasan (381 unitarias, 6 arquitectura, 6 integración, 247 seguridad/API).
 
+## CI
+- GitHub Actions (`ci.yml`) corre en cada push a `main` y en cada pull request: build en Release y pruebas (6 de arquitectura, 411 unitarias, 262 de seguridad/API, 6 de integración), paquetes vulnerables, SBOM, gitleaks y construcción y escaneo Trivy de las dos imágenes. Primera corrida completa en verde el 2026-10-05.
+- Hallazgos al ponerlo en verde: la tarea de contenedores no arrancaba porque `aquasecurity/trivy-action@0.28.0` ya no existe (se reescribieron sus etiquetas tras el ataque a la cadena de suministro de marzo de 2026; ahora `v0.36.0`, fijada a un commit, igual que gitleaks); dos corridas fallaban en Release por advertencias tratadas como errores que Debug no muestra; y una prueba del worker era intermitente porque el worker consultaba también los comprobantes de un resumen, que esperan sin ticket propio (ahora solo consulta quien tiene el ticket).
+- Pendiente: cobertura sin medir; las acciones oficiales siguen en etiquetas mayores (`@v4`; Dependabot propone las nuevas) y GitHub avisa de que Node 20 está en desuso.
+
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
-- Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; CI sin ejecutar en GitHub; cobertura sin medir.
+- Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; cobertura sin medir.
 - ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.
 - Notas de crédito/débito esperan el CDR (Fase 4).
 
@@ -89,5 +94,5 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 1. Commit y push.
 2. ISC, ICBPER, IVAP, exportación y operaciones gratuitas con valor referencial en el UBL.
 3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF, retención del outbox.
-4. Outbox + bus + S3 de código; ejecutar el CI; medir cobertura.
+4. Outbox + bus + S3 de código; medir cobertura.
 5. PDF y renderizado del QR.

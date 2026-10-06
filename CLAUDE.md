@@ -20,6 +20,7 @@ Plataforma SaaS de facturación electrónica peruana (monolito modular .NET 10 +
 ```bash
 docker compose up -d
 dotnet build SecureFact.slnx
+dotnet build SecureFact.slnx -c Release   # como el CI: en Release las advertencias son errores
 dotnet test SecureFact.slnx
 ```
 
