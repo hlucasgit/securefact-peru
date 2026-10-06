@@ -5,6 +5,7 @@ public static class Permissions
 {
     public const string TenantsCreate = "tenants.create";
     public const string TenantsRead = "tenants.read";
+    public const string TenantsManage = "tenants.manage";
     public const string UsersRead = "users.read";
     public const string UsersManage = "users.manage";
     public const string SessionsRevoke = "sessions.revoke";
@@ -24,7 +25,7 @@ public static class Permissions
 
     public static IReadOnlyList<string> All { get; } =
     [
-        TenantsCreate, TenantsRead, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
+        TenantsCreate, TenantsRead, TenantsManage, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
         SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
         CertificatesRead, CertificatesManage, CpeSend,
     ];

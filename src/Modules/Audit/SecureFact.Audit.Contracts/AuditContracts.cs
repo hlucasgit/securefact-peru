@@ -4,6 +4,9 @@ namespace SecureFact.Audit.Contracts;
 public static class AuditActions
 {
     public const string TenantCreated = "tenancy.tenant.created";
+    public const string TenantSuspended = "tenancy.tenant.suspended";
+    public const string TenantReactivated = "tenancy.tenant.reactivated";
+    public const string TenantClosed = "tenancy.tenant.closed";
 
     public const string CompanyCreated = "organizations.company.created";
     public const string CompanyUpdated = "organizations.company.updated";

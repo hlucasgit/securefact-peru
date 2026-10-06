@@ -5,6 +5,7 @@ using SecureFact.Identity.Application;
 using SecureFact.Identity.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel.Domain;
+using SecureFact.Tenancy.Contracts;
 
 namespace SecureFact.Api.Security;
 
@@ -67,6 +68,14 @@ public static class AuthenticationSetup
             || !await services.GetRequiredService<IAuthenticationService>().IsSessionActiveAsync(sessionId, context.HttpContext.RequestAborted))
         {
             context.Fail("The session is no longer active.");
+            return;
+        }
+
+        // A suspended or closed tenant is refused on every request, not only at sign-in (the status is cached for a few seconds, ITenantStatusReader).
+        if (user.TenantId is { } tenantId && !user.IsPlatform
+            && await services.GetRequiredService<ITenantStatusReader>().GetStatusAsync(tenantId, fresh: false, context.HttpContext.RequestAborted) != TenantStatus.Active)
+        {
+            context.Fail("The tenant is not active.");
         }
     }
 }

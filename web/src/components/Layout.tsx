@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useSession } from '../auth/session'
-import { ADMIN_ROLES, BILLING_ROLES, ROLE_LABELS } from '../lib/format'
+import { ADMIN_ROLES, AUDIT_ROLES, BILLING_ROLES, PLATFORM_ROLES, QUEUE_ROLES, ROLE_LABELS } from '../lib/format'
 
 interface Item {
   to: string
@@ -9,10 +9,15 @@ interface Item {
   roles?: string[]
 }
 
+const PLATFORM_GROUPS: { title: string; items: Item[] }[] = [
+  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/auditoria', label: 'Auditoría' }] },
+  { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
+]
+
 const GROUPS: { title: string; items: Item[] }[] = [
   { title: 'Operación', items: [{ to: '/', label: 'Panel' }, { to: '/documentos', label: 'Documentos' }, { to: '/documentos/nuevo', label: 'Emitir', roles: BILLING_ROLES }, { to: '/resumenes', label: 'Resumen diario', roles: BILLING_ROLES }] },
   { title: 'Datos', items: [{ to: '/clientes', label: 'Clientes' }, { to: '/productos', label: 'Productos' }, { to: '/empresas', label: 'Empresas' }] },
-  { title: 'Cuenta', items: [{ to: '/usuarios', label: 'Usuarios', roles: ADMIN_ROLES }, { to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
+  { title: 'Cuenta', items: [{ to: '/usuarios', label: 'Usuarios', roles: ADMIN_ROLES }, { to: '/auditoria', label: 'Auditoría', roles: AUDIT_ROLES }, { to: '/mensajes', label: 'Mensajes fallidos', roles: QUEUE_ROLES }, { to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
 ]
 
 export function Layout() {
@@ -28,7 +33,7 @@ export function Layout() {
           <small>Facturación electrónica</small>
         </div>
         <nav aria-label="Navegación principal">
-          {GROUPS.map((group) => {
+          {(hasRole(...PLATFORM_ROLES) ? PLATFORM_GROUPS : GROUPS).map((group) => {
             const items = group.items.filter((item) => !item.roles || hasRole(...item.roles))
             return (
               items.length > 0 && (

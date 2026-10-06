@@ -85,9 +85,16 @@ internal sealed class UserAdministration(
         return user is null ? NotFound : ToDto(user);
     }
 
-    public async Task<IReadOnlyList<UserDto>> ListAsync(int skip, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<UserDto>> ListAsync(int skip, int take, Guid? tenantId, CancellationToken cancellationToken)
     {
-        var users = await db.Users.AsNoTracking().Include(u => u.Roles)
+        var query = db.Users.AsNoTracking().Include(u => u.Roles).AsQueryable();
+        if (tenantId is { } only)
+        {
+            // A tenant user never sees another tenant (the filter of the data scope already says so); platform staff narrow the list to one tenant.
+            query = query.Where(u => u.TenantId == only);
+        }
+
+        var users = await query
             .OrderBy(u => u.EmailNormalized)
             .Skip(Math.Max(skip, 0))
             .Take(Math.Clamp(take, 1, MaxPageSize))

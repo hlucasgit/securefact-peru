@@ -16,7 +16,9 @@ public static class TenancyModule
         services.AddDbContext<TenancyDbContext>((sp, options) => options
             .UseNpgsql(appConnectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", TenancyDbContext.Schema))
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
+        services.AddMemoryCache();
         services.AddScoped<ITenantAdministration, TenantAdministration>();
+        services.AddScoped<ITenantStatusReader, TenantStatusReader>();
         return services;
     }
 

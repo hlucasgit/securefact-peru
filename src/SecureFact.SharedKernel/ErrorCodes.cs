@@ -12,6 +12,10 @@ public static class ErrorCodes
 
     public const string TenantNotFound = "SF-TEN-001";
 
+    public const string TenantInactive = "SF-TEN-002";
+
+    public const string InvalidTenantStatusChange = "SF-TEN-003";
+
     public const string InvalidSeriesConfiguration = "SF-BIL-001";
     public const string SeriesNotFound = "SF-BIL-002";
     public const string SeriesAlreadyExists = "SF-BIL-003";

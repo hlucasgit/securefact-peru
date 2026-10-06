@@ -19,7 +19,7 @@
 - **Configuración**: en `docker-compose.yml` y en el CI, `SF_SUNAT_ENVIRONMENT=Sandbox`; vacío sigue siendo «sin canal» (la API prepara y firma, pero no envía), y `Beta` y `Production` siguen exigiendo nombrarlos.
 
 ## Verificación
-15 pruebas unitarias del canal (aceptación y su CDR, las tres marcas, nombres de archivo y ZIP inválidos, resumen y baja con su ticket, tickets ajenos, registro fuera y dentro de producción) y los 28 recorridos de extremo a extremo de la interfaz (ADR-040), que envían, observan, rechazan y dan de baja contra él.
+15 pruebas unitarias del canal (aceptación y su CDR, las tres marcas, nombres de archivo y ZIP inválidos, resumen y baja con su ticket, tickets ajenos, registro fuera y dentro de producción) y los recorridos de extremo a extremo de la interfaz (ADR-040), que envían, observan, rechazan y dan de baja contra él.
 
 ## Límites (P)
 - **No es SUNAT**: no valida XSD, firma ni reglas. Que el simulador acepte un documento no prueba que SUNAT lo acepte; eso solo lo prueba el beta (herramienta `tools/SecureFact.BetaSmoke`, de forma funcional y nunca con carga).

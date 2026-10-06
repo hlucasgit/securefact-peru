@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useSession } from './auth/session'
+import { PLATFORM_ROLES } from './lib/format'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
 import { Rules, Security, Users } from './pages/Account'
+import { Audit, DeadMessages } from './pages/Audit'
 import { CompanyDetail } from './pages/CompanyDetail'
 import { Companies } from './pages/Companies'
 import { Dashboard } from './pages/Dashboard'
@@ -12,7 +14,14 @@ import { Login } from './pages/Login'
 import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
 import { NewNote } from './pages/NewNote'
+import { TenantDetail, Tenants } from './pages/Platform'
 import { Summaries } from './pages/Summaries'
+
+/** The home of a user: platform staff administer tenants and have no companies or documents of their own. */
+function Home() {
+  const { hasRole } = useSession()
+  return hasRole(...PLATFORM_ROLES) ? <Navigate to="/plataforma/inquilinos" replace /> : <Dashboard />
+}
 
 function Protected() {
   const { principal, restoring } = useSession()
@@ -27,7 +36,11 @@ export function App() {
     <Routes>
       <Route path="/ingresar" element={<Login />} />
       <Route element={<Protected />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={<Home />} />
+        <Route path="plataforma/inquilinos" element={<Tenants />} />
+        <Route path="plataforma/inquilinos/:id" element={<TenantDetail />} />
+        <Route path="auditoria" element={<Audit />} />
+        <Route path="mensajes" element={<DeadMessages />} />
         <Route path="documentos" element={<Documents />} />
         <Route path="documentos/nuevo" element={<NewDocument />} />
         <Route path="documentos/:id" element={<DocumentDetail />} />

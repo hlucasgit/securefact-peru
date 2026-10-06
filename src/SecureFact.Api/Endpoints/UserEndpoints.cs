@@ -11,12 +11,14 @@ internal static class UserEndpoints
 
     public sealed record CreateTenantBody(string Name, TenantEnvironment Environment);
 
+    public sealed record TenantStatusBody(TenantStatus Status, string Reason);
+
     public static void MapUserAndTenantEndpoints(this IEndpointRouteBuilder app)
     {
         var users = app.MapGroup("/api/v1/users").WithTags("Users");
 
-        users.MapGet(string.Empty, async (int? skip, int? take, IUserAdministration admin, CancellationToken ct) =>
-            Results.Ok(await admin.ListAsync(skip ?? 0, take ?? 50, ct))).RequireAuthorization(Permissions.UsersRead);
+        users.MapGet(string.Empty, async (int? skip, int? take, Guid? tenantId, IUserAdministration admin, CancellationToken ct) =>
+            Results.Ok(await admin.ListAsync(skip ?? 0, take ?? 50, tenantId, ct))).RequireAuthorization(Permissions.UsersRead);
 
         users.MapGet("/{id:guid}", async (Guid id, IUserAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.UsersRead);
@@ -43,6 +45,12 @@ internal static class UserEndpoints
             (await admin.CreateAsync(new CreateTenantRequest(body.Name, body.Environment), ct))
                 .ToHttp(http, dto => Results.Created($"/api/v1/platform/tenants/{dto.Id}", dto)))
             .RequireAuthorization(Permissions.TenantsCreate);
+
+        tenants.MapGet("/platform/tenants", async (string? search, TenantStatus? status, int? skip, int? take, ITenantAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.ListAsync(search, status, skip ?? 0, take ?? 50, ct)).ToHttp(http)).RequireAuthorization(Permissions.TenantsRead);
+
+        tenants.MapPost("/platform/tenants/{id:guid}/status", async (Guid id, TenantStatusBody body, ITenantAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.ChangeStatusAsync(new TenantId(id), body.Status, body.Reason, ct)).ToHttp(http)).RequireAuthorization(Permissions.TenantsManage);
 
         tenants.MapGet("/platform/tenants/{id:guid}", async (Guid id, ITenantAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.GetAsync(new TenantId(id), ct)).ToHttp(http)).RequireAuthorization(Permissions.TenantsRead);

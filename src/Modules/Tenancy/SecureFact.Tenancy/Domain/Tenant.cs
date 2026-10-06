@@ -23,6 +23,8 @@ internal sealed class Tenant
     /// <summary>Mapped to PostgreSQL <c>xmin</c> for optimistic concurrency.</summary>
     public uint Version { get; private set; }
 
+    public void ChangeStatus(TenantStatus status) => Status = status;
+
     public static Tenant Create(Guid id, string name, TenantEnvironment environment, Guid? resellerId, DateTimeOffset now) => new()
     {
         Id = id,

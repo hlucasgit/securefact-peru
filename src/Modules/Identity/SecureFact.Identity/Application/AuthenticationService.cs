@@ -8,8 +8,10 @@ using SecureFact.Identity.Infrastructure;
 using SecureFact.Platform.Security;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
+using SecureFact.SharedKernel.Domain;
 using SecureFact.SharedKernel.Results;
 using SecureFact.SharedKernel.Telemetry;
+using SecureFact.Tenancy.Contracts;
 
 namespace SecureFact.Identity.Application;
 
@@ -22,6 +24,7 @@ internal sealed partial class AuthenticationService(
     IOptions<IdentityOptions> options,
     TimeProvider clock,
     IAuditTrail audit,
+    ITenantStatusReader tenantStatus,
     ILogger<AuthenticationService> logger) : IAuthenticationService
 {
     private static readonly Error InvalidCredentials = Error.Validation(
@@ -30,7 +33,14 @@ internal sealed partial class AuthenticationService(
     private static readonly Error InvalidRefresh = Error.Validation(
         ErrorCodes.InvalidRefreshToken, "Sesión inválida", "La sesión expiró o ya no es válida. Inicie sesión nuevamente.");
 
+    private static readonly Error TenantInactive = Error.Forbidden(
+        ErrorCodes.TenantInactive, "Cuenta no disponible", "La cuenta de su empresa está suspendida o cerrada. Comuníquese con soporte.");
+
     private IdentityOptions Options => options.Value;
+
+    /// <summary>A user of a suspended or closed tenant cannot start or renew a session. Platform staff belong to no tenant.</summary>
+    private async Task<bool> TenantIsActiveAsync(User user, CancellationToken cancellationToken) =>
+        user.TenantId is not { } tenantId || await tenantStatus.GetStatusAsync(new TenantId(tenantId), fresh: true, cancellationToken) == TenantStatus.Active;
 
     /// <summary>
     /// Two sign-ins of the same account at once (two devices, a retried request) update the same user row; the second one loses the concurrency check. The sign-in is repeated from
@@ -81,6 +91,13 @@ internal sealed partial class AuthenticationService(
         {
             await RegisterFailureAsync(user, now, cancellationToken);
             return InvalidCredentials;
+        }
+
+        // Only after the password is right, so the state of an account is not told to whoever does not know it.
+        if (!await TenantIsActiveAsync(user, cancellationToken))
+        {
+            LogRejected(user.Id, "tenant-inactive");
+            return TenantInactive;
         }
 
         if (user.MfaEnabled)
@@ -153,6 +170,12 @@ internal sealed partial class AuthenticationService(
         if (user is null || !user.IsActive)
         {
             await RevokeFamilyAsync(session.FamilyId, "user-inactive", now, cancellationToken);
+            return InvalidRefresh;
+        }
+
+        // The family is kept: when the tenant is reactivated its users renew their sessions again.
+        if (!await TenantIsActiveAsync(user, cancellationToken))
+        {
             return InvalidRefresh;
         }
 

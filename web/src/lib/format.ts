@@ -77,3 +77,8 @@ export const TENANT_ROLES = ['TenantAdmin', 'BillingAdmin', 'Accountant', 'Sales
 /** Roles that can issue and manage documents. */
 export const BILLING_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin', 'Sales']
 export const ADMIN_ROLES = ['TenantOwner', 'TenantAdmin', 'PlatformSuperAdmin']
+/** Platform staff belong to no tenant: they administer the platform and have no companies or documents of their own. */
+export const PLATFORM_ROLES = ['PlatformSuperAdmin', 'PlatformSupport']
+/** Roles with the permission to read the audit trail and to requeue the messages that failed. */
+export const AUDIT_ROLES = ['TenantOwner', 'Auditor', 'PlatformSuperAdmin', 'PlatformSupport']
+export const QUEUE_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']

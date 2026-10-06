@@ -45,7 +45,8 @@ public interface IUserAdministration
 
     Task<Result<UserDto>> GetAsync(Guid userId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<UserDto>> ListAsync(int skip, int take, CancellationToken cancellationToken);
+    /// <summary>The users of the current scope. Platform staff may name a tenant to see only its users; a tenant user always sees its own tenant.</summary>
+    Task<IReadOnlyList<UserDto>> ListAsync(int skip, int take, Guid? tenantId, CancellationToken cancellationToken);
 
     Task<Result<UserDto>> AssignRoleAsync(Guid userId, string role, CancellationToken cancellationToken);
 

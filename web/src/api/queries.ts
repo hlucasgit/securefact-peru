@@ -3,6 +3,11 @@ import { del, get, newKey, post, put } from './http'
 import type {
   AppUser,
   ArchivedFile,
+  AuditRecord,
+  AuditVerification,
+  DeadMessage,
+  TenantRow,
+  TenantStatus,
   CatalogEntry,
   Certificate,
   Company,
@@ -39,6 +44,11 @@ export const keys = {
   archive: (id: string) => ['archive', id] as const,
   catalog: (number: string) => ['catalog', number] as const,
   users: ['users'] as const,
+  tenants: (search: string, status: string) => ['platform', 'tenants', search, status] as const,
+  platformTenant: (id: string) => ['platform', 'tenant', id] as const,
+  tenantUsers: (id: string) => ['platform', 'tenant', id, 'users'] as const,
+  audit: (filters: string) => ['audit', filters] as const,
+  dead: ['outbox', 'dead'] as const,
   tenant: ['tenant'] as const,
   rules: ['rules'] as const,
 }
@@ -151,3 +161,32 @@ export const useRecover = (documentId: string) => useElectronicAction(documentId
 export const useCreateSummary = () => useAction((input: { companyId: string; referenceDate: string }) => post<SummaryResult[]>('/api/v1/summaries', input), [['documents']])
 export const useCreateVoid = (documentId: string) =>
   useAction((input: { companyId: string; items: { documentId: string; reason: string }[] }) => post('/api/v1/voids', input), [keys.electronic(documentId)])
+
+// Platform administration (ADR-041)
+export const useTenants = (search: string, status: string, enabled = true) =>
+  useQuery({ queryKey: keys.tenants(search, status), enabled, queryFn: () => get<TenantRow[]>(`/api/v1/platform/tenants?${page(0, 100)}&search=${encodeURIComponent(search)}${status ? `&status=${status}` : ''}`) })
+export const usePlatformTenant = (id: string) => useQuery({ queryKey: keys.platformTenant(id), queryFn: () => get<TenantRow>(`/api/v1/platform/tenants/${id}`) })
+export const useTenantUsers = (id: string) => useQuery({ queryKey: keys.tenantUsers(id), queryFn: () => get<AppUser[]>(`/api/v1/users?${page(0, 100)}&tenantId=${id}`) })
+export const useCreateTenant = () =>
+  useAction((input: { name: string; environment: 'Sandbox' | 'Production' }) => post<TenantRow>('/api/v1/platform/tenants', input), [['platform', 'tenants']])
+export const useChangeTenantStatus = (id: string) =>
+  useAction((input: { status: TenantStatus; reason: string }) => post<TenantRow>(`/api/v1/platform/tenants/${id}/status`, input), [keys.platformTenant(id), ['platform', 'tenants'], ['audit']])
+export const useCreateTenantUser = (tenantId: string) =>
+  useAction((input: { email: string; displayName: string; password: string; roles: string[] }) => post<AppUser>('/api/v1/users', { ...input, tenantId }), [keys.tenantUsers(tenantId)])
+export const useRevokeSessions = () => useAction((userId: string) => post(`/api/v1/users/${userId}/sessions/revoke`), [])
+export const useDeactivateTenantUser = (tenantId: string) => useAction((userId: string) => post(`/api/v1/users/${userId}/deactivate`), [keys.tenantUsers(tenantId)])
+
+export interface AuditFilters {
+  tenantId: string
+  action: string
+  entityType: string
+}
+
+const auditQuery = (filters: AuditFilters, skip: number) =>
+  `${page(skip, 50)}${filters.tenantId ? `&tenantId=${filters.tenantId}` : ''}${filters.action ? `&action=${encodeURIComponent(filters.action)}` : ''}${filters.entityType ? `&entityType=${encodeURIComponent(filters.entityType)}` : ''}`
+
+export const useAudit = (filters: AuditFilters, skip: number) =>
+  useQuery({ queryKey: keys.audit(`${auditQuery(filters, skip)}`), queryFn: () => get<AuditRecord[]>(`/api/v1/audit?${auditQuery(filters, skip)}`) })
+export const useVerifyAudit = () => useAction((tenantId: string) => post<AuditVerification>(`/api/v1/audit/verify${tenantId ? `?tenantId=${tenantId}` : ''}`), [])
+export const useDeadMessages = () => useQuery({ queryKey: keys.dead, queryFn: () => get<DeadMessage[]>('/api/v1/outbox/dead') })
+export const useRequeue = () => useAction((message: DeadMessage) => post(`/api/v1/outbox/${message.source}/${message.id}/requeue`), [keys.dead])

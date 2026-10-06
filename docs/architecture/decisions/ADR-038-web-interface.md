@@ -20,7 +20,7 @@ Hasta ahora la plataforma era solo API. El MVP necesita que un contribuyente con
 - **Límite (P)**: un *refresh token* en `sessionStorage` es legible por un script de la página (XSS). La CSP lo mitiga; moverlo a una cookie `HttpOnly` pide un cambio de la API (cookie, `SameSite`, protección CSRF) que no se hizo.
 
 ### Pantallas del MVP
-Ingreso (con segundo factor) · Panel (empresas, certificados por vencer, últimos documentos) · Empresas (datos, establecimientos, series, certificado digital, credenciales SOL) · Clientes y productos · **Emitir** factura o boleta (ítems con afectación, descuento, ISC y bolsas de plástico; venta al crédito) · Documentos (lista paginada, detalle, generar y firmar, enviar, consultar, reintentar, XML, PDF, CDR, archivo conservado con su hash, baja) · **Notas** de crédito y débito desde el documento · Resumen diario · Usuarios · Seguridad (activar el segundo factor) · Reglas (valor, fuente y verificación).
+Administración de plataforma: ADR-041. Ingreso (con segundo factor) · Panel (empresas, certificados por vencer, últimos documentos) · Empresas (datos, establecimientos, series, certificado digital, credenciales SOL) · Clientes y productos · **Emitir** factura o boleta (ítems con afectación, descuento, ISC y bolsas de plástico; venta al crédito) · Documentos (lista paginada, detalle, generar y firmar, enviar, consultar, reintentar, XML, PDF, CDR, archivo conservado con su hash, baja) · **Notas** de crédito y débito desde el documento · Resumen diario · Usuarios · Seguridad (activar el segundo factor) · Reglas (valor, fuente y verificación).
 
 ### Empaquetado y CI
 - `web/Dockerfile` (compilación con Node 24 y nginx sin privilegios) y el servicio `web` de `docker-compose.yml` (`http://localhost:5173`).
@@ -34,5 +34,5 @@ Ingreso (con segundo factor) · Panel (empresas, certificados por vencer, últim
 ## Límites (P)
 - Sin pruebas de extremo a extremo con navegador automatizado (solo las unitarias de arriba y la revisión manual).
 - La lista de documentos pide el estado de cada fila por separado (la API no lo trae en la lista): 25 llamadas pequeñas por página; un campo de estado en la lista las evitaría.
-- Fuera de esta primera entrega: administración de inquilinos y *resellers* (plataforma), exportaciones, detracciones, retenciones, leyendas y transporte de carga desde la interfaz (siguen por API), importación masiva, planes y métricas de consumo, *webhooks*, recuperación de contraseña, auditoría.
+- Fuera de esta primera entrega: exportaciones, detracciones, retenciones, leyendas y transporte de carga desde la interfaz (siguen por API), importación masiva, planes y métricas de consumo, *webhooks*, recuperación de contraseña, auditoría.
 - Solo español.

@@ -283,3 +283,46 @@ export interface RuleVersion {
   verification: 'Verified' | 'Pending'
   configurationJson: string
 }
+
+export type TenantStatus = 'Active' | 'Suspended' | 'Closed'
+
+export interface TenantRow {
+  id: string
+  name: string
+  status: TenantStatus
+  environment: 'Sandbox' | 'Production'
+  resellerId: string | null
+  createdAt: string
+}
+
+export interface AuditRecord {
+  id: string
+  tenantId: string | null
+  sequence: number
+  occurredAt: string
+  actorType: string
+  actorUserId: string | null
+  action: string
+  entityType: string
+  entityId: string | null
+  oldValues: string | null
+  newValues: string | null
+  ipAddress: string | null
+  correlationId: string | null
+}
+
+export interface AuditVerification {
+  isIntact: boolean
+  eventsChecked: number
+  firstBrokenSequence: number | null
+  reason: string | null
+}
+
+export interface DeadMessage {
+  id: string
+  source: string
+  eventType: string
+  attempts: number
+  lastError: string | null
+  createdAt: string
+}
