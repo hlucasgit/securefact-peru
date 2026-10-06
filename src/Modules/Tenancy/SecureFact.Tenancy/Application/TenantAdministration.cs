@@ -32,13 +32,26 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
                 $"El nombre debe tener entre {MinNameLength} y {MaxNameLength} caracteres.");
         }
 
-        var tenant = Tenant.Create(TenantId.New().Value, name, request.Environment, request.ResellerId, clock.GetUtcNow());
+        // A tenant starts on the plan that was asked for, or on the default one (which limits nothing).
+        var planId = request.PlanId ?? Plan.DefaultId;
+        var plan = await db.Plans.AsNoTracking().SingleOrDefaultAsync(p => p.Id == planId, cancellationToken);
+        if (plan is null)
+        {
+            return PlanAdministration.PlanMissing;
+        }
+
+        if (!plan.IsActive)
+        {
+            return Error.Validation(ErrorCodes.InvalidPlan, "Plan inactivo", "Un plan inactivo no se puede asignar a un tenant.");
+        }
+
+        var tenant = Tenant.Create(TenantId.New().Value, name, request.Environment, request.ResellerId, plan.Id, clock.GetUtcNow());
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(
             new AuditEvent(
                 AuditActions.TenantCreated, "tenant", tenant.Id.ToString("D"), tenant.Id,
-                NewValues: new Dictionary<string, object?> { ["name"] = tenant.Name, ["environment"] = tenant.Environment, ["resellerId"] = tenant.ResellerId }),
+                NewValues: new Dictionary<string, object?> { ["name"] = tenant.Name, ["environment"] = tenant.Environment, ["resellerId"] = tenant.ResellerId, ["plan"] = plan.Code }),
             cancellationToken);
         return ToDto(tenant);
     }
@@ -127,5 +140,5 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
-    private static TenantDto ToDto(Tenant t) => new(new TenantId(t.Id), t.Name, t.Status, t.Environment, t.ResellerId, t.CreatedAt);
+    internal static TenantDto ToDto(Tenant t) => new(new TenantId(t.Id), t.Name, t.Status, t.Environment, t.ResellerId, t.CreatedAt, t.PlanId);
 }

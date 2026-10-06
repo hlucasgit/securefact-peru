@@ -19,6 +19,8 @@ public static class TenancyModule
         services.AddMemoryCache();
         services.AddScoped<ITenantAdministration, TenantAdministration>();
         services.AddScoped<ITenantStatusReader, TenantStatusReader>();
+        services.AddScoped<IPlanAdministration, PlanAdministration>();
+        services.AddScoped<IPlanLimits, PlanLimitsReader>();
         return services;
     }
 

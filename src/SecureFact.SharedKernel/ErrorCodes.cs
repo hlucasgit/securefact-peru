@@ -16,6 +16,14 @@ public static class ErrorCodes
 
     public const string InvalidTenantStatusChange = "SF-TEN-003";
 
+    public const string PlanLimitReached = "SF-PLAN-001";
+
+    public const string PlanNotFound = "SF-PLAN-002";
+
+    public const string InvalidPlan = "SF-PLAN-003";
+
+    public const string PlanCodeInUse = "SF-PLAN-004";
+
     public const string InvalidSeriesConfiguration = "SF-BIL-001";
     public const string SeriesNotFound = "SF-BIL-002";
     public const string SeriesAlreadyExists = "SF-BIL-003";

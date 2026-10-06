@@ -646,7 +646,8 @@
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.Rules.Contracts": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
-          "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+          "SecureFact.TaxEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Tenancy.Contracts": "[1.0.0, )"
         }
       },
       "securefact.billing.contracts": {
@@ -762,7 +763,8 @@
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Organizations.Contracts": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
-          "SecureFact.SharedKernel": "[1.0.0, )"
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.Tenancy.Contracts": "[1.0.0, )"
         }
       },
       "securefact.organizations.contracts": {

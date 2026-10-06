@@ -61,6 +61,9 @@ public interface ICompanyAdministration
 
     Task<IReadOnlyList<CompanyDto>> ListAsync(int skip, int take, CancellationToken cancellationToken);
 
+    /// <summary>How many companies the tenant holds (for plan consumption). Platform staff may ask about any tenant; a tenant user only about its own.</summary>
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken);
+
     Task<Result<CompanyDto>> UpdateAsync(Guid companyId, CompanyDetails details, CancellationToken cancellationToken);
 
     /// <summary>Companies are never deleted: fiscal history must stay traceable. Deactivation blocks new activity only.</summary>

@@ -14,6 +14,7 @@ using SecureFact.Rules.Contracts;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Results;
 using SecureFact.TaxEngine.Contracts;
+using SecureFact.Tenancy.Contracts;
 using IdentityDocuments = SecureFact.SharedKernel.Domain.IdentityDocuments;
 
 namespace SecureFact.Billing.Application;
@@ -28,7 +29,8 @@ internal sealed partial class DocumentService(
     IIneffectiveDocumentsProvider ineffective,
     ITaxCalculator calculator,
     TimeProvider clock,
-    IAuditTrail audit) : IDocumentService
+    IAuditTrail audit,
+    IPlanLimits plans) : IDocumentService
 {
     private const int MaxLines = 1000;
     private const int MaxPage = 100;
@@ -185,6 +187,12 @@ internal sealed partial class DocumentService(
                 ?? Error.Conflict(ErrorCodes.IdempotencyConflict, "Solicitud en conflicto", "No se pudo resolver la clave de idempotencia; reintente.");
         }
 
+        if (await CheckMonthlyAllowanceAsync(tenantId, now, cancellationToken) is { } overLimit)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return overLimit;
+        }
+
         // Credit notes on the same document are serialised and counted together before a number is taken, so two requests cannot both fit under the original.
         if (note is not null && series.DocumentTypeCode == DocumentTypes.CreditNote)
         {
@@ -249,6 +257,31 @@ internal sealed partial class DocumentService(
 
         return ToDto(document);
     }
+
+    private static readonly TimeZoneInfo Lima = TimeZoneInfo.FindSystemTimeZoneById("America/Lima");
+
+    /// <summary>
+    /// The plan's monthly allowance (Lima calendar month, notes and voided documents included). Takes a transaction-scoped lock per tenant before counting, so concurrent requests cannot both
+    /// take the last place. Null while the plan has no limit, which skips the lock and the count.
+    /// </summary>
+    private async Task<Error?> CheckMonthlyAllowanceAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var plan = await plans.OfTenantAsync(new SecureFact.SharedKernel.Domain.TenantId(tenantId), cancellationToken);
+        if (plan?.MaxDocumentsPerMonth is not { } limit)
+        {
+            return null;
+        }
+
+        var key = $"plan-documents:{tenantId:N}";
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))", cancellationToken);
+        var local = TimeZoneInfo.ConvertTime(now, Lima);
+        var monthStart = new DateTimeOffset(local.Year, local.Month, 1, 0, 0, 0, Lima.GetUtcOffset(new DateTime(local.Year, local.Month, 1))).ToUniversalTime();
+        var issued = await db.Documents.CountAsync(d => d.TenantId == tenantId && d.CreatedAt >= monthStart, cancellationToken);
+        return issued >= limit ? IPlanLimits.LimitReached(PlanResource.DocumentsPerMonth, plan.Name, limit) : null;
+    }
+
+    public async Task<int> CountIssuedAsync(Guid tenantId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>
+        await db.Documents.CountAsync(d => d.TenantId == tenantId && d.CreatedAt >= from && d.CreatedAt < to, cancellationToken);
 
     private static readonly HashSet<string> CreditReasons = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"];
 

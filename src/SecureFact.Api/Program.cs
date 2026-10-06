@@ -110,6 +110,7 @@ if (appConnection is not null)
 {
     builder.Services.AddAuditModule(appConnection);
     builder.Services.AddTenancyModule(appConnection);
+    builder.Services.AddPlanUsage();
     builder.Services.AddOrganizationsModule(appConnection);
     builder.Services.AddTaxEngineModule();
     builder.Services.AddCpeEngineModule();
@@ -199,6 +200,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapAuthEndpoints();
 app.MapUserAndTenantEndpoints();
+app.MapPlanEndpoints();
 app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
 app.MapBillingEndpoints();

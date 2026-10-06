@@ -5,6 +5,9 @@ public static class AuditActions
 {
     public const string TenantCreated = "tenancy.tenant.created";
     public const string TenantSuspended = "tenancy.tenant.suspended";
+    public const string TenantPlanChanged = "tenancy.tenant.plan_changed";
+    public const string PlanCreated = "tenancy.plan.created";
+    public const string PlanUpdated = "tenancy.plan.updated";
     public const string TenantReactivated = "tenancy.tenant.reactivated";
     public const string TenantClosed = "tenancy.tenant.closed";
 

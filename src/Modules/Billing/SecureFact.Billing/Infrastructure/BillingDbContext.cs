@@ -74,6 +74,7 @@ internal sealed class BillingDbContext(DbContextOptions<BillingDbContext> option
             b.HasIndex(d => d.ReferencedDocumentId);
             b.HasIndex(d => new { d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number }).IsUnique();
             b.HasIndex(d => new { d.TenantId, d.CompanyId, d.IssueDate });
+            b.HasIndex(d => new { d.TenantId, d.CreatedAt }).HasDatabaseName("ix_document_tenant_created");
             b.HasMany(d => d.Lines).WithOne().HasForeignKey(l => l.DocumentId).OnDelete(DeleteBehavior.Restrict);
             b.Navigation(d => d.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
             ConfigureTenantOwned(b);

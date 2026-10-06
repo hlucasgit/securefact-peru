@@ -8,11 +8,12 @@ using SecureFact.Organizations.Infrastructure;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Domain;
+using SecureFact.Tenancy.Contracts;
 using SecureFact.SharedKernel.Results;
 
 namespace SecureFact.Organizations.Application;
 
-internal sealed partial class CompanyAdministration(OrganizationsDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit)
+internal sealed partial class CompanyAdministration(OrganizationsDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, IPlanLimits plans)
     : ICompanyAdministration
 {
     private const int MaxPage = 200;
@@ -55,6 +56,12 @@ internal sealed partial class CompanyAdministration(OrganizationsDbContext db, I
             return Error.Conflict(ErrorCodes.CompanyAlreadyExists, "Empresa existente", "Ya existe una empresa con ese RUC en esta cuenta.");
         }
 
+        var allowed = await plans.EnsureCanAddAsync(new TenantId(tenantId), PlanResource.Companies, await db.Companies.CountAsync(cancellationToken), cancellationToken);
+        if (!allowed.IsSuccess)
+        {
+            return allowed.Error;
+        }
+
         var company = Company.Create(Guid.CreateVersion7(), tenantId, ruc.Value.Value, request.Details, clock.GetUtcNow());
         db.Companies.Add(company);
         await db.SaveChangesAsync(cancellationToken);
@@ -69,6 +76,9 @@ internal sealed partial class CompanyAdministration(OrganizationsDbContext db, I
         var company = await db.Companies.AsNoTracking().SingleOrDefaultAsync(c => c.Id == companyId, cancellationToken);
         return company is null ? CompanyMissing : ToDto(company);
     }
+
+    public async Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await db.Companies.CountAsync(c => c.TenantId == tenantId, cancellationToken);
 
     public async Task<IReadOnlyList<CompanyDto>> ListAsync(int skip, int take, CancellationToken cancellationToken)
     {

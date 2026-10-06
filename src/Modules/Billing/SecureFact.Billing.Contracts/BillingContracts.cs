@@ -358,6 +358,9 @@ public interface IIneffectiveDocumentsProvider
 
 public interface IDocumentService
 {
+    /// <summary>How many documents the tenant issued from <paramref name="from"/> (inclusive) to <paramref name="to"/> (exclusive), notes and voided ones included: that is what a plan meters.</summary>
+    Task<int> CountIssuedAsync(Guid tenantId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
+
     /// <summary>
     /// Creates and numbers a document. Idempotent per <paramref name="idempotencyKey"/>: the same key with the same content returns the
     /// original document; the same key with different content is a conflict.

@@ -5,8 +5,10 @@ using SecureFact.Identity.Contracts;
 using SecureFact.Identity.Domain;
 using SecureFact.Identity.Infrastructure;
 using SecureFact.SharedKernel;
+using SecureFact.SharedKernel.Domain;
 using SecureFact.SharedKernel.Results;
 using SecureFact.SharedKernel.Tenancy;
+using SecureFact.Tenancy.Contracts;
 
 namespace SecureFact.Identity.Application;
 
@@ -15,7 +17,8 @@ internal sealed class UserAdministration(
     ICurrentUser actor,
     PasswordHasher hasher,
     TimeProvider clock,
-    IAuditTrail audit) : IUserAdministration
+    IAuditTrail audit,
+    IPlanLimits plans) : IUserAdministration
 {
     private const int MaxPageSize = 200;
 
@@ -66,6 +69,16 @@ internal sealed class UserAdministration(
             return Error.Conflict(ErrorCodes.EmailInUse, "Correo en uso", "Ya existe un usuario con ese correo.");
         }
 
+        if (tenantResult.Value is { } owner)
+        {
+            var allowed = await plans.EnsureCanAddAsync(
+                new TenantId(owner), PlanResource.Users, await db.Users.CountAsync(u => u.TenantId == owner && u.IsActive, cancellationToken), cancellationToken);
+            if (!allowed.IsSuccess)
+            {
+                return allowed.Error;
+            }
+        }
+
         var now = clock.GetUtcNow();
         var user = User.Create(Guid.CreateVersion7(), tenantResult.Value, email, name, hasher.Hash(request.Password), now);
         foreach (var role in roles)
@@ -101,6 +114,9 @@ internal sealed class UserAdministration(
             .ToListAsync(cancellationToken);
         return users.Select(ToDto).ToList();
     }
+
+    public async Task<int> CountActiveAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await db.Users.CountAsync(u => u.TenantId == tenantId && u.IsActive, cancellationToken);
 
     public async Task<Result<UserDto>> AssignRoleAsync(Guid userId, string role, CancellationToken cancellationToken)
     {

@@ -1,3 +1,4 @@
+using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Domain;
 using SecureFact.SharedKernel.Results;
 
@@ -16,7 +17,7 @@ public enum TenantEnvironment
     Production,
 }
 
-public sealed record CreateTenantRequest(string Name, TenantEnvironment Environment, Guid? ResellerId = null);
+public sealed record CreateTenantRequest(string Name, TenantEnvironment Environment, Guid? ResellerId = null, Guid? PlanId = null);
 
 public sealed record TenantDto(
     TenantId Id,
@@ -24,7 +25,8 @@ public sealed record TenantDto(
     TenantStatus Status,
     TenantEnvironment Environment,
     Guid? ResellerId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid PlanId);
 
 /// <summary>Public surface of the Tenancy module. Creating tenants is a platform-scope operation.</summary>
 public interface ITenantAdministration
@@ -56,4 +58,59 @@ public interface ITenantStatusReader
 
     /// <summary>The tenants that are suspended or closed. Read in platform scope (a tenant scope sees only its own row); never cached: the background work asks once per pass.</summary>
     Task<IReadOnlyList<Guid>> ListInactiveAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>What a plan allows. A null limit means unlimited.</summary>
+public sealed record PlanDto(Guid Id, string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive);
+
+public sealed record PlanInput(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive = true);
+
+/// <summary>The plan catalogue and the plan of each tenant, for platform staff. A tenant reads only its own plan, through <see cref="IPlanLimits"/>: it never sees the other plans.</summary>
+public interface IPlanAdministration
+{
+    Task<Result<IReadOnlyList<PlanDto>>> ListAsync(CancellationToken cancellationToken);
+
+    Task<Result<PlanDto>> CreateAsync(PlanInput input, CancellationToken cancellationToken);
+
+    /// <summary>Changes name, limits and whether new tenants can pick the plan. The code never changes. Lowering a limit never removes what a tenant already holds.</summary>
+    Task<Result<PlanDto>> UpdateAsync(Guid id, PlanInput input, CancellationToken cancellationToken);
+
+    /// <summary>Moves a tenant to an active plan (audited, with the previous plan).</summary>
+    Task<Result<TenantDto>> AssignAsync(TenantId tenantId, Guid planId, CancellationToken cancellationToken);
+}
+
+public enum PlanResource
+{
+    Companies,
+    Users,
+    DocumentsPerMonth,
+}
+
+/// <summary>The limits that apply to a tenant, for the modules that must refuse what a plan does not allow.</summary>
+public interface IPlanLimits
+{
+    /// <summary>The plan of the tenant, or null when it does not exist or is not visible to the current scope.</summary>
+    Task<PlanDto?> OfTenantAsync(TenantId tenantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ok while adding one more keeps <paramref name="current"/> + 1 within the limit of the tenant's plan; otherwise <c>SF-PLAN-001</c>. The caller counts what it owns: Tenancy
+    /// knows the plan, not the companies, users or documents.
+    /// </summary>
+    Task<Result<Unit>> EnsureCanAddAsync(TenantId tenantId, PlanResource resource, int current, CancellationToken cancellationToken);
+
+    /// <summary>The limit of the tenant's plan for the resource (null: unlimited), for callers that count inside their own transaction.</summary>
+    Task<int?> LimitAsync(TenantId tenantId, PlanResource resource, CancellationToken cancellationToken);
+
+    /// <summary>The refusal for a resource that is at its limit.</summary>
+    static Error LimitReached(PlanResource resource, string planName, int limit) => Error.Forbidden(
+        ErrorCodes.PlanLimitReached,
+        "Límite del plan alcanzado",
+        $"El plan {planName} permite hasta {limit} {Describe(resource)}. Cambie de plan para continuar.");
+
+    private static string Describe(PlanResource resource) => resource switch
+    {
+        PlanResource.Companies => "empresas",
+        PlanResource.Users => "usuarios",
+        _ => "comprobantes por mes",
+    };
 }

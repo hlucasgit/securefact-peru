@@ -294,6 +294,12 @@
           "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },
+      "securefact.tenancy.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "Microsoft.EntityFrameworkCore": {
         "type": "CentralTransitive",
         "requested": "[10.0.12, )",
