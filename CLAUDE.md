@@ -22,6 +22,7 @@ docker compose up -d
 dotnet build SecureFact.slnx
 dotnet build SecureFact.slnx -c Release   # como el CI: en Release las advertencias son errores
 dotnet test SecureFact.slnx
+# cobertura: ver docs/testing/README.md (coverage.runsettings; el CI exige 95 % de líneas y 84 % de ramas)
 ```
 
 ## Estilo

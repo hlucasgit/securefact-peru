@@ -6,6 +6,7 @@ obj/
 .vs/
 TestResults/
 coverage/
+coverage-results/
 *.log
 artifacts/
 

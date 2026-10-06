@@ -8,7 +8,7 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - **Customers** y **Products**: datos maestros por tenant con validación contra los catálogos 06 y 07, identidad inmutable, sin borrado, búsqueda con comodines escapados. Los documentos pueden referenciar `customerId` (instantánea del adquirente).
 - **UBL**: generador de XML 2.1 sin firmar para factura y boleta (líneas gravadas, exoneradas, inafectas, gratuitas). **Valida contra el XSD oficial UBL 2.1** y contiene **todas las etiquetas obligatorias de las hojas `Factura2_0` y `Boleta2_0`** del libro oficial (la prueba lee el libro versionado). Todo lo demás falla con `SF-CPE-002` en lugar de emitir XML engañoso. **ADR-016**.
 - Hallazgos: el libro de reglas es la fuente más fiable (la guía PDF de 2017 usa una estructura anterior); el ejemplo de la guía firma con RSA-SHA1 (algoritmo vigente por confirmar, R-032); `EF.Functions.ILike` sin carácter de escape no escapa comodines.
-- **Pruebas: 319 pasan en Release con warnings-as-errors** (191 unitarias, 6 de arquitectura, 6 de integración, 116 de seguridad/API). Cobertura no medida.
+- **Pruebas: 703 pasan en Release con warnings-as-errors** (411 unitarias, 6 de arquitectura, 6 de integración, 280 de seguridad/API). Cobertura: 95.9 % de líneas y 85.4 % de ramas (ver «Cobertura»).
 
 ## Novedades de la tercera tanda
 - **Firma XMLDSig** (SHA-256 por defecto, SHA-1 configurable): una firma envuelta en `ext:ExtensionContent`, certificado validado (clave privada, vigencia, RSA ≥ 2048). El XML firmado valida contra el XSD oficial. Expone el `DigestValue` para el QR.
@@ -81,12 +81,17 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 ## CI
 - GitHub Actions (`ci.yml`) corre en cada push a `main` y en cada pull request: build en Release y pruebas (6 de arquitectura, 411 unitarias, 262 de seguridad/API, 6 de integración), paquetes vulnerables, SBOM, gitleaks y construcción y escaneo Trivy de las dos imágenes. Primera corrida completa en verde el 2026-10-05.
 - Hallazgos al ponerlo en verde: la tarea de contenedores no arrancaba porque `aquasecurity/trivy-action@0.28.0` ya no existe (se reescribieron sus etiquetas tras el ataque a la cadena de suministro de marzo de 2026; ahora `v0.36.0`, fijada a un commit, igual que gitleaks); dos corridas fallaban en Release por advertencias tratadas como errores que Debug no muestra; y una prueba del worker era intermitente porque el worker consultaba también los comprobantes de un resumen, que esperan sin ticket propio (ahora solo consulta quien tiene el ticket).
-- Pendiente: cobertura sin medir; las acciones oficiales siguen en etiquetas mayores (`@v4`; Dependabot propone las nuevas) y GitHub avisa de que Node 20 está en desuso.
+- Pendiente: las acciones oficiales siguen en etiquetas mayores (`@v4`; Dependabot propone las nuevas) y GitHub avisa de que Node 20 está en desuso.
+
+## Cobertura
+- Medida con coverlet (`coverage.runsettings`) sobre las cuatro suites juntas y unida con ReportGenerator: **95.9 % de líneas (6 925 de 7 214) y 85.4 % de ramas (3 380 de 3 956)**, 96.6 % de métodos, el 2026-10-05. Excluye migraciones, fábricas de tiempo de diseño, herramientas y pruebas. El CI la mide en cada corrida, la publica en el resumen del job y como artefacto, y **falla bajo un piso de 95 % de líneas y 84 % de ramas** (`.github/scripts/check_coverage.py`; los pisos solo suben).
+- Antes de este trabajo: 93.5 % y 82.3 %. Se agregaron pruebas donde la falta de cobertura era de riesgo: la guarda de inquilino de la capa de aplicación (`TenantDbContext`: escrituras y borrados de filas de otro inquilino, filas de la plataforma, API síncrona) y el intercepto de RLS, el manejador global de excepciones (que no filtra detalles internos), las reglas de entrada de empresas, establecimientos, clientes, productos, usuarios, series y notas, y los errores de refresco, MFA y restablecimiento de contraseña.
+- Lo que sigue bajo: `Program` de la API (arranque, migraciones, exportador OTLP; 77 %) y el ensamblado de los workers (78 %), ramas de la API (68 %) y de `Products` (62 %), y los caminos de error por servicio no disponible de `ElectronicDocumentService`, `VoidService` y `SummaryService`.
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
-- Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código; cobertura sin medir.
+- Auditoría fuera de la transacción de negocio (ADR-012) hasta el outbox; sin outbox, bus ni S3 en código.
 - ISC, ICBPER, IVAP y exportación: el motor tributario los calcula parcialmente y el generador UBL no los emite aún.
 - Notas de crédito/débito esperan el CDR (Fase 4).
 
@@ -94,5 +99,5 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 1. Commit y push.
 2. ISC, ICBPER, IVAP, exportación y operaciones gratuitas con valor referencial en el UBL.
 3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF, retención del outbox.
-4. Outbox + bus + S3 de código; medir cobertura.
+4. Outbox + bus + S3 de código.
 5. PDF y renderizado del QR.

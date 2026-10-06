@@ -135,9 +135,21 @@ public sealed class Note : ITenantOwned
     public string Body { get; set; } = string.Empty;
 }
 
+/// <summary>A row of the tenant or of the platform itself (null tenant), as the users of the Identity module are.</summary>
+public sealed class PlatformNote : IOptionalTenantOwned
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+
+    public Guid? TenantId { get; set; }
+
+    public string Body { get; set; } = string.Empty;
+}
+
 public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options, IDataScope scope) : TenantDbContext(options, scope)
 {
     public DbSet<Note> Notes => Set<Note>();
+
+    public DbSet<PlatformNote> PlatformNotes => Set<PlatformNote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -148,6 +160,14 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options, IDa
             builder.Property(n => n.Id).HasColumnName("id").ValueGeneratedNever();
             builder.Property(n => n.Body).HasColumnName("body");
             ConfigureTenantOwned(builder);
+        });
+        modelBuilder.Entity<PlatformNote>(builder =>
+        {
+            builder.ToTable("platform_notes", "rlstest");
+            builder.HasKey(n => n.Id);
+            builder.Property(n => n.Id).HasColumnName("id").ValueGeneratedNever();
+            builder.Property(n => n.Body).HasColumnName("body");
+            ConfigureOptionalTenantOwned(builder);
         });
     }
 }

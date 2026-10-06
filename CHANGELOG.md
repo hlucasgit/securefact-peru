@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Cobertura de pruebas medida y exigida en el CI: `coverage.runsettings`, informe unido con ReportGenerator publicado en el resumen del job y como artefacto, y piso de 95 % de líneas y 84 % de ramas; 93.5 % → 95.9 % de líneas y 82.3 % → 85.4 % de ramas con pruebas de la guarda de inquilino y del intercepto de RLS, del manejador de excepciones, de las reglas de entrada de la administración y de los errores de autenticación.
 - CI de GitHub en verde: acciones de terceros fijadas a un commit (Trivy `v0.36.0`, gitleaks), escaneo de la imagen de los workers, runner `ubuntu-24.04` fijo, tiempo límite y cancelación de corridas obsoletas; documentado en `docs/testing/README.md`.
 - Tramos y vehículos del transporte de carga (1004) en cada línea (`transport.legs`, hasta 99): origen, destino, configuración vehicular, cargas y valores referenciales, en el UBL y en el PDF; aceptados en el beta (ADR-034, R-059, S25).
 - Exportación de servicios de hospedaje (0202) y de paquete turístico (0205) en facturas, con el huésped no domiciliado y su estadía en cada línea (catálogo 55, códigos 4000–4009), en el UBL y en el PDF; aceptadas en el beta (ADR-033, R-058).

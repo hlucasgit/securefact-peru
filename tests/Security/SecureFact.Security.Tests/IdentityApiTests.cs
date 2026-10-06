@@ -361,6 +361,62 @@ public sealed class IdentityApiTests(ApiFixture api)
         Assert.Equal("SF-AUTH-009", await ProblemCodeAsync(reuse));
     }
 
+    [Fact]
+    public async Task Refresh_refuses_an_empty_or_unknown_token()
+    {
+        using var anonymous = api.NewClient();
+
+        foreach (var token in new[] { "", "   ", "not-a-token-we-ever-issued" })
+        {
+            var response = await anonymous.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = token });
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.StartsWith("SF-AUTH-", await ProblemCodeAsync(response), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Mfa_enrolment_refuses_a_confirmation_without_enrolment_a_wrong_code_and_a_second_enrolment()
+    {
+        var (_, _, owner) = await NewTenantWithOwnerAsync("Mfa Errors SAC");
+        using var client = api.ClientFor(await api.LoginOkAsync(owner.Email, owner.Password));
+
+        var early = await client.PostAsJsonAsync("/api/v1/auth/mfa/confirm", new { code = "123456" });
+        Assert.Equal(HttpStatusCode.Unauthorized, early.StatusCode); // nothing to confirm yet
+        Assert.Equal("SF-AUTH-006", await ProblemCodeAsync(early));
+
+        var enrolment = (await (await client.PostAsync("/api/v1/auth/mfa/enroll", null)).Content.ReadFromJsonAsync<MfaEnrollment>(ApiFixture.JsonOptions))!;
+        var secret = Base32Decode(enrolment.Secret);
+        var step = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
+        var valid = new[] { step - 1, step, step + 1 }.Select(s => Totp.Compute(secret, s)).ToHashSet(StringComparer.Ordinal);
+        var wrong = Enumerable.Range(0, 1_000_000).Select(n => n.ToString("D6", System.Globalization.CultureInfo.InvariantCulture)).First(c => !valid.Contains(c));
+
+        var refused = await client.PostAsJsonAsync("/api/v1/auth/mfa/confirm", new { code = wrong });
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.Equal("SF-AUTH-006", await ProblemCodeAsync(refused));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/v1/auth/mfa/confirm", new { code = Totp.Compute(secret, step) })).StatusCode);
+        var again = await client.PostAsync("/api/v1/auth/mfa/enroll", null);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode); // the second factor is already active
+    }
+
+    [Fact]
+    public async Task A_password_reset_refuses_an_empty_token_and_a_weak_password_and_keeps_the_old_password()
+    {
+        var (_, _, owner) = await NewTenantWithOwnerAsync("Reset Errors SAC");
+        using var anonymous = api.NewClient();
+
+        var empty = await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new { token = "", newPassword = "Another long passphrase 2029" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
+        var unknown = await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new { token = "nothing-we-sent", newPassword = "Another long passphrase 2029" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
+
+        await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/request", new { email = owner.Email });
+        var token = api.Notifier.TokenFor(owner.Email)!;
+        var weak = await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new { token, newPassword = "short" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, weak.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await api.LoginAsync(owner.Email, owner.Password)).StatusCode); // the password did not change
+    }
+
     // ---- data at rest ----
 
     [Fact]

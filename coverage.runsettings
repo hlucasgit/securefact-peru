@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Code coverage of the test projects (coverlet collector). The CI and the local coverage run (docs/testing/README.md) pass this file to dotnet test. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[SecureFact.*]*</Include>
+          <Exclude>[SecureFact.*.Tests]*,[SecureFact.BetaSmoke]*,[SecureFact.CatalogImporter]*</Exclude>
+          <ExcludeByFile>**/Migrations/**/*.cs,**/*DesignTimeFactory.cs</ExcludeByFile>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <SkipAutoProps>true</SkipAutoProps>
+          <DeterministicReport>true</DeterministicReport>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

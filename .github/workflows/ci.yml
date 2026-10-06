@@ -26,10 +26,24 @@ jobs:
         run: dotnet restore SecureFact.slnx --locked-mode
       - name: Build
         run: dotnet build SecureFact.slnx -c Release --no-restore
-      - name: Unit + architecture tests
-        run: dotnet test SecureFact.slnx -c Release --no-build --filter "FullyQualifiedName!~Integration"
-      - name: Integration tests
-        run: dotnet test tests/Integration/SecureFact.Integration.Tests -c Release --no-build
+      - name: Tests with coverage
+        run: dotnet test SecureFact.slnx -c Release --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory coverage-results
+      - name: Coverage report and floor
+        env:
+          # The floors are a ratchet: raise them when the coverage rises. See docs/testing/README.md.
+          MIN_LINE_COVERAGE: "95"
+          MIN_BRANCH_COVERAGE: "84"
+        run: |
+          dotnet tool restore
+          dotnet tool run reportgenerator -reports:"coverage-results/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:"MarkdownSummaryGithub;JsonSummary;Cobertura;HtmlInline" -assemblyfilters:"+SecureFact.*"
+          cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/check_coverage.py coverage/Summary.json "$MIN_LINE_COVERAGE" "$MIN_BRANCH_COVERAGE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
       - name: Vulnerable packages
         run: |
           dotnet list SecureFact.slnx package --vulnerable --include-transitive 2>&1 | tee vuln.txt

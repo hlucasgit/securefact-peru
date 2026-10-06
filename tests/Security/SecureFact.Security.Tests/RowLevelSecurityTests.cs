@@ -138,6 +138,86 @@ public sealed class RowLevelSecurityTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Application_guard_rejects_modifying_or_deleting_a_row_owned_by_another_tenant()
+    {
+        var foreign = Guid.NewGuid();
+        await using var db = postgres.NotesContext(PostgresFixture.TenantScope(A));
+        var attached = db.Notes.Attach(new Note { Id = foreign, TenantId = B.Value, Body = "theirs" });
+        attached.Entity.Body = "changed";
+
+        var modify = await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        Assert.Contains("modify a row owned by a different tenant", modify.Message, StringComparison.Ordinal);
+
+        attached.State = EntityState.Deleted;
+        var delete = await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        Assert.Contains("delete a row owned by a different tenant", delete.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_platform_scope_may_write_rows_of_any_tenant_where_the_table_allows_it_but_never_change_their_owner()
+    {
+        await using var db = postgres.NotesContext(PostgresFixture.PlatformScope());
+        db.PlatformNotes.Add(new PlatformNote { TenantId = B.Value, Body = "created-by-platform" });
+        await db.SaveChangesAsync();
+
+        var note = await db.PlatformNotes.FirstAsync(n => n.Body == "created-by-platform");
+        note.TenantId = A.Value;
+        await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+
+        // The strict tables refuse the platform at the database even though the application guard lets it through.
+        db.ChangeTracker.Clear();
+        db.Notes.Add(new Note { TenantId = B.Value, Body = "platform-forged" });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task Application_guard_also_covers_the_rows_that_may_belong_to_the_platform()
+    {
+        await using var db = postgres.NotesContext(PostgresFixture.TenantScope(A));
+
+        // A tenant cannot create a row of another tenant or of the platform (null tenant).
+        db.PlatformNotes.Add(new PlatformNote { TenantId = B.Value, Body = "forged" });
+        await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+        db.PlatformNotes.Add(new PlatformNote { TenantId = null, Body = "platform row" });
+        await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+
+        // Nor modify or delete a row of another tenant, nor change who owns a row.
+        var theirs = db.PlatformNotes.Attach(new PlatformNote { TenantId = B.Value, Body = "theirs" });
+        theirs.Entity.Body = "changed";
+        await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        theirs.State = EntityState.Deleted;
+        await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+
+        var mine = db.PlatformNotes.Attach(new PlatformNote { TenantId = A.Value, Body = "mine" });
+        mine.Entity.TenantId = B.Value;
+        mine.Property(n => n.TenantId).IsModified = true;
+        var change = await Assert.ThrowsAsync<TenantMismatchException>(() => db.SaveChangesAsync());
+        Assert.Contains("owner tenant of a row cannot be changed", change.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_guard_and_the_scope_also_work_through_the_synchronous_api()
+    {
+        var tag = Guid.NewGuid().ToString("N");
+        using (var db = postgres.NotesContext(PostgresFixture.TenantScope(A)))
+        {
+            db.Notes.Add(new Note { Body = $"sync-{tag}" });
+            db.SaveChanges();
+            Assert.Contains($"sync-{tag}", db.Notes.Select(n => n.Body).ToList());
+
+            db.Notes.Add(new Note { TenantId = B.Value, Body = "forged" });
+            Assert.Throws<TenantMismatchException>(() => db.SaveChanges());
+        }
+
+        // The scope of the previous synchronous connection was cleared when it went back to the pool.
+        using var anonymous = postgres.NotesContext(new SecureFact.Platform.Tenancy.DataScope());
+        Assert.DoesNotContain($"sync-{tag}", anonymous.Notes.IgnoreQueryFilters().Select(n => n.Body).ToList());
+    }
+
+    [Fact]
     public async Task Update_and_delete_of_another_tenants_row_affect_nothing()
     {
         var tag = Guid.NewGuid().ToString("N");
