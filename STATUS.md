@@ -57,7 +57,8 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Boletas (y notas de boletas) en soles de más de S/ 700 deben identificar al adquirente: Billing lo rechaza al emitir con el monto de la regla versionada `billing.receipt_identification_threshold` (R-056). Pruebas: 663 pasan (397 unitarias, 6 arquitectura, 6 integración, 254 seguridad/API).
 - Leyendas de las ventas exoneradas 2001, 2002, 2003 (Amazonía) y 2008 (zona comercial de Tacna) en facturas y boletas (ADR-032); aceptadas en el beta. Pruebas: 673 pasan (404 unitarias, 6 arquitectura, 6 integración, 257 seguridad/API).
 - Exportación de hospedaje (0202) y de paquete turístico (0205) en facturas, con el huésped no domiciliado en cada línea (ADR-033); aceptadas en el beta. Pruebas: 680 pasan (408 unitarias, 6 arquitectura, 6 integración, 260 seguridad/API).
-- Pendiente: tramos y vehículos del transporte de carga (1004).
+- Tramos y vehículos del transporte de carga (1004): un tramo es un registro con su vehículo, emitido como `cac:Consignment` en `cac:Shipment` (ADR-034); aceptados en el beta. Pruebas: 685 pasan (411 unitarias, 6 arquitectura, 6 integración, 262 seguridad/API).
+- Pendientes de la lista de ampliaciones: ninguno; lo que falta está en «Riesgos y deuda».
 
 ## Comunicación de baja
 - `POST /api/v1/voids`: baja de facturas y notas de facturas (comunicación `RA`) y de boletas y notas de boletas (resumen `RC` con líneas de estado 3), aceptados (≤ 7 días), un archivo por fecha y tipo; se envía y sigue como un resumen; «anulado» se deriva del archivo aceptado. Aceptadas en el beta. Pruebas: 545 pasan (319 unitarias, 6 arquitectura, 6 integración, 214 seguridad/API).
@@ -76,7 +77,6 @@ Fase 0 completa. **Fase 1 casi completa** (falta outbox, bus de mensajes y almac
 - Detracción y retención del IGV en facturas (ADR-029): porcentajes, montos y cuenta son datos del emisor que la plataforma comprueba; el crédito deja ambas fuera del monto neto pendiente; aceptadas en el beta (que no comprueba el padrón de agentes). Pruebas: 627 pasan (374 unitarias, 6 arquitectura, 6 integración, 241 seguridad/API).
 - La empresa guarda su cuenta de detracciones (`detractionAccount`); una detracción sin cuenta propia usa la de la empresa y la factura conserva la usada. Pruebas: 629 pasan (374 unitarias, 6 arquitectura, 6 integración, 243 seguridad/API).
 - Tipos de operación de detracción 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte): el tipo sigue al código de la detracción, con datos de pesca o de viaje por línea (ADR-030); una factura de cada tipo aceptada en el beta. Pruebas: 640 pasan (381 unitarias, 6 arquitectura, 6 integración, 247 seguridad/API).
-- Pendiente: tramos y vehículos del transporte de carga (opcionales).
 
 ## Riesgos y deuda (resumen actual)
 - Valores `Pending` en reglas: ICBPER S/ 0,50, plazo de boletas (ver `/api/v1/rules`).

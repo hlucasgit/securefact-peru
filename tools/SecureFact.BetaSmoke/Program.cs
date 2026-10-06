@@ -84,7 +84,8 @@ UblLine[] ublLines = exportSale
     : [new UblLine(
         1, "Servicio de prueba", "ZZ", null, 1, 100m, null, "10",
         Fishing: fishingSale ? new UblFishing("CO-10955-PM", "LUANA II", "Anchoveta", "Planta pesquera, Puerto Mollendo", DateOnly.FromDateTime(lima.DateTime).AddDays(-1), 185.85m) : null,
-        Transport: cargoSale ? new UblCargoTransport("150101", "Av. Argentina 123, Lima", "040101", "Calle Mercaderes 45, Arequipa", "Transporte de cemento en bolsas", 1500m, 1200m, 1000m) : null)];
+        Transport: cargoSale ? new UblCargoTransport("150101", "Av. Argentina 123, Lima", "040101", "Calle Mercaderes 45, Arequipa", "Transporte de cemento en bolsas", 1500m, 1200m, 1000m,
+            Environment.GetEnvironmentVariable("SF_BETA_LEGS") is null ? null : [new UblTransportLeg("150101", "020801", "C3", 15m, "TRAMO LIMA-CASMA", 12m, 1232.28m, 1078.25m), new UblTransportLeg("020801", "130101", "C4", 18m, "TRAMO CASMA-TRUJILLO", 12m, 395.64m, 415.42m, true)]) : null)];
 GlobalAdjustments? adjustments = discount ? new GlobalAdjustments(DiscountAffectingBase: 12m, ChargeAffectingBase: 4m, DiscountNotAffectingBase: 7m, ChargeNotAffectingBase: 2m) : null;
 var totals = provider.GetRequiredService<ITaxCalculator>()
     .Calculate(new TaxCalculationRequest(taxLines, new TaxRates(0.18m, 0.04m), adjustments)).Value;

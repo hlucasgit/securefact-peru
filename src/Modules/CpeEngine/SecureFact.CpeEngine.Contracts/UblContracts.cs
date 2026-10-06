@@ -31,7 +31,19 @@ public sealed record UblGuest(
     DateOnly? ConsumptionDate = null,
     int? StayDays = null);
 
-/// <summary>Cargo transport of a line of an operation 1004: origin and destination (ubigeo and address), trip detail and the three reference values in soles.</summary>
+/// <summary>One leg of a cargo transport with its vehicle: origin and destination ubigeos, vehicle configuration, loads in metric tonnes and the preliminary reference values in soles.</summary>
+public sealed record UblTransportLeg(
+    string OriginUbigeo,
+    string DestinationUbigeo,
+    string VehicleConfiguration,
+    decimal UsefulLoadTonnes,
+    string? Description = null,
+    decimal? EffectiveLoadTonnes = null,
+    decimal? EffectiveLoadReferenceValue = null,
+    decimal? NominalLoadReferenceValue = null,
+    bool ReturnEmpty = false);
+
+/// <summary>Cargo transport of a line of an operation 1004: origin and destination (ubigeo and address), trip detail, the three reference values in soles and the legs of the trip.</summary>
 public sealed record UblCargoTransport(
     string OriginUbigeo,
     string OriginAddress,
@@ -40,7 +52,8 @@ public sealed record UblCargoTransport(
     string TripDetail,
     decimal ServiceReferenceValue,
     decimal EffectiveLoadReferenceValue,
-    decimal NominalLoadReferenceValue);
+    decimal NominalLoadReferenceValue,
+    IReadOnlyList<UblTransportLeg>? Legs = null);
 
 public sealed record UblParty(string DocumentTypeCode, string DocumentNumber, string LegalName, string? TradeName = null, string? EstablishmentCode = null);
 

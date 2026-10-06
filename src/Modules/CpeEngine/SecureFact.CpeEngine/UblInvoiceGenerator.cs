@@ -418,6 +418,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 return Invalid($"Línea {line.LineNumber}: la matrícula (hasta 15 caracteres), el nombre de la embarcación (100), la especie (150), el lugar de descarga (100) y una cantidad mayor que cero son obligatorios.");
             }
 
+            if (line.Transport?.Legs is { } legs && !LegsAreValid(legs))
+            {
+                return Invalid($"Línea {line.LineNumber}: los tramos (hasta 99) requieren ubigeos de origen y destino, configuración vehicular de 1 a 15 caracteres y carga útil mayor que cero; la descripción (3 a 100 caracteres), la carga efectiva y los valores referenciales son opcionales, mayores que cero y con hasta 2 decimales.");
+            }
+
             if (line.Transport is { } t
                 && !(IsUbigeo(t.OriginUbigeo) && IsUbigeo(t.DestinationUbigeo) && IsText(t.OriginAddress, 3, 200) && IsText(t.DestinationAddress, 3, 200) && IsText(t.TripDetail, 3, 500)
                     && IsAmount(t.ServiceReferenceValue) && IsAmount(t.EffectiveLoadReferenceValue) && IsAmount(t.NominalLoadReferenceValue)))
@@ -432,6 +437,12 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     /// <summary>Text of the length the rules ask for, without line breaks, tabs or other control characters.</summary>
     private static bool IsText(string? value, int minLength, int maxLength) =>
         value is not null && value.Trim().Length >= minLength && value.Trim().Length <= maxLength && !value.Any(char.IsControl);
+
+    private static bool IsOptionalAmount(decimal? value) => value is null || IsAmount(value.Value);
+
+    private static bool LegsAreValid(IReadOnlyList<UblTransportLeg> legs) =>
+        legs.Count <= 99 && legs.All(l => l is not null && IsUbigeo(l.OriginUbigeo) && IsUbigeo(l.DestinationUbigeo) && IsText(l.VehicleConfiguration, 1, 15) && IsAmount(l.UsefulLoadTonnes)
+            && (l.Description is null || IsText(l.Description, 3, 100)) && IsOptionalAmount(l.EffectiveLoadTonnes) && IsOptionalAmount(l.EffectiveLoadReferenceValue) && IsOptionalAmount(l.NominalLoadReferenceValue));
 
     private static bool IsCountry(string? value) => value is { Length: 2 } && value.All(char.IsAsciiLetterUpper);
 
@@ -532,13 +543,79 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         static XElement Terms(string type, decimal amount) =>
             new(Cac + "DeliveryTerms", new XElement(Cbc + "ID", type), Amount("Amount", amount, "PEN"));
 
-        return new XElement(
+        var delivery = new XElement(
             Cac + "Delivery",
             new XElement(Cac + "DeliveryLocation", Address("Address", transport.DestinationUbigeo, transport.DestinationAddress)),
             new XElement(Cac + "Despatch", new XElement(Cbc + "Instructions", transport.TripDetail.Trim()), Address("DespatchAddress", transport.OriginUbigeo, transport.OriginAddress)),
             Terms("01", transport.ServiceReferenceValue),
             Terms("02", transport.EffectiveLoadReferenceValue),
             Terms("03", transport.NominalLoadReferenceValue));
+
+        // The legs of the trip: one consignment per leg inside the shipment of the service (fixed identifier "01"), after the delivery terms (UBL order).
+        if (transport.Legs is { Count: > 0 } legs)
+        {
+            var shipment = new XElement(Cac + "Shipment", new XElement(Cbc + "ID", "01"));
+            for (var i = 0; i < legs.Count; i++)
+            {
+                shipment.Add(LegConsignment(legs[i], i + 1));
+            }
+
+            delivery.Add(shipment);
+        }
+
+        return delivery;
+    }
+
+    /// <summary>
+    /// One leg and its vehicle as a consignment (sheet Factura2_0, rows "detalle de tramos" and "detalle de el(los) vehículo(s)"): the leg number, its description, the preliminary value by nominal
+    /// useful load, the origin and destination, the preliminary value by effective load and the vehicle with its configuration, return-empty factor and loads (type 01 useful, 02 effective, in TNE).
+    /// </summary>
+    private static XElement LegConsignment(UblTransportLeg leg, int number)
+    {
+        static XElement Event(string name, string ubigeo) =>
+            new(
+                Cac + name,
+                new XElement(Cac + "Location", new XElement(Cbc + "ID", new XAttribute("schemeAgencyName", "PE:INEI"), new XAttribute("schemeName", "Ubigeos"), ubigeo)));
+
+        static XElement Load(string type, decimal tonnes) =>
+            new(
+                Cac + "MeasurementDimension",
+                new XElement(Cbc + "AttributeID", type),
+                new XElement(Cbc + "Measure", new XAttribute("unitCode", "TNE"), tonnes.ToString("0.00", CultureInfo.InvariantCulture)));
+
+        var equipment = new XElement(
+            Cac + "TransportEquipment",
+            new XElement(Cbc + "SizeTypeCode", new XAttribute("listAgencyName", "PE:MTC"), new XAttribute("listName", "Configuracion Vehícular"), leg.VehicleConfiguration.Trim()));
+        if (leg.ReturnEmpty)
+        {
+            equipment.Add(new XElement(Cbc + "ReturnabilityIndicator", "true"));
+        }
+
+        var unit = new XElement(Cac + "TransportHandlingUnit", equipment, Load("01", leg.UsefulLoadTonnes));
+        if (leg.EffectiveLoadTonnes is { } effective)
+        {
+            unit.Add(Load("02", effective));
+        }
+
+        var consignment = new XElement(Cac + "Consignment", new XElement(Cbc + "ID", number.ToString(CultureInfo.InvariantCulture)));
+        if (!string.IsNullOrWhiteSpace(leg.Description))
+        {
+            consignment.Add(new XElement(Cbc + "CarrierServiceInstructions", leg.Description.Trim()));
+        }
+
+        if (leg.NominalLoadReferenceValue is { } nominal)
+        {
+            consignment.Add(Amount("DeclaredForCarriageValueAmount", nominal, "PEN"));
+        }
+
+        consignment.Add(Event("PlannedPickupTransportEvent", leg.OriginUbigeo), Event("PlannedDeliveryTransportEvent", leg.DestinationUbigeo));
+        if (leg.EffectiveLoadReferenceValue is { } byEffectiveLoad)
+        {
+            consignment.Add(new XElement(Cac + "DeliveryTerms", Amount("Amount", byEffectiveLoad, "PEN")));
+        }
+
+        consignment.Add(unit);
+        return consignment;
     }
 
     /// <summary>A credit note of reason 11 (adjustment of an export) carries only export lines and modifies an invoice (rules 2642, 3194, 3221, 3107).</summary>

@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Tramos y vehículos del transporte de carga (1004) en cada línea (`transport.legs`, hasta 99): origen, destino, configuración vehicular, cargas y valores referenciales, en el UBL y en el PDF; aceptados en el beta (ADR-034, R-059, S25).
 - Exportación de servicios de hospedaje (0202) y de paquete turístico (0205) en facturas, con el huésped no domiciliado y su estadía en cada línea (catálogo 55, códigos 4000–4009), en el UBL y en el PDF; aceptadas en el beta (ADR-033, R-058).
 - Leyendas de las ventas exoneradas 2001, 2002, 2003 (Amazonía) y 2008 (zona comercial de Tacna) en facturas y boletas (`legendCodes`): el documento debe tener operaciones exoneradas; aceptadas en el beta (ADR-032, R-057).
 - Billing rechaza al emitir las boletas y notas de boletas en soles de más de S/ 700 sin identificar al adquirente (regla 2514 del resumen); el monto es la regla versionada `billing.receipt_identification_threshold` y el generador del resumen ya no lo lleva fijo (R-056).

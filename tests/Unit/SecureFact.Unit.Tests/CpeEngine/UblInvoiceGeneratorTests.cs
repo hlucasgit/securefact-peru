@@ -423,6 +423,94 @@ public class UblInvoiceGeneratorTests
         Assert.Empty(xml.XPathSelectElements("//cac:AdditionalItemProperty", Namespaces));
     }
 
+    private static readonly UblTransportLeg FirstLeg = new("150101", "020801", "C3", 15m, "TRAMO LIMA-CASMA", 12m, 1232.28m, 1078.25m);
+
+    private static readonly UblTransportLeg SecondLeg = new("020801", "130101", "C4", 18m, "TRAMO CASMA-TRUJILLO", 12m, 395.64m, 415.42m, true);
+
+    private static UblInvoiceData CargoSaleWithLegs(params UblTransportLeg[] legs) =>
+        WithLine(CargoSale(), l => l with { Transport = Trip with { Legs = legs } });
+
+    [Fact]
+    public void The_legs_of_a_cargo_transport_state_the_route_and_the_vehicle_of_each_one_inside_the_shipment()
+    {
+        var result = _generator.GenerateInvoice(CargoSaleWithLegs(FirstLeg, SecondLeg));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        var schemaErrors = SchemaErrors(xml);
+        Assert.True(schemaErrors.Count == 0, string.Join(" | ", schemaErrors));
+        var shipment = xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:Delivery/cac:Shipment", Namespaces)!;
+        Assert.Equal("01", shipment.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        var legs = shipment.XPathSelectElements("cac:Consignment", Namespaces).ToList();
+        Assert.Equal(2, legs.Count);
+
+        var first = legs[0];
+        Assert.Equal("1", first.XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("TRAMO LIMA-CASMA", first.XPathSelectElement("cbc:CarrierServiceInstructions", Namespaces)!.Value);
+        Assert.Equal("1078.25", first.XPathSelectElement("cbc:DeclaredForCarriageValueAmount", Namespaces)!.Value);
+        Assert.Equal("PEN", first.XPathSelectElement("cbc:DeclaredForCarriageValueAmount", Namespaces)!.Attribute("currencyID")!.Value);
+        var origin = first.XPathSelectElement("cac:PlannedPickupTransportEvent/cac:Location/cbc:ID", Namespaces)!;
+        Assert.Equal("150101", origin.Value);
+        Assert.Equal("PE:INEI", origin.Attribute("schemeAgencyName")!.Value);
+        Assert.Equal("Ubigeos", origin.Attribute("schemeName")!.Value);
+        Assert.Equal("020801", first.XPathSelectElement("cac:PlannedDeliveryTransportEvent/cac:Location/cbc:ID", Namespaces)!.Value);
+        var configuration = first.XPathSelectElement("cac:TransportHandlingUnit/cac:TransportEquipment/cbc:SizeTypeCode", Namespaces)!;
+        Assert.Equal("C3", configuration.Value);
+        Assert.Equal("PE:MTC", configuration.Attribute("listAgencyName")!.Value);
+        Assert.Equal("Configuracion Vehícular", configuration.Attribute("listName")!.Value);
+        var loads = first.XPathSelectElements("cac:TransportHandlingUnit/cac:MeasurementDimension", Namespaces)
+            .ToDictionary(m => m.XPathSelectElement("cbc:AttributeID", Namespaces)!.Value, m => m.XPathSelectElement("cbc:Measure", Namespaces)!);
+        Assert.Equal(("15.00", "12.00"), (loads["01"].Value, loads["02"].Value));
+        Assert.All(loads.Values, m => Assert.Equal("TNE", m.Attribute("unitCode")!.Value));
+        Assert.Equal("1232.28", first.XPathSelectElement("cac:DeliveryTerms/cbc:Amount", Namespaces)!.Value);
+        Assert.Empty(first.XPathSelectElements("cac:TransportHandlingUnit/cac:TransportEquipment/cbc:ReturnabilityIndicator", Namespaces));
+
+        Assert.Equal("2", legs[1].XPathSelectElement("cbc:ID", Namespaces)!.Value);
+        Assert.Equal("true", legs[1].XPathSelectElement("cac:TransportHandlingUnit/cac:TransportEquipment/cbc:ReturnabilityIndicator", Namespaces)!.Value);
+    }
+
+    [Fact]
+    public void A_leg_with_only_its_required_data_states_no_optional_nodes()
+    {
+        var result = _generator.GenerateInvoice(CargoSaleWithLegs(new UblTransportLeg("150101", "130101", "T3S3", 25m)));
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var leg = xml.XPathSelectElement("//cac:Shipment/cac:Consignment", Namespaces)!;
+        Assert.Empty(leg.XPathSelectElements("cbc:CarrierServiceInstructions|cbc:DeclaredForCarriageValueAmount|cac:DeliveryTerms", Namespaces));
+        Assert.Single(leg.XPathSelectElements("cac:TransportHandlingUnit/cac:MeasurementDimension", Namespaces));
+        Assert.Empty(Parse(_generator.GenerateInvoice(CargoSale()).Value).XPathSelectElements("//cac:Shipment", Namespaces)); // no legs, no shipment
+    }
+
+    [Fact]
+    public void The_legs_of_a_cargo_transport_keep_the_formats_of_the_rules()
+    {
+        UblTransportLeg[][] refused =
+        [
+            [FirstLeg with { OriginUbigeo = "1501" }],
+            [FirstLeg with { DestinationUbigeo = "02080A" }],
+            [FirstLeg with { VehicleConfiguration = " " }],
+            [FirstLeg with { VehicleConfiguration = new string('C', 16) }], // 1 to 15 (observation 4273)
+            [FirstLeg with { UsefulLoadTonnes = 0m }],
+            [FirstLeg with { UsefulLoadTonnes = 1.234m }],
+            [FirstLeg with { Description = "ab" }], // 3 to 100 (4271)
+            [FirstLeg with { Description = new string('D', 101) }],
+            [FirstLeg with { Description = "Lima\nCasma" }],
+            [FirstLeg with { EffectiveLoadTonnes = 0m }],
+            [FirstLeg with { EffectiveLoadReferenceValue = -1m }], // 4272
+            [FirstLeg with { NominalLoadReferenceValue = 0m }], // 4278
+            [.. Enumerable.Repeat(FirstLeg, 100)], // the leg identifier has 2 digits
+        ];
+        foreach (var legs in refused)
+        {
+            Assert.Equal(ErrorCodes.CpeInvalidDocument, _generator.GenerateInvoice(CargoSaleWithLegs(legs)).Error.Code);
+        }
+
+        Assert.True(_generator.GenerateInvoice(CargoSaleWithLegs([.. Enumerable.Repeat(FirstLeg, 99)])).IsSuccess);
+        Assert.True(_generator.GenerateInvoice(CargoSaleWithLegs(FirstLeg with { VehicleConfiguration = new string('C', 15), Description = new string('D', 100) })).IsSuccess);
+    }
+
     [Fact]
     public void The_detraction_types_demand_their_code_and_their_line_data()
     {

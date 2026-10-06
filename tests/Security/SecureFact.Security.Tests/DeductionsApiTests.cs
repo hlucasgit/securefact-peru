@@ -208,7 +208,7 @@ public sealed class DeductionsApiTests(ApiFixture api)
     private static object FishingData(string registration = "CO-10955-PM", decimal quantity = 185.85m) =>
         new { vesselRegistration = registration, vesselName = "LUANA II", speciesType = "Anchoveta", unloadingPlace = "Planta pesquera, Puerto Mollendo", unloadingDate = Day(-1), speciesQuantity = quantity };
 
-    private static object TransportData(string origin = "150101", decimal service = 1500m) =>
+    private static object TransportData(string origin = "150101", decimal service = 1500m, object[]? legs = null) =>
         new
         {
             originUbigeo = origin,
@@ -219,6 +219,21 @@ public sealed class DeductionsApiTests(ApiFixture api)
             serviceReferenceValue = service,
             effectiveLoadReferenceValue = 1200m,
             nominalLoadReferenceValue = 1000m,
+            legs,
+        };
+
+    private static object Leg(string origin = "150101", string destination = "020801", string configuration = "C3", decimal useful = 15m, bool returnEmpty = false) =>
+        new
+        {
+            originUbigeo = origin,
+            destinationUbigeo = destination,
+            vehicleConfiguration = configuration,
+            usefulLoadTonnes = useful,
+            description = "TRAMO LIMA-CASMA",
+            effectiveLoadTonnes = (decimal?)12m,
+            effectiveLoadReferenceValue = (decimal?)1232.28m,
+            nominalLoadReferenceValue = (decimal?)1078.25m,
+            returnEmpty,
         };
 
     private static object[] LineWith(object? fishing = null, object? transport = null) =>
@@ -276,6 +291,65 @@ public sealed class DeductionsApiTests(ApiFixture api)
         Assert.Equal(["01", "02", "03"], delivery.Elements(Cac + "DeliveryTerms").Select(t => t.Element(Cbc + "ID")!.Value));
 
         Assert.Contains("transporte de carga", PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_cargo_transport_sale_states_the_legs_and_vehicles_of_the_trip_and_the_invoice_keeps_them()
+    {
+        var setup = await NewTenantAsync("Cargo Legs SAC");
+        object[] legs = [Leg(), Leg("020801", "130101", "C4", 18m, returnEmpty: true)];
+
+        var response = await PostAsync(setup.Owner, Body(setup, detraction: Detraction(amount: 9m, percentage: 4m, code: "027"), lines: LineWith(transport: TransportData(legs: legs))));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        var read = (await setup.Owner.GetFromJsonAsync<DocumentDto>($"/api/v1/documents/{invoice.Id}", ApiFixture.JsonOptions))!;
+        var stored = read.Lines[0].Transport!.Legs!;
+        Assert.Equal(["C3", "C4"], stored.Select(l => l.VehicleConfiguration));
+        Assert.Equal([false, true], stored.Select(l => l.ReturnEmpty));
+        Assert.Equal(1232.28m, stored[0].EffectiveLoadReferenceValue);
+
+        var electronic = await AcceptAsync(setup, invoice);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var shipment = XDocument.Parse(xml).Root!.Element(Cac + "InvoiceLine")!.Element(Cac + "Delivery")!.Element(Cac + "Shipment")!;
+        Assert.Equal("01", shipment.Element(Cbc + "ID")!.Value);
+        var consignments = shipment.Elements(Cac + "Consignment").ToList();
+        Assert.Equal(["1", "2"], consignments.Select(c => c.Element(Cbc + "ID")!.Value));
+        Assert.Equal("C4", consignments[1].Element(Cac + "TransportHandlingUnit")!.Element(Cac + "TransportEquipment")!.Element(Cbc + "SizeTypeCode")!.Value);
+
+        var pdf = PdfContent(await setup.Owner.GetByteArrayAsync($"/api/v1/electronic-documents/{electronic.Id}/pdf"));
+        Assert.Contains("tramo 1", pdf, StringComparison.Ordinal);
+        Assert.Contains("tramo 2", pdf, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_legs_of_a_cargo_transport_that_break_the_rules_are_refused_before_numbering()
+    {
+        var setup = await NewTenantAsync("Cargo Legs Rules SAC");
+        var cargo = Detraction(amount: 9m, percentage: 4m, code: "027");
+
+        Task<HttpResponseMessage> WithLegs(params object[] legs) => PostAsync(setup.Owner, Body(setup, detraction: cargo, lines: LineWith(transport: TransportData(legs: legs))));
+
+        var cases = new (string Name, Task<HttpResponseMessage> Response)[]
+        {
+            ("a short origin ubigeo", WithLegs(Leg(origin: "1501"))),
+            ("a destination that is not a ubigeo", WithLegs(Leg(destination: "02080A"))),
+            ("no vehicle configuration", WithLegs(Leg(configuration: " "))),
+            ("a long vehicle configuration", WithLegs(Leg(configuration: new string('C', 16)))),
+            ("no useful load", WithLegs(Leg(useful: 0m))),
+            ("a useful load with three decimals", WithLegs(Leg(useful: 1.234m))),
+            ("more than 99 legs", WithLegs([.. Enumerable.Repeat(Leg(), 100)])),
+        };
+        foreach (var (name, pending) in cases)
+        {
+            var response = await pending;
+            Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, $"{name}: {response.StatusCode}");
+            Assert.Equal("SF-BIL-006", ProblemCode(await response.Content.ReadAsStringAsync()));
+        }
+
+        var first = (await (await WithLegs(Leg())).Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        Assert.Equal(1, first.Number); // nothing refused took a number
     }
 
     [Fact]

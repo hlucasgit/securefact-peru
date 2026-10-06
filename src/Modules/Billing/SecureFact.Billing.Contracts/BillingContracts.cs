@@ -98,9 +98,25 @@ public static class OperationTypes
 public sealed record FishingDetail(string VesselRegistration, string VesselName, string SpeciesType, string UnloadingPlace, DateOnly UnloadingDate, decimal SpeciesQuantity);
 
 /// <summary>
+/// One leg (tramo) of a cargo transport and the vehicle that runs it, as SOL's "Información de Tramo y Vehículo" form registers them. The origin and destination are ubigeos (6 digits) and the
+/// vehicle configuration (1–15 characters, codes of the D.S. 058-2003-MTC) and the useful load in metric tonnes are required; the description (3–100 characters), the effective load in
+/// tonnes, the two preliminary reference values in soles (by effective load and by nominal useful load) and the return-empty factor are optional. Amounts are greater than zero, up to 2 decimals.
+/// </summary>
+public sealed record TransportLeg(
+    string OriginUbigeo,
+    string DestinationUbigeo,
+    string VehicleConfiguration,
+    decimal UsefulLoadTonnes,
+    string? Description = null,
+    decimal? EffectiveLoadTonnes = null,
+    decimal? EffectiveLoadReferenceValue = null,
+    decimal? NominalLoadReferenceValue = null,
+    bool ReturnEmpty = false);
+
+/// <summary>
 /// Data of the cargo transport a line sells, required on every line of an operation 1004. The origin and destination come with their ubigeo (6 digits) and an
-/// address of 3–200 characters, the trip detail has 3–500; the three reference values are in soles. The routes and the vehicles of the trip, which SUNAT's rules
-/// leave optional, are not supported yet.
+/// address of 3–200 characters, the trip detail has 3–500; the three reference values are in soles. The <paramref name="Legs"/> of the trip (at most 99), with their vehicles,
+/// are optional in SUNAT's rules.
 /// </summary>
 public sealed record CargoTransportDetail(
     string OriginUbigeo,
@@ -110,7 +126,8 @@ public sealed record CargoTransportDetail(
     string TripDetail,
     decimal ServiceReferenceValue,
     decimal EffectiveLoadReferenceValue,
-    decimal NominalLoadReferenceValue);
+    decimal NominalLoadReferenceValue,
+    IReadOnlyList<TransportLeg>? Legs = null);
 
 /// <summary>
 /// Legends of catalogue 52 that an issuer states on a sale of exonerated operations: the exoneration of the Amazon region (2001 goods, 2002 services, 2003 construction contracts) and the

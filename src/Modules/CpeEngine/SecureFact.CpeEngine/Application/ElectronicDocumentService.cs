@@ -96,7 +96,10 @@ internal sealed class ElectronicDocumentService(
             l.Transport is { } transport
                 ? new UblCargoTransport(
                     transport.OriginUbigeo, transport.OriginAddress, transport.DestinationUbigeo, transport.DestinationAddress, transport.TripDetail,
-                    transport.ServiceReferenceValue, transport.EffectiveLoadReferenceValue, transport.NominalLoadReferenceValue)
+                    transport.ServiceReferenceValue, transport.EffectiveLoadReferenceValue, transport.NominalLoadReferenceValue,
+                    transport.Legs?.Select(leg => new UblTransportLeg(
+                        leg.OriginUbigeo, leg.DestinationUbigeo, leg.VehicleConfiguration, leg.UsefulLoadTonnes, leg.Description, leg.EffectiveLoadTonnes,
+                        leg.EffectiveLoadReferenceValue, leg.NominalLoadReferenceValue, leg.ReturnEmpty)).ToList())
                 : null,
             l.Guest is { } guest
                 ? new UblGuest(
@@ -514,6 +517,13 @@ internal sealed class ElectronicDocumentService(
                 lines.Add(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
                     $"Ítem {line.LineNumber}, transporte de carga: origen {transport.OriginUbigeo} {transport.OriginAddress}; destino {transport.DestinationUbigeo} {transport.DestinationAddress}; viaje: {transport.TripDetail}; valor referencial del servicio S/ {transport.ServiceReferenceValue:0.00}, de la carga efectiva S/ {transport.EffectiveLoadReferenceValue:0.00}, de la carga útil nominal S/ {transport.NominalLoadReferenceValue:0.00}"));
+            }
+
+            foreach (var (leg, index) in (line.Transport?.Legs ?? []).Select((l, i) => (l, i)))
+            {
+                lines.Add(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Ítem {line.LineNumber}, tramo {index + 1}{(string.IsNullOrWhiteSpace(leg.Description) ? string.Empty : $" ({leg.Description})")}: origen {leg.OriginUbigeo}, destino {leg.DestinationUbigeo}; vehículo {leg.VehicleConfiguration}, carga útil {leg.UsefulLoadTonnes:0.00} TM{(leg.EffectiveLoadTonnes is { } effective ? $", carga efectiva {effective:0.00} TM" : string.Empty)}{(leg.ReturnEmpty ? ", con factor de retorno al vacío" : string.Empty)}"));
             }
         }
 

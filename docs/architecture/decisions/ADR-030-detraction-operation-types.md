@@ -18,7 +18,7 @@ Hoja `Factura2_0` de las reglas de validación del 26.08.2026 (S16): reglas 3127
 Una factura de cada tipo, con detracción (cuenta de once ceros): 1002 con código 004 y los seis datos de la línea; 1003 con código 028; 1004 con código 027 y el viaje completo. Las tres aceptadas, código 0, sin observaciones.
 
 ## Límites (P)
-- **Tramos y vehículos del transporte de carga** (hoja `Factura2_0`: «detalle de tramos» y «detalle de el(los) vehículo(s)»: configuración vehicular, cargas útil y efectiva, valor referencial por tonelada, factor de retorno en vacío): son opcionales en las reglas y no se emiten todavía.
+- **Tramos y vehículos del transporte de carga**: ADR-034.
 - La regla 4200 (ubigeo fuera del listado) no se comprueba más allá del formato de 6 dígitos: el catálogo 13 sembrado no trae el listado del INEI.
 - Los porcentajes, montos y la cuenta siguen siendo datos del emisor (ADR-029); la plataforma no trae la tabla de porcentajes por bien ni los valores referenciales del anexo del D. S. 010-2006-MTC.
 - Sin detracción en boletas ni en notas.

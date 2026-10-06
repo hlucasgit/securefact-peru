@@ -1101,6 +1101,11 @@ internal sealed partial class DocumentService(
                 return Invalid(number, "La matrícula (hasta 15 caracteres), el nombre de la embarcación (100), la especie (150) y el lugar de descarga (100) son obligatorios, sin saltos de línea, y la cantidad en toneladas debe ser mayor que cero, con hasta 2 decimales.");
             }
 
+            if (line.Transport?.Legs is { } legs && !LegsAreValid(legs))
+            {
+                return Invalid(number, "Los tramos (hasta 99) requieren ubigeos de origen y destino, configuración vehicular de 1 a 15 caracteres y carga útil mayor que cero; la descripción (3 a 100 caracteres), la carga efectiva y los valores referenciales son opcionales, mayores que cero y con hasta 2 decimales.");
+            }
+
             if (line.Transport is { } t
                 && !(IsUbigeo(t.OriginUbigeo) && IsUbigeo(t.DestinationUbigeo) && IsText(t.OriginAddress, 3, 200) && IsText(t.DestinationAddress, 3, 200) && IsText(t.TripDetail, 3, 500)
                     && IsAmount(t.ServiceReferenceValue) && IsAmount(t.EffectiveLoadReferenceValue) && IsAmount(t.NominalLoadReferenceValue)))
@@ -1142,6 +1147,12 @@ internal sealed partial class DocumentService(
     /// <summary>Text of the length the rules ask for, without line breaks, tabs or other control characters.</summary>
     private static bool IsText(string? value, int minLength, int maxLength) =>
         value is not null && value.Trim().Length >= minLength && value.Trim().Length <= maxLength && !value.Any(char.IsControl);
+
+    private static bool IsOptionalAmount(decimal? value) => value is null || IsAmount(value.Value);
+
+    private static bool LegsAreValid(IReadOnlyList<TransportLeg> legs) =>
+        legs.Count <= 99 && legs.All(l => l is not null && IsUbigeo(l.OriginUbigeo) && IsUbigeo(l.DestinationUbigeo) && IsText(l.VehicleConfiguration, 1, 15) && IsAmount(l.UsefulLoadTonnes)
+            && (l.Description is null || IsText(l.Description, 3, 100)) && IsOptionalAmount(l.EffectiveLoadTonnes) && IsOptionalAmount(l.EffectiveLoadReferenceValue) && IsOptionalAmount(l.NominalLoadReferenceValue));
 
     private static bool IsUbigeo(string? value) => value is { Length: 6 } && value.All(char.IsAsciiDigit);
 

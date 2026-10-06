@@ -1,0 +1,21 @@
+# ADR-034: Tramos y vehículos del transporte de carga (1004)
+
+- Estado: Aceptada · Fecha: 2026-10-05
+
+## Fuentes
+Hoja `Factura2_0` de las reglas de validación del 26.08.2026 (S16): secciones «Información adicional - detracciones - servicio de transporte de carga - detalle de tramos» y «- detalle de el(los) vehículo(s)» (reglas 4200, 4271, 4272, 4273, 4274–4277, 4278, 3208, 4251, 4252; campos de valor referencial por tonelada y factor de retorno al vacío sin validación) y la guía de SUNAT «Registro de factura con detracción – SEE SOL – Servicio de Transporte de Carga» (S25), cuya pantalla «Información de Tramo y Vehículo» muestra qué datos se registran por tramo. Esquema UBL 2.1 (XSD de `docs/regulatory/assets`) y prueba contra el beta del 2026-10-05.
+
+## Decisión
+- **Un tramo es un registro con su vehículo**, como en la pantalla de SOL: origen (ubigeo), destino (ubigeo), descripción del tramo, configuración vehicular, carga útil y carga efectiva en toneladas métricas, valor referencial preliminar en función de la carga efectiva, valor referencial preliminar en función de la carga útil nominal e indicador de retorno al vacío. SOL pide origen, destino, configuración y carga útil; el resto es opcional.
+- **API**: `legs` dentro de `transport` de una línea de 1004 (`TransportLeg`, hasta 99 tramos: el identificador del tramo tiene dos dígitos). Obligatorios por tramo: ubigeos de origen y destino (6 dígitos), configuración vehicular (1 a 15 caracteres, códigos del D. S. 058-2003-MTC) y carga útil (mayor que cero, hasta 2 decimales). Opcionales: descripción (3 a 100 caracteres), carga efectiva, los dos valores referenciales (mayores que cero, hasta 2 decimales, en soles) y `returnEmpty`. Los tramos no son obligatorios (las reglas de la hoja solo observan sus formatos); un tipo 1004 sin tramos sigue válido.
+- **UBL**: dentro del `cac:Delivery` de la línea, después de los `DeliveryTerms`, un `cac:Shipment` con `cbc:ID` fijo «01» y un `cac:Consignment` por tramo con, en el orden del XSD: `cbc:ID` (número de tramo desde 1), `cbc:CarrierServiceInstructions` (descripción), `cbc:DeclaredForCarriageValueAmount` (valor por carga útil nominal), `cac:PlannedPickupTransportEvent` y `cac:PlannedDeliveryTransportEvent` (ubigeo con `schemeAgencyName` «PE:INEI» y `schemeName` «Ubigeos»), `cac:DeliveryTerms/cbc:Amount` (valor por carga efectiva) y `cac:TransportHandlingUnit` con `cac:TransportEquipment` (`SizeTypeCode` con `listAgencyName` «PE:MTC» y `listName` «Configuracion Vehícular»; `ReturnabilityIndicator` solo si es `true`) y un `cac:MeasurementDimension` por carga (`AttributeID` 01 útil y 02 efectiva, `Measure` en `TNE`). Los importes van en soles (regla 3208).
+- **Persistencia y PDF**: viven en la solicitud original dentro de `transport` y vuelven en `CargoTransportDetail.Legs`; el PDF imprime una línea de información adicional por tramo (decisión de producto).
+
+## Verificado en el beta (2026-10-05)
+Una factura de transporte de carga (1004) con dos tramos y vehículos de configuraciones C3 y C4, uno con retorno al vacío: aceptada, código 0, sin observaciones. El primer envío, con `listName` «Configuracion Vehicular» (sin tilde), fue aceptado con la **observación 4252**; la hoja pide «Configuracion Vehícular» y con ese valor la observación desapareció.
+
+## Límites (P)
+- **Cómo se agrupan tramos y vehículos en el UBL no lo fija la hoja** (cada campo es una ruta independiente bajo `cac:Shipment/cac:Consignment`) ni se encontró un ejemplo XML en las fuentes: se eligió un `Consignment` por tramo con su vehículo, que coincide con el registro de SOL. El beta lo aceptó; que SUNAT lo interprete así en producción no se pudo comprobar.
+- **Valor referencial por tonelada métrica** (`TransportEquipment/Delivery/DeliveryTerms/Amount`, importes del Anexo II del D. S. 010-2006-MTC): la hoja no lo valida y SOL no lo pide; no se emite.
+- **Registro MTC** (dato del viaje en la pantalla de SOL): no tiene ruta en la hoja de reglas; no se soporta.
+- Que el código de configuración vehicular pertenezca al D. S. 058-2003-MTC no se comprueba (la hoja solo pide 1 a 15 caracteres), ni que la carga efectiva no supere la útil, ni la suma de los valores referenciales con los del viaje: las reglas no lo exigen.
