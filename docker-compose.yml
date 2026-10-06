@@ -141,6 +141,10 @@ services:
       SF__Environment: ${SF_ENVIRONMENT:-Local}
       ConnectionStrings__App: Host=postgres;Database=${POSTGRES_DB};Username=${SF_APP_DB_USER};Password=${SF_APP_DB_PASSWORD}
       Security__LocalDevKek: ${SF_LOCAL_DEV_KEK:?set in .env}
+      # Events also go to the message bus (ADR-035) when RabbitMq__Host is set; the credentials are the ones of the broker container, from .env.
+      RabbitMq__Host: rabbitmq
+      RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:?set in .env}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:?set in .env}
       # SUNAT is never reached implicitly: leave empty to only prepare summaries, or set Beta / Production explicitly.
       Sunat__Environment: ${SF_SUNAT_ENVIRONMENT:-}
       Cpe__WorkerIntervalSeconds: ${SF_CPE_WORKER_INTERVAL:-15}

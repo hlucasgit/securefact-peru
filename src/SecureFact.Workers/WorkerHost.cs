@@ -5,6 +5,7 @@ using SecureFact.Certificates;
 using SecureFact.CpeEngine;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.Customers;
+using SecureFact.Messaging.RabbitMq;
 using SecureFact.Organizations;
 using SecureFact.Platform;
 using SecureFact.Platform.Messaging;
@@ -72,6 +73,14 @@ internal static class WorkerHost
         }
 
         builder.Services.AddOutboxProcessing();
+
+        // Events leave for the message bus only when a broker is configured (ADR-035); without RabbitMq:Host the outbox delivers to the platform's own consumers and nothing else.
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["RabbitMq:Host"]))
+        {
+            builder.Services.AddRabbitMqMessageBus(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
+            builder.Services.AddBusPublishing();
+        }
+
         builder.Services.AddHostedService<OutboxWorker>();
         builder.Services.AddHostedService<CpeWorker>();
 

@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Bus de mensajes: `IMessageBus` y su implementación sobre RabbitMQ (`SecureFact.Messaging.RabbitMq`) con confirmaciones del publicador y reconexión; el outbox entrega cada evento a sus consumidores y después al bus cuando `RabbitMq:Host` está configurado; retención del outbox (purga horaria de lo entregado, `Outbox:RetentionDays`, por una función que es la única vía de borrado) (ADR-035).
 - Cobertura de pruebas medida y exigida en el CI: `coverage.runsettings`, informe unido con ReportGenerator publicado en el resumen del job y como artefacto, y piso de 95 % de líneas y 84 % de ramas; 93.5 % → 95.9 % de líneas y 82.3 % → 85.4 % de ramas con pruebas de la guarda de inquilino y del intercepto de RLS, del manejador de excepciones, de las reglas de entrada de la administración y de los errores de autenticación.
 - CI de GitHub en verde: acciones de terceros fijadas a un commit (Trivy `v0.36.0`, gitleaks), escaneo de la imagen de los workers, runner `ubuntu-24.04` fijo, tiempo límite y cancelación de corridas obsoletas; documentado en `docs/testing/README.md`.
 - Tramos y vehículos del transporte de carga (1004) en cada línea (`transport.legs`, hasta 99): origen, destino, configuración vehicular, cargas y valores referenciales, en el UBL y en el PDF; aceptados en el beta (ADR-034, R-059, S25).

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/SecureFact.Api/SecureFact.Api.csproj" />
+    <Project Path="src/SecureFact.Messaging.RabbitMq/SecureFact.Messaging.RabbitMq.csproj" />
     <Project Path="src/SecureFact.Platform/SecureFact.Platform.csproj" />
     <Project Path="src/SecureFact.SharedKernel/SecureFact.SharedKernel.csproj" />
     <Project Path="src/SecureFact.Workers/SecureFact.Workers.csproj" />

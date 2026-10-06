@@ -7,11 +7,14 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="RabbitMQ.Client" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\..\src\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\..\..\src\SecureFact.Messaging.RabbitMq\SecureFact.Messaging.RabbitMq.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Tenancy\SecureFact.Tenancy\SecureFact.Tenancy.csproj" />
     <ProjectReference Include="..\..\..\src\SecureFact.Api\SecureFact.Api.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />

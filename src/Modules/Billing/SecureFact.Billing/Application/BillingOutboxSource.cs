@@ -71,6 +71,13 @@ internal sealed class BillingOutboxSource(BillingDbContext db, TimeProvider cloc
         return rows.Select(m => new DeadOutboxMessage(m.Id, Name, m.EventType, m.Attempts, m.LastError, m.CreatedAt)).ToList();
     }
 
+    public async Task<int> PurgeDeliveredAsync(TimeSpan retention, CancellationToken cancellationToken)
+    {
+        // The delete goes through a function that only removes delivered messages older than the retention: the table itself stays append-only for everybody (see the migration).
+        var removed = await db.Database.SqlQuery<int>($"SELECT billing.purge_outbox_messages(make_interval(secs => {retention.TotalSeconds})) AS \"Value\"").ToListAsync(cancellationToken);
+        return removed.Single();
+    }
+
     public async Task<bool> RequeueAsync(Guid messageId, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();

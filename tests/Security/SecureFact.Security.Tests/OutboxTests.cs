@@ -10,6 +10,7 @@ using Npgsql;
 using SecureFact.Billing.Contracts;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.Identity.Contracts;
+using SecureFact.Messaging.RabbitMq;
 using SecureFact.Organizations.Contracts;
 using SecureFact.Platform.Messaging;
 using SecureFact.SharedKernel.Messaging;
@@ -18,7 +19,7 @@ using SecureFact.Workers;
 namespace SecureFact.Security.Tests;
 
 [Collection(ApiTestGroup.Name)]
-public sealed class OutboxTests(ApiFixture api)
+public sealed class OutboxTests(ApiFixture api, RabbitFixture rabbit)
 {
     private static int _rucCounter = 15_000_000;
 
@@ -336,6 +337,100 @@ public sealed class OutboxTests(ApiFixture api)
             while (current?.State != EDocumentState.Accepted && DateTimeOffset.UtcNow < deadline);
 
             Assert.Equal(EDocumentState.Accepted, current?.State);
+        }
+        finally
+        {
+            await host.StopAsync();
+        }
+    }
+
+    // ---------- retention ----------
+
+    [Fact]
+    public async Task Delivered_messages_are_purged_after_the_retention_and_the_table_stays_append_only_for_everything_else()
+    {
+        var setup = await NewTenantAsync("Outbox Purge SAC");
+        for (var n = 0; n < 4; n++)
+        {
+            await IssueOkAsync(setup);
+        }
+
+        Assert.Equal(new OutboxReport(4, 0, 0), await Processor().RunOnceAsync(CancellationToken.None, setup.TenantId));
+        var ids = await ScalarAsync<Guid[]>($"SELECT array_agg(id ORDER BY created_at) FROM billing.outbox_message WHERE tenant_id = '{setup.TenantId}'");
+        var (delivered, recent, pending, dead) = (ids[0], ids[1], ids[2], ids[3]);
+
+        await ExecuteAsync($"UPDATE billing.outbox_message SET processed_at = now() - interval '40 days' WHERE id = '{delivered}'");
+        await ExecuteAsync($"UPDATE billing.outbox_message SET processed_at = now() - interval '2 days' WHERE id = '{recent}'");
+        await ExecuteAsync($"UPDATE billing.outbox_message SET processed_at = NULL WHERE id = '{pending}'");
+        await ExecuteAsync($"UPDATE billing.outbox_message SET processed_at = NULL, dead_at = now() - interval '50 days', attempts = {OutboxPolicy.MaxAttempts} WHERE id = '{dead}'");
+
+        var removed = await Processor().PurgeAsync(TimeSpan.FromDays(30), CancellationToken.None);
+
+        Assert.True(removed >= 1);
+        Assert.Equal(0, await CountAsync(setup.TenantId, $"id = '{delivered}'"));
+        Assert.Equal(1, await CountAsync(setup.TenantId, $"id = '{recent}'")); // delivered but still inside the retention
+        Assert.Equal(1, await CountAsync(setup.TenantId, $"id = '{pending}'")); // never removed while pending
+        Assert.Equal(1, await CountAsync(setup.TenantId, $"id = '{dead}'")); // nor while it waits for an operator
+
+        // Less than a day of retention is refused by the function itself.
+        var tooShort = await Assert.ThrowsAsync<PostgresException>(() => Processor().PurgeAsync(TimeSpan.FromHours(12), CancellationToken.None));
+        Assert.Equal(PostgresErrorCodes.InvalidParameterValue, tooShort.SqlState);
+
+        // Outside the function nobody can delete a message: not the schema owner, and not the runtime role even if it sets the marker the function sets.
+        var owner = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync($"DELETE FROM billing.outbox_message WHERE id = '{recent}'"));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, owner.SqlState);
+        await using var connection = new NpgsqlConnection(api.Postgres.AppConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand($"SELECT set_config('app.scope', 'platform', false), set_config('app.outbox_purge', 'on', false); DELETE FROM billing.outbox_message WHERE id = '{recent}'", connection);
+        var app = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, app.SqlState);
+        Assert.Equal(1, await CountAsync(setup.TenantId, $"id = '{recent}'"));
+    }
+
+    // ---------- the message bus ----------
+
+    [Fact]
+    public async Task With_a_broker_configured_every_event_also_reaches_the_bus_after_its_own_consumer_ran()
+    {
+        var setup = await NewTenantAsync("Outbox Bus SAC");
+        var exchange = $"test.events.{Guid.NewGuid():N}";
+        await using var subscription = await rabbit.SubscribeAsync(exchange, "billing.#");
+        var document = await IssueOkAsync(setup);
+        var messageId = await ScalarAsync<Guid>($"SELECT id FROM billing.outbox_message WHERE tenant_id = '{setup.TenantId}'");
+
+        var appConnection = new NpgsqlConnectionStringBuilder(api.Postgres.AppConnectionString) { MaxPoolSize = 10 }.ConnectionString;
+        var builder = WorkerHost.Create(
+        [
+            $"--ConnectionStrings:App={appConnection}", "--Cpe:WorkerIntervalSeconds=1", "--Outbox:WorkerIntervalSeconds=1", "--environment=Development",
+            $"--RabbitMq:Host={rabbit.Host}", $"--RabbitMq:Port={rabbit.Port}", $"--RabbitMq:UserName={RabbitFixture.User}", $"--RabbitMq:Password={RabbitFixture.Password}", $"--RabbitMq:Exchange={exchange}",
+        ]);
+        builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(10));
+        using var host = builder.Build();
+
+        await host.StartAsync();
+        try
+        {
+            // The worker drains the outbox of every tenant: look for the message of this document among whatever else it publishes.
+            RabbitMQ.Client.BasicGetResult? ours = null;
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(60);
+            while (ours is null && DateTimeOffset.UtcNow < deadline)
+            {
+                var next = await subscription.NextAsync(TimeSpan.FromSeconds(5));
+                if (next?.BasicProperties.MessageId == messageId.ToString("D"))
+                {
+                    ours = next;
+                }
+            }
+
+            Assert.NotNull(ours);
+            Assert.Equal("billing.document.issued", ours.RoutingKey);
+            Assert.Equal(setup.TenantId.ToString("D"), System.Text.Encoding.UTF8.GetString((byte[])ours.BasicProperties.Headers![RabbitMqMessageBus.TenantHeader]!));
+            using var payload = JsonDocument.Parse(ours.Body.ToArray());
+            Assert.Equal(document.Id, payload.RootElement.GetProperty("documentId").GetGuid());
+
+            // Its own consumer ran too, and the message is complete.
+            Assert.Equal(HttpStatusCode.OK, (await ElectronicAsync(setup, document.Id)).StatusCode);
+            Assert.Equal(1, await CountAsync(setup.TenantId, "processed_at IS NOT NULL"));
         }
         finally
         {

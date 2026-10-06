@@ -29,11 +29,29 @@
           "Microsoft.TestPlatform.TestHost": "18.10.1"
         }
       },
+      "RabbitMQ.Client": {
+        "type": "Direct",
+        "requested": "[7.2.2, )",
+        "resolved": "7.2.2",
+        "contentHash": "k4b6RnTXpLbsF96V93ooNYxgPMnoA2tEm24B6AXNJr1mG8wwNYdA1XJtgU66L5xqeGyveS7SJriRzlX3cbqQNA==",
+        "dependencies": {
+          "System.Threading.RateLimiting": "8.0.0"
+        }
+      },
       "Testcontainers.PostgreSql": {
         "type": "Direct",
         "requested": "[4.15.0, )",
         "resolved": "4.15.0",
         "contentHash": "45ZvqAzrh9BoI15Z4id7WEfhk1pVKqVeAX76aef8fR5ScglD75fSQtYuXhKFx4kIcgRL5aLKt3pRiqCVIgsL9g==",
+        "dependencies": {
+          "Testcontainers": "4.15.0"
+        }
+      },
+      "Testcontainers.RabbitMq": {
+        "type": "Direct",
+        "requested": "[4.15.0, )",
+        "resolved": "4.15.0",
+        "contentHash": "bJ1B5afbVvHRHDQx6Wz6dP/STbmM+4IcH5qro7dUQj5PS7on893xgumRPPgG/nQKHBEWprb/nc3jXQFFYdfa+Q==",
         "dependencies": {
           "Testcontainers": "4.15.0"
         }
@@ -515,6 +533,11 @@
         "resolved": "10.0.12",
         "contentHash": "W6BsawU2tB2qy6u4+3cBOSOmiTUgYWW365b5WMVA1bDxQwZZeNWD+qufKJkDQNKzAKq4b6Q04DDKhmr2SNJ1eg=="
       },
+      "System.Threading.RateLimiting": {
+        "type": "Transitive",
+        "resolved": "8.0.0",
+        "contentHash": "7mu9v0QDv66ar3DpGSZHg9NuNcxDaaAcnMULuZlaTpP9+hwXhrxNGsF5GmLkSHxFdb5bBc1TzeujsRgTrPWi+Q=="
+      },
       "Testcontainers": {
         "type": "Transitive",
         "resolved": "4.15.0",
@@ -715,6 +738,16 @@
           "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },
+      "securefact.messaging.rabbitmq": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.12, )",
+          "RabbitMQ.Client": "[7.2.2, )",
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "securefact.organizations": {
         "type": "Project",
         "dependencies": {
@@ -813,6 +846,7 @@
           "SecureFact.Certificates": "[1.0.0, )",
           "SecureFact.CpeEngine": "[1.0.0, )",
           "SecureFact.Customers": "[1.0.0, )",
+          "SecureFact.Messaging.RabbitMq": "[1.0.0, )",
           "SecureFact.Organizations": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.Rules": "[1.0.0, )",

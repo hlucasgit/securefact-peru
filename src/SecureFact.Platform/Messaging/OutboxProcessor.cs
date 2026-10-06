@@ -11,6 +11,22 @@ public static class OutboxServiceCollectionExtensions
     /// <summary>Registers the dispatcher. Modules add their <see cref="IOutboxSource"/> and handlers.</summary>
     public static IServiceCollection AddOutboxProcessing(this IServiceCollection services) =>
         services.AddSingleton<IOutboxProcessor, OutboxProcessor>();
+
+    /// <summary>
+    /// Publishes every outbox message to the message bus once its own handler has run (ADR-035). Needs an <see cref="IMessageBus"/>: without one the platform delivers
+    /// only to its own consumers.
+    /// </summary>
+    public static IServiceCollection AddBusPublishing(this IServiceCollection services) =>
+        services.AddScoped<IIntegrationEventConsumer, BusPublishingConsumer>();
+}
+
+/// <summary>Consumer of every event type that hands the message to the bus. The message id travels with it, so subscribers can drop the duplicates of an at-least-once delivery.</summary>
+internal sealed class BusPublishingConsumer(IMessageBus bus) : IIntegrationEventConsumer
+{
+    public string EventType => IIntegrationEventConsumer.AnyEvent;
+
+    public Task HandleAsync(OutboxMessage message, CancellationToken cancellationToken) =>
+        bus.PublishAsync(new BusMessage(message.Id, message.TenantId, message.EventType, message.PayloadJson, message.CreatedAt), cancellationToken);
 }
 
 /// <summary>
@@ -58,14 +74,20 @@ public sealed partial class OutboxProcessor(IServiceScopeFactory scopes, ILogger
         string? error = null;
         try
         {
-            var handler = scope.ServiceProvider.GetServices<IIntegrationEventConsumer>().FirstOrDefault(h => h.EventType == message.EventType);
-            if (handler is null)
+            // The consumers of the event's own type run first and the ones of every type (the bus) after them, so nothing leaves the platform before its own effect happened.
+            // The first failure stops the delivery; the retry runs the consumers again, which is why they are idempotent.
+            var consumers = scope.ServiceProvider.GetServices<IIntegrationEventConsumer>()
+                .Where(h => h.EventType == message.EventType || h.EventType == IIntegrationEventConsumer.AnyEvent)
+                .OrderBy(h => h.EventType == IIntegrationEventConsumer.AnyEvent ? 1 : 0)
+                .ToList();
+            if (consumers.Count == 0)
             {
                 error = $"No handler registered for '{message.EventType}'.";
             }
-            else
+
+            foreach (var consumer in consumers)
             {
-                await handler.HandleAsync(message, cancellationToken);
+                await consumer.HandleAsync(message, cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -93,6 +115,25 @@ public sealed partial class OutboxProcessor(IServiceScopeFactory scopes, ILogger
         }
 
         return report with { Failed = report.Failed + 1, Dead = report.Dead + (dead ? 1 : 0) };
+    }
+
+    public async Task<int> PurgeAsync(TimeSpan retention, CancellationToken cancellationToken)
+    {
+        string[] sources;
+        await using (var probe = scopes.CreateAsyncScope())
+        {
+            sources = probe.ServiceProvider.GetServices<IOutboxSource>().Select(s => s.Name).ToArray();
+        }
+
+        var removed = 0;
+        foreach (var source in sources)
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<DataScope>().UsePlatform("outbox: purge delivered messages");
+            removed += await Source(scope.ServiceProvider, source).PurgeDeliveredAsync(retention, cancellationToken);
+        }
+
+        return removed;
     }
 
     private static IOutboxSource Source(IServiceProvider services, string name) =>

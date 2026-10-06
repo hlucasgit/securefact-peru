@@ -15,6 +15,6 @@
 Si faltaba una credencial, el worker volvía a elegir siempre los mismos documentos y llenaba el lote de 50, bloqueando a los demás. Ahora una precondición fallida (credenciales SOL, canal, empresa) **conserva el estado y los intentos pero aplaza el siguiente intento 5 minutos** y deja el código del error en el documento.
 
 ## Límites
-- Sin retención: los mensajes procesados se conservan; falta una tarea de depuración con política de retención.
-- Un solo origen (Billing) y un solo consumidor; `IMessageBus` (RabbitMQ) para publicar a sistemas externos queda para la fase de integración. La interfaz `IOutboxSource` permite sumar orígenes por módulo.
+- Retención de los mensajes entregados y publicación a sistemas externos por el bus: ADR-035.
+- Un solo origen (Billing) y un solo evento. La interfaz `IOutboxSource` permite sumar orígenes por módulo.
 - Sin orden garantizado entre mensajes de distintos documentos.

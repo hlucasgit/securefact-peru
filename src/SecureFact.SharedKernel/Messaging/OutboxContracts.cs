@@ -42,14 +42,24 @@ public interface IOutboxSource
 
     /// <summary>Puts a dead message back in the queue with its attempts reset. False when the message is not dead (or not visible).</summary>
     Task<bool> RequeueAsync(Guid messageId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes the messages that were delivered more than <paramref name="retention"/> ago and returns how many. Delivered events are kept for that long for audit and support; messages that are
+    /// pending or dead are never removed. Spans tenants (platform scope).
+    /// </summary>
+    Task<int> PurgeDeliveredAsync(TimeSpan retention, CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// Consumer of one event type. Delivery is at-least-once, so handlers must be idempotent; a thrown exception means "not handled" and the
-/// message is retried later. A handler runs in the scope of the message's tenant.
+/// Consumer of one event type, or of every event type when <see cref="EventType"/> is <see cref="AnyEvent"/> (the publisher to the message bus). Delivery is at-least-once, so
+/// handlers must be idempotent; a thrown exception means "not handled" and the message is retried later, with every consumer of the message run again. A handler runs in the scope of
+/// the message's tenant. A message is delivered when every consumer that matches it returned: the ones of its own type first, then the ones of <see cref="AnyEvent"/>.
 /// </summary>
 public interface IIntegrationEventConsumer
 {
+    /// <summary>The event type that a consumer of every type declares.</summary>
+    const string AnyEvent = "*";
+
     string EventType { get; }
 
     Task HandleAsync(OutboxMessage message, CancellationToken cancellationToken);
@@ -67,4 +77,7 @@ public interface IOutboxProcessor
 {
     /// <param name="onlyTenant">Limits the pass to one tenant (a support run); null covers every tenant, as the background worker does.</param>
     Task<OutboxReport> RunOnceAsync(CancellationToken cancellationToken, Guid? onlyTenant = null);
+
+    /// <summary>Removes the messages of every source that were delivered more than <paramref name="retention"/> ago; returns how many.</summary>
+    Task<int> PurgeAsync(TimeSpan retention, CancellationToken cancellationToken);
 }
