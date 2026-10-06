@@ -305,6 +305,16 @@ export interface PlanRow {
   maxUsers: number | null
   maxDocumentsPerMonth: number | null
   isActive: boolean
+  /** Set for a private offer of one reseller. */
+  resellerId: string | null
+}
+
+export interface ResellerRow {
+  id: string
+  name: string
+  isActive: boolean
+  tenantCount: number
+  createdAt: string
 }
 
 export interface PlanInput {
@@ -314,6 +324,7 @@ export interface PlanInput {
   maxUsers: number | null
   maxDocumentsPerMonth: number | null
   isActive: boolean
+  resellerId: string | null
 }
 
 export interface UsageItem {

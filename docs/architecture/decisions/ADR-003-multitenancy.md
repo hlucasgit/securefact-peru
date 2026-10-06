@@ -29,4 +29,4 @@ Los permisos de reseller sobre tenants son concesiones explícitas (`reseller_gr
 - Prueba estructural: toda tabla de cualquier esquema debe tener RLS forzado y al menos una política (excepto `__ef_migrations_history`); un módulo nuevo que lo olvide rompe CI.
 - Pruebas (`tests/Security`, PostgreSQL real vía Testcontainers): aislamiento con y sin filtro EF, SQL crudo, ámbito anónimo, inserción/actualización/borrado forzados, fuga por conexión del pool, ámbito plataforma, privilegios del rol. Se verificó por mutación que anular el interceptor hace fallar las pruebas.
 - Limitación conocida: `set_config` añade un viaje de ida y vuelta por apertura de conexión; se optimizará fijando la vida de la conexión por request si el perfil lo exige.
-- Pendiente: resolución del tenant desde credenciales (depende de Identity) y concesiones explícitas de reseller (`reseller_grant`).
+- Pendiente: resolución del tenant desde credenciales (depende de Identity). El acceso del reseller a sus tenants es la relación explícita `tenant.reseller_id` con permisos propios, sin tabla `reseller_grant` (ADR-043).

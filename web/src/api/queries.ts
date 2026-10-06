@@ -8,6 +8,7 @@ import type {
   DeadMessage,
   PlanInput,
   PlanRow,
+  ResellerRow,
   TenantRow,
   TenantStatus,
   TenantUsage,
@@ -52,6 +53,11 @@ export const keys = {
   tenantUsers: (id: string) => ['platform', 'tenant', id, 'users'] as const,
   tenantUsage: (id: string) => ['platform', 'tenant', id, 'usage'] as const,
   plans: ['platform', 'plans'] as const,
+  resellers: ['platform', 'resellers'] as const,
+  resellerTenants: (search: string) => ['reseller', 'tenants', search] as const,
+  resellerTenant: (id: string) => ['reseller', 'tenant', id] as const,
+  resellerUsage: (id: string) => ['reseller', 'tenant', id, 'usage'] as const,
+  resellerPlans: ['reseller', 'plans'] as const,
   myPlan: ['plan'] as const,
   audit: (filters: string) => ['audit', filters] as const,
   dead: ['outbox', 'dead'] as const,
@@ -190,6 +196,27 @@ export const useAssignPlan = (tenantId: string) =>
   useAction((planId: string) => post<TenantRow>(`/api/v1/platform/tenants/${tenantId}/plan`, { planId }), [keys.platformTenant(tenantId), keys.tenantUsage(tenantId), ['audit']])
 export const useTenantUsage = (id: string) => useQuery({ queryKey: keys.tenantUsage(id), queryFn: () => get<TenantUsage>(`/api/v1/platform/tenants/${id}/usage`) })
 export const useMyPlan = () => useQuery({ queryKey: keys.myPlan, queryFn: () => get<TenantUsage>('/api/v1/plan') })
+
+// Resellers (ADR-043)
+export const useResellers = () => useQuery({ queryKey: keys.resellers, queryFn: () => get<ResellerRow[]>('/api/v1/platform/resellers') })
+export const useCreateReseller = () => useAction((name: string) => post<ResellerRow>('/api/v1/platform/resellers', { name }), [keys.resellers])
+export const useUpdateReseller = (id: string) => useAction((input: { name: string; isActive: boolean }) => put<ResellerRow>(`/api/v1/platform/resellers/${id}`, input), [keys.resellers])
+export const useCreateResellerUser = (resellerId: string) =>
+  useAction((input: { email: string; displayName: string; password: string }) => post<AppUser>('/api/v1/users', { ...input, roles: ['ResellerAdmin'], resellerId }), [])
+export const useAssignReseller = (tenantId: string) =>
+  useAction((resellerId: string | null) => post<TenantRow>(`/api/v1/platform/tenants/${tenantId}/reseller`, { resellerId }), [keys.platformTenant(tenantId), keys.resellers, ['audit']])
+
+export const useResellerTenants = (search: string) =>
+  useQuery({ queryKey: keys.resellerTenants(search), queryFn: () => get<TenantRow[]>(`/api/v1/reseller/tenants?${page(0, 100)}&search=${encodeURIComponent(search)}`) })
+export const useResellerTenant = (id: string) => useQuery({ queryKey: keys.resellerTenant(id), queryFn: () => get<TenantRow>(`/api/v1/reseller/tenants/${id}`) })
+export const useResellerUsage = (id: string) => useQuery({ queryKey: keys.resellerUsage(id), queryFn: () => get<TenantUsage>(`/api/v1/reseller/tenants/${id}/usage`) })
+export const useResellerPlans = () => useQuery({ queryKey: keys.resellerPlans, queryFn: () => get<PlanRow[]>('/api/v1/reseller/plans') })
+export const useOpenTenant = () =>
+  useAction((input: { name: string; environment: 'Sandbox' | 'Production'; planId: string | null }) => post<TenantRow>('/api/v1/reseller/tenants', input), [['reseller', 'tenants']])
+export const useAddOwner = (tenantId: string) =>
+  useAction((input: { email: string; displayName: string; password: string }) => post<AppUser>(`/api/v1/reseller/tenants/${tenantId}/owner`, input), [])
+export const useChangeResellerPlan = (tenantId: string) =>
+  useAction((planId: string) => post<TenantRow>(`/api/v1/reseller/tenants/${tenantId}/plan`, { planId }), [keys.resellerTenant(tenantId), keys.resellerUsage(tenantId), ['reseller', 'tenants']])
 
 export interface AuditFilters {
   tenantId: string

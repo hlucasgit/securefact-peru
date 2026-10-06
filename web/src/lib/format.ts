@@ -83,4 +83,6 @@ export const PLATFORM_ROLES = ['PlatformSuperAdmin', 'PlatformSupport']
 export const AUDIT_ROLES = ['TenantOwner', 'Auditor', 'PlatformSuperAdmin', 'PlatformSupport']
 /** Who reads the plan and the consumption of the account (permission tenants.read, without the roles that only read documents). */
 export const PLAN_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']
+/** A reseller user belongs to no tenant and has its own screens: its accounts. */
+export const RESELLER_ROLES = ['ResellerAdmin']
 export const QUEUE_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']

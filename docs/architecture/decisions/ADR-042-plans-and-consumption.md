@@ -55,4 +55,5 @@ Auditoría: `tenancy.plan.created`, `tenancy.plan.updated`, `tenancy.tenant.plan
 - El conteo mensual es por `created_at` en el mes calendario de Lima; un plan con periodo de facturación distinto (por ejemplo desde la fecha de alta) pediría otro cálculo.
 - El conteo de comprobantes de un mes grande recorre el índice de la cuenta en cada emisión mientras el plan tenga límite; con volúmenes muy altos convendría un contador transaccional (se descartó ahora por el riesgo de desfase).
 - Sin cuota blanda ni avisos al acercarse al límite (80 %, 100 %); la interfaz solo marca «Límite alcanzado».
+- Un plan con `reseller_id` es una oferta privada de ese revendedor (ADR-043): solo él (y la plataforma) puede asignarlo.
 - Un plan retirado sigue sirviendo a quien lo tiene; no hay migración masiva de cuentas entre planes.

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useSession } from '../auth/session'
-import { ADMIN_ROLES, AUDIT_ROLES, BILLING_ROLES, PLAN_ROLES, PLATFORM_ROLES, QUEUE_ROLES, ROLE_LABELS } from '../lib/format'
+import { ADMIN_ROLES, AUDIT_ROLES, BILLING_ROLES, PLAN_ROLES, PLATFORM_ROLES, QUEUE_ROLES, RESELLER_ROLES, ROLE_LABELS } from '../lib/format'
 
 interface Item {
   to: string
@@ -10,8 +10,13 @@ interface Item {
 }
 
 const PLATFORM_GROUPS: { title: string; items: Item[] }[] = [
-  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/plataforma/planes', label: 'Planes' }, { to: '/auditoria', label: 'Auditoría' }] },
+  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/plataforma/planes', label: 'Planes' }, { to: '/plataforma/revendedores', label: 'Revendedores' }, { to: '/auditoria', label: 'Auditoría' }] },
   { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
+]
+
+const RESELLER_GROUPS: { title: string; items: Item[] }[] = [
+  { title: 'Revendedor', items: [{ to: '/revendedor/cuentas', label: 'Mis cuentas' }] },
+  { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }] },
 ]
 
 const GROUPS: { title: string; items: Item[] }[] = [
@@ -33,7 +38,7 @@ export function Layout() {
           <small>Facturación electrónica</small>
         </div>
         <nav aria-label="Navegación principal">
-          {(hasRole(...PLATFORM_ROLES) ? PLATFORM_GROUPS : GROUPS).map((group) => {
+          {(hasRole(...PLATFORM_ROLES) ? PLATFORM_GROUPS : hasRole(...RESELLER_ROLES) ? RESELLER_GROUPS : GROUPS).map((group) => {
             const items = group.items.filter((item) => !item.roles || hasRole(...item.roles))
             return (
               items.length > 0 && (

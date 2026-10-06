@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useSession } from './auth/session'
-import { PLATFORM_ROLES } from './lib/format'
+import { PLATFORM_ROLES, RESELLER_ROLES } from './lib/format'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
 import { Rules, Security, Users } from './pages/Account'
@@ -15,13 +15,15 @@ import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
 import { NewNote } from './pages/NewNote'
 import { MyPlan, Plans } from './pages/Plans'
+import { ResellerAccountDetail, ResellerAccounts, Resellers } from './pages/Resellers'
 import { TenantDetail, Tenants } from './pages/Platform'
 import { Summaries } from './pages/Summaries'
 
 /** The home of a user: platform staff administer tenants and have no companies or documents of their own. */
 function Home() {
   const { hasRole } = useSession()
-  return hasRole(...PLATFORM_ROLES) ? <Navigate to="/plataforma/inquilinos" replace /> : <Dashboard />
+  if (hasRole(...PLATFORM_ROLES)) return <Navigate to="/plataforma/inquilinos" replace />
+  return hasRole(...RESELLER_ROLES) ? <Navigate to="/revendedor/cuentas" replace /> : <Dashboard />
 }
 
 function Protected() {
@@ -41,6 +43,9 @@ export function App() {
         <Route path="plataforma/inquilinos" element={<Tenants />} />
         <Route path="plataforma/inquilinos/:id" element={<TenantDetail />} />
         <Route path="plataforma/planes" element={<Plans />} />
+        <Route path="plataforma/revendedores" element={<Resellers />} />
+        <Route path="revendedor/cuentas" element={<ResellerAccounts />} />
+        <Route path="revendedor/cuentas/:id" element={<ResellerAccountDetail />} />
         <Route path="plan" element={<MyPlan />} />
         <Route path="auditoria" element={<Audit />} />
         <Route path="mensajes" element={<DeadMessages />} />

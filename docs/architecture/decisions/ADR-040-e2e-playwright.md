@@ -9,7 +9,7 @@ Las 16 pruebas unitarias de la interfaz no prueban lo que más importa: que la p
 ## Decisión
 - **Playwright** (`@playwright/test`, Chromium) en `web/e2e/`, contra la **API real** con PostgreSQL y el almacén S3, los **workers** y el **simulador de SUNAT** (ADR-039). La interfaz se sirve **compilada** (`vite preview`): el mismo paquete que se despliega.
 - **Cada archivo trabaja en su propia cuenta**: el administrador de plataforma (`SF_E2E_ADMIN_EMAIL`, `SF_E2E_ADMIN_PASSWORD`) crea por la API una cuenta nueva con su propietario para cada prueba, y una empresa lista (certificado, SOL, series) cuando hace falta. Las pruebas preparan su mundo por la API y **ejercitan la interfaz para lo que verifican**; así corren en paralelo (4 trabajadores) sin tocarse, y dos corridas seguidas no chocan.
-- **Qué cubren (40 recorridos)**:
+- **Qué cubren (43 recorridos)**:
   - *Autenticación*: ruta protegida con regreso, clave equivocada, cerrar sesión, recargar, segundo factor completo (con TOTP calculado en la prueba; el código del paso de la inscripción no se acepta dos veces, y la prueba usa el siguiente).
   - *Emisión*: factura con ISC e ICBPER de punta a punta (totales, XML firmado con 2000 y 7152, CDR, PDF), archivo conservado con su hash, boleta con DNI, crédito con cuotas que no suman, empresa sin series.
   - *Seguimiento*: nota de crédito que parte del documento aceptado con su ISC y sus bolsas, nota de débito, observación, falla y rechazo del simulador, baja hasta «Anulado» (1 minuto: SUNAT contesta con un ticket que los workers consultan cada minuto) y resumen diario.
@@ -17,6 +17,7 @@ Las 16 pruebas unitarias de la interfaz no prueban lo que más importa: que la p
   - *Roles y aislamiento*: un usuario de solo lectura creado desde la interfaz no ve las acciones y la API refusa lo que intenta por la dirección directa; otra cuenta no abre documentos ni empresas ajenos por su dirección.
   - *Plataforma* (ADR-041): crear inquilino con su propietario, suspender y reactivar con la sesión del propietario en otra ventana, cierre, búsqueda, usuarios, soporte de solo lectura, auditoría y su integridad.
   - *Planes* (ADR-042): crear un plan, asignarlo, agotar un tope de empresas y ampliarlo con la vista del propietario y la auditoría; accesibilidad del catálogo y acceso negado al propietario.
+  - *Revendedores* (ADR-043): crear un revendedor y su administrador, abrir una cuenta con plan propio y propietario, aislamiento entre revendedores, mover una cuenta y apagar al revendedor.
   - *Accesibilidad* (axe-core, WCAG 2 A y AA: falla con violaciones graves o críticas) en el ingreso, la emisión, el detalle y las cinco pestañas de la empresa; y *teléfono* (Pixel 7): menú, navegación, sin desborde horizontal y emisión.
 - **CI**: el trabajo `e2e` publica la API y los workers, levanta PostgreSQL y S3 con Docker (`.github/scripts/e2e-stack.sh`: migraciones, administrador de plataforma con clave generada y enmascarada), instala Chromium y corre la suite; sube el informe, las capturas, las trazas y los registros como artefacto.
 

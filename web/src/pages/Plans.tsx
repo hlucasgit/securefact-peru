@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAssignPlan, useCreatePlan, useMyPlan, usePlans, useTenantUsage, useUpdatePlan } from '../api/queries'
+import { useAssignPlan, useCreatePlan, useMyPlan, usePlans, useResellers, useTenantUsage, useUpdatePlan } from '../api/queries'
 import type { PlanInput, PlanRow, TenantUsage, UsageItem } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, Loading, Modal, PageHeader, SelectField, TextField, useToast } from '../components/ui'
@@ -97,6 +97,7 @@ export function TenantPlanCard({ tenantId, canManage, closed }: { tenantId: stri
 export function Plans() {
   const { hasRole } = useSession()
   const { data, isPending, error } = usePlans()
+  const resellers = useResellers()
   const [editing, setEditing] = useState<PlanRow | 'new' | null>(null)
   const canManage = hasRole('PlatformSuperAdmin')
 
@@ -123,6 +124,7 @@ export function Plans() {
                   <th className="right">Empresas</th>
                   <th className="right">Usuarios</th>
                   <th className="right">Comprobantes por mes</th>
+                  <th>Oferta</th>
                   <th>Estado</th>
                   <th />
                 </tr>
@@ -135,6 +137,7 @@ export function Plans() {
                     <td className="right">{limitText(plan.maxCompanies)}</td>
                     <td className="right">{limitText(plan.maxUsers)}</td>
                     <td className="right">{limitText(plan.maxDocumentsPerMonth)}</td>
+                    <td>{plan.resellerId ? `Privada de ${(resellers.data ?? []).find((reseller) => reseller.id === plan.resellerId)?.name ?? 'un revendedor'}` : 'Pública'}</td>
                     <td>
                       <Badge tone={plan.isActive ? 'ok' : 'neutral'}>{plan.isActive ? 'Disponible' : 'Retirado'}</Badge>
                     </td>
@@ -172,7 +175,9 @@ function PlanModal({ plan, onClose }: { plan: PlanRow | null; onClose: () => voi
     maxUsers: plan?.maxUsers?.toString() ?? '',
     maxDocumentsPerMonth: plan?.maxDocumentsPerMonth?.toString() ?? '',
     isActive: plan?.isActive ?? true,
+    resellerId: plan?.resellerId ?? '',
   })
+  const resellers = useResellers()
   const mutation = plan ? update : create
 
   function submit() {
@@ -183,6 +188,7 @@ function PlanModal({ plan, onClose }: { plan: PlanRow | null; onClose: () => voi
       maxUsers: toLimit(value.maxUsers),
       maxDocumentsPerMonth: toLimit(value.maxDocumentsPerMonth),
       isActive: value.isActive,
+      resellerId: value.resellerId || null,
     }
     mutation.mutate(input, { onSuccess: () => { toast.ok(plan ? 'Plan actualizado.' : 'Plan creado.'); onClose() } })
   }
@@ -202,6 +208,14 @@ function PlanModal({ plan, onClose }: { plan: PlanRow | null; onClose: () => voi
         <TextField label="Máximo de empresas" type="number" min={0} inputMode="numeric" hint="vacío: ilimitado" value={value.maxCompanies} onChange={(event) => setValue({ ...value, maxCompanies: event.target.value })} />
         <TextField label="Máximo de usuarios activos" type="number" min={0} inputMode="numeric" hint="vacío: ilimitado" value={value.maxUsers} onChange={(event) => setValue({ ...value, maxUsers: event.target.value })} />
         <TextField label="Comprobantes por mes" type="number" min={0} inputMode="numeric" hint="vacío: ilimitado" value={value.maxDocumentsPerMonth} onChange={(event) => setValue({ ...value, maxDocumentsPerMonth: event.target.value })} />
+        <SelectField label="Oferta" hint="una oferta privada solo la ve y la asigna ese revendedor" value={value.resellerId} onChange={(event) => setValue({ ...value, resellerId: event.target.value })}>
+          <option value="">Pública</option>
+          {(resellers.data ?? []).map((reseller) => (
+            <option key={reseller.id} value={reseller.id}>
+              Privada de {reseller.name}
+            </option>
+          ))}
+        </SelectField>
         {plan && (
           <label className="checkbox">
             <input type="checkbox" checked={value.isActive} onChange={(event) => setValue({ ...value, isActive: event.target.checked })} /> Disponible para asignar a cuentas nuevas

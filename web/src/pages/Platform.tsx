@@ -17,6 +17,7 @@ import { useSession } from '../auth/session'
 import { Badge, ConfirmButton, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextAreaField, TextField, useToast } from '../components/ui'
 import { ROLE_LABELS, TENANT_ROLES, dateTime } from '../lib/format'
 import { TenantPlanCard } from './Plans'
+import { TenantResellerCard } from './Resellers'
 import type { Tone } from '../lib/format'
 
 const STATUS_LABELS: Record<TenantStatus, string> = { Active: 'Activo', Suspended: 'Suspendido', Closed: 'Cerrado' }
@@ -208,6 +209,7 @@ export function TenantDetail() {
       </div>
 
       <TenantPlanCard tenantId={t.id} canManage={canManage} closed={t.status === 'Closed'} />
+      <TenantResellerCard tenant={t} canManage={canManage} />
 
       <div className="card">
         <div className="row spread" style={{ marginBottom: 8 }}>
