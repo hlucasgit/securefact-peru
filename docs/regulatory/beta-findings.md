@@ -41,6 +41,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Detracción y retención** (R-053): factura con detracción (tipo de operación 1001, `PaymentMeans` y `PaymentTerms` «Detraccion», leyenda 2006), la misma al crédito con cuotas sin la detracción, y factura con retención del 3 % (`AllowanceCharge` 62): aceptadas con código 0, sin observaciones. El beta **no comprueba** que el adquirente sea agente de retención.
 
+- **Detracción en la nota de débito** (R-061, 2026-10-06): factura con detracción (037, 12 %) aceptada y nota de débito sobre ella (motivo 02) con su propia detracción de su importe: aceptada, código 0, sin observaciones.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|

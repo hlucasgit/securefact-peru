@@ -34,6 +34,9 @@ internal static class BillingEndpoints
         documents.MapPost("/preview", async (PreviewRequest body, IDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.PreviewAsync(body, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsCreate);
 
+        app.MapPost("/api/v1/notes/preview", async (NotePreviewRequest body, IDocumentService service, HttpContext http, CancellationToken ct) =>
+            (await service.PreviewNoteAsync(body, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsCreate);
+
         // Credit and debit notes: the series (07 or 08) decides which; same idempotency and numbering guarantees as documents.
         app.MapPost("/api/v1/notes", async (CreateNoteRequest body, IDocumentService service, HttpContext http, CancellationToken ct) =>
         {

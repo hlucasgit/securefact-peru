@@ -366,4 +366,53 @@ public class UblNoteGeneratorTests
         Assert.Equal(["1000", "2000", "7152"], xml.XPathSelectElements($"/{prefix}:{root}/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID", Namespaces).Select(e => e.Value));
         Assert.Equal("2", xml.XPathSelectElement($"/{prefix}:{root}/cac:{line}/cac:TaxTotal/cac:TaxSubtotal/cbc:BaseUnitMeasure", Namespaces)!.Value);
     }
+
+    // ---------- detraction on a debit note (sheet NotaDebito2_0, rules 3313, 3314, 3127, 3033-3037, 3208) ----------
+
+    private static UblNoteData WithDetraction(string type = "08", string referencedType = "01", string currency = "PEN", decimal amount = 14.16m) =>
+        Note(type, type == "07" ? "07" : "02", referencedType) with { Currency = currency, Detraction = new UblDetraction("037", 12m, amount, "00012345678") };
+
+    [Fact]
+    public void A_debit_note_states_its_detraction_as_the_account_and_the_terms_before_the_taxes_and_validates_against_the_schema()
+    {
+        var result = _generator.GenerateNote(WithDetraction());
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = XDocument.Parse(result.Value.Xml);
+        Assert.Empty(SchemaErrors(xml, "08"));
+        Assert.Equal("Detraccion", xml.XPathSelectElement("/dn:DebitNote/cac:PaymentMeans/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("001", xml.XPathSelectElement("/dn:DebitNote/cac:PaymentMeans/cbc:PaymentMeansCode", Namespaces)!.Value);
+        Assert.Equal("00012345678", xml.XPathSelectElement("/dn:DebitNote/cac:PaymentMeans/cac:PayeeFinancialAccount/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("Detraccion", xml.XPathSelectElement("/dn:DebitNote/cac:PaymentTerms/cbc:ID", Namespaces)!.Value);
+        Assert.Equal("037", xml.XPathSelectElement("/dn:DebitNote/cac:PaymentTerms/cbc:PaymentMeansID", Namespaces)!.Value);
+        Assert.Equal("12.00", xml.XPathSelectElement("/dn:DebitNote/cac:PaymentTerms/cbc:PaymentPercent", Namespaces)!.Value);
+        var amount = xml.XPathSelectElement("/dn:DebitNote/cac:PaymentTerms/cbc:Amount", Namespaces)!;
+        Assert.Equal(("14.16", "PEN"), (amount.Value, amount.Attribute("currencyID")!.Value));
+        // UBL order: the means, then the terms, then the tax total.
+        var order = xml.Root!.Elements().Select(e => e.Name.LocalName).ToList();
+        Assert.True(order.IndexOf("PaymentMeans") < order.IndexOf("PaymentTerms") && order.IndexOf("PaymentTerms") < order.IndexOf("TaxTotal"));
+        Assert.Empty(xml.XPathSelectElements("//cbc:InvoiceTypeCode", Namespaces)); // a note has no operation type: the sheet ties none to its detraction
+    }
+
+    [Fact]
+    public void A_note_without_detraction_has_no_payment_means_and_a_credit_note_never_carries_one()
+    {
+        Assert.Empty(XDocument.Parse(_generator.GenerateNote(Note("08", "02")).Value.Xml).XPathSelectElements("//cac:PaymentMeans", Namespaces));
+
+        var credit = _generator.GenerateNote(WithDetraction("07"));
+        Assert.False(credit.IsSuccess);
+        Assert.Contains("nota de débito", credit.Error.Detail, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("08", "03", "PEN", 14.16)] // on a receipt
+    [InlineData("08", "01", "USD", 14.16)] // not in soles
+    [InlineData("08", "01", "PEN", 0)] // no amount
+    [InlineData("08", "01", "PEN", 500)] // more than the payable amount of the note
+    public void A_detraction_that_the_sheet_does_not_allow_is_refused(string type, string referencedType, string currency, double amount)
+    {
+        var result = _generator.GenerateNote(WithDetraction(type, referencedType, currency, (decimal)amount));
+
+        Assert.False(result.IsSuccess);
+    }
 }

@@ -188,7 +188,8 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
           <h2>Operación</h2>
           <KeyValues
             items={[
-              ['Tipo de operación', operationType.data?.find((entry) => entry.code === doc.operationTypeCode)?.description ?? doc.operationTypeCode],
+              // A note has no operation type of its own: its detraction does not give it one.
+              ...(doc.note ? [] : ([['Tipo de operación', operationType.data?.find((entry) => entry.code === doc.operationTypeCode)?.description ?? doc.operationTypeCode]] as [string, React.ReactNode][])),
               ...(doc.usageCountryCode ? ([['País del uso o aprovechamiento', doc.usageCountryCode]] as [string, React.ReactNode][]) : []),
               ...((doc.legendCodes?.length ?? 0) > 0
                 ? ([['Leyendas', doc.legendCodes!.join(', ')]] as [string, React.ReactNode][])
@@ -254,6 +255,7 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
         {doc.installments && doc.installments.length > 0 && (
           <p className="muted" style={{ marginTop: 12 }}>
             Venta al crédito: {doc.installments.map((item) => `${money(item.amount, doc.currency)} el ${date(item.dueDate)}`).join(' · ')}
+            {doc.initialPayment ? ` · Entrega inicial de ${money(doc.initialPayment, doc.currency)} pagada en la emisión` : ''}
           </p>
         )}
       </div>

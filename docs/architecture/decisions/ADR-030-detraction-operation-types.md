@@ -21,4 +21,4 @@ Una factura de cada tipo, con detracción (cuenta de once ceros): 1002 con códi
 - **Tramos y vehículos del transporte de carga**: ADR-034.
 - La regla 4200 (ubigeo fuera del listado) no se comprueba más allá del formato de 6 dígitos: el catálogo 13 sembrado no trae el listado del INEI.
 - Los porcentajes, montos y la cuenta siguen siendo datos del emisor (ADR-029); la plataforma no trae la tabla de porcentajes por bien ni los valores referenciales del anexo del D. S. 010-2006-MTC.
-- Sin detracción en boletas ni en notas.
+- Sin detracción en boletas ni en notas de crédito; la nota de débito sobre una factura puede llevarla, sin tipo de operación ni datos de línea (ADR-049).

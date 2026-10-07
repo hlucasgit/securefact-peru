@@ -204,7 +204,7 @@ internal sealed partial class DocumentService(
 
         // The amounts of a detraction and of a retention depend on the total, so they are not checked here and are offered afterwards; the rest of what the document states (the code of the
         // detraction, which sets the operation type and the data of every line, an export, a legend) is checked as in the issue. The installments need the final amounts too.
-        var bare = document with { Installments = null, InitialPayment = null };
+        var bare = document with { Installments = null };
         var prepared = await PrepareAsync(series, bare, preview: true, cancellationToken);
         if (!prepared.IsSuccess)
         {
@@ -212,10 +212,11 @@ internal sealed partial class DocumentService(
         }
 
         var payable = prepared.Value.Totals.PayableAmount;
-        return new DocumentPreview(
-            prepared.Value.Totals,
-            request.DetractionPercentage is { } detraction ? decimal.Round(payable * detraction / 100m, 2, MidpointRounding.AwayFromZero) : null,
-            request.RetentionPercentage is { } retention ? RetainedAmount(payable, retention) : null);
+        var suggestedDetraction = request.DetractionPercentage is { } detraction ? decimal.Round(payable * detraction / 100m, 2, MidpointRounding.AwayFromZero) : (decimal?)null;
+        var retained = request.RetentionPercentage is { } retention ? RetainedAmount(payable, retention) : (decimal?)null;
+        // What is left to pay on credit (the installments add up to it): the payable amount less the detraction (the one typed, or the suggested one) or the withholding, and the initial payment.
+        var deducted = (document.Detraction is { Amount: > 0 } typed ? typed.Amount : suggestedDetraction ?? 0m) + (retained ?? 0m);
+        return new DocumentPreview(prepared.Value.Totals, suggestedDetraction, retained, payable - deducted - (document.InitialPayment ?? 0m));
     }
 
     private async Task<Result<DocumentDto>> IssueAsync(
@@ -406,6 +407,28 @@ internal sealed partial class DocumentService(
             return replay.Value;
         }
 
+        var prepared = await PrepareNoteAsync(series, request, preview: false, cancellationToken);
+        if (!prepared.IsSuccess)
+        {
+            return prepared.Error;
+        }
+
+        var (referenced, buyer, calculated, effective) = prepared.Value;
+        // As in an invoice, the issued note keeps the account of the detraction that was used.
+        var storedJson = ReferenceEquals(effective, request) ? requestJson : JsonSerializer.Serialize(effective, Json);
+        var note = new NoteInfo(request.ReasonCode!.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
+        return await IssueAsync(
+            tenant.Value, idempotencyKey, storedJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines!, calculated, note, cancellationToken);
+    }
+
+    private sealed record PreparedNote(Document Referenced, BuyerSnapshot Buyer, TaxCalculationResult Totals, CreateNoteRequest Effective);
+
+    /// <summary>
+    /// Everything that is checked and calculated before a note is numbered: the document it modifies, the rules of the note, the totals and, unless it is a preview, the amount of its detraction.
+    /// Issuing and previewing go through the same code.
+    /// </summary>
+    private async Task<Result<PreparedNote>> PrepareNoteAsync(Series series, CreateNoteRequest request, bool preview, CancellationToken cancellationToken)
+    {
         var referenced = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == request.ReferencedDocumentId, cancellationToken);
         if (referenced is null)
         {
@@ -443,9 +466,98 @@ internal sealed partial class DocumentService(
             return unidentified;
         }
 
-        var note = new NoteInfo(request.ReasonCode!.Trim(), request.Reason.Trim(), referenced.Id, referenced.DocumentTypeCode, referenced.SeriesCode, referenced.Number);
-        return await IssueAsync(
-            tenant.Value, idempotencyKey, requestJson, requestHash, series, request.IssueDate, referenced.Currency, buyer, request.Lines!, calculated.Value, note, cancellationToken);
+        var effective = request;
+        if (request.Detraction is { } detraction)
+        {
+            var checkedDetraction = await CheckNoteDetractionAsync(series, referenced, request, detraction, calculated.Value.PayableAmount, preview, cancellationToken);
+            if (!checkedDetraction.IsSuccess)
+            {
+                return checkedDetraction.Error;
+            }
+
+            effective = request with { Detraction = checkedDetraction.Value };
+        }
+
+        return new PreparedNote(referenced, buyer, calculated.Value, effective);
+    }
+
+    public async Task<Result<DocumentPreview>> PreviewNoteAsync(NotePreviewRequest request, CancellationToken cancellationToken)
+    {
+        if (scope.Kind != DataScopeKind.Tenant)
+        {
+            return Error.Forbidden(ErrorCodes.TenantNotResolved, "Tenant requerido", "Esta operación requiere un contexto de tenant.");
+        }
+
+        if (request?.Note is not { } note)
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Nota inválida", "La solicitud de la nota es obligatoria.");
+        }
+
+        if (request.DetractionPercentage is <= 0 or > 100)
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Porcentaje inválido", "La detracción va de más de 0 a 100.");
+        }
+
+        var adjustsInstallments = note.ReasonCode?.Trim() == InstallmentAdjustmentReason;
+        if (adjustsInstallments ? note.Lines is { Count: > 0 } : note.Lines is not { Count: > 0 and <= MaxLines })
+        {
+            return Error.Validation(ErrorCodes.InvalidDocument, "Nota inválida", $"La nota requiere entre 1 y {MaxLines} líneas.");
+        }
+
+        if (adjustsInstallments)
+        {
+            note = note with { Lines = [InstallmentAdjustmentLine] };
+        }
+
+        var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == note.SeriesId, cancellationToken);
+        if (series is null)
+        {
+            return Error.NotFound(ErrorCodes.SeriesNotFound, "Serie no encontrada", "La serie no existe o no es visible para este contexto.");
+        }
+
+        var prepared = await PrepareNoteAsync(series, note, preview: true, cancellationToken);
+        if (!prepared.IsSuccess)
+        {
+            return prepared.Error;
+        }
+
+        var payable = prepared.Value.Totals.PayableAmount;
+        var suggested = request.DetractionPercentage is { } percentage ? decimal.Round(payable * percentage / 100m, 2, MidpointRounding.AwayFromZero) : (decimal?)null;
+        return new DocumentPreview(prepared.Value.Totals, suggested, null, suggested is null ? payable : payable - (note.Detraction is { Amount: > 0 } typed ? typed.Amount : suggested.Value));
+    }
+
+    /// <summary>
+    /// A detraction on a note (sheet NotaDebito2_0, section «Información adicional - detracciones»; the sheet of the credit note has none): only a debit note on an invoice, in soles, with the
+    /// same checks of data as an invoice. The sheet states no operation type, no data of line and no legend for it, and does not check the percentage or the amount.
+    /// </summary>
+    private async Task<Result<Detraction>> CheckNoteDetractionAsync(Series series, Document referenced, CreateNoteRequest request, Detraction detraction, decimal payable, bool preview, CancellationToken cancellationToken)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Detracción inválida", detail);
+
+        if (series.DocumentTypeCode != DocumentTypes.DebitNote)
+        {
+            return Invalid("La detracción es de la nota de débito: la hoja NotaCredito2_0 de SUNAT no la admite en la nota de crédito.");
+        }
+
+        if (referenced.DocumentTypeCode != DocumentTypes.Invoice)
+        {
+            return Invalid("La nota de débito con detracción modifica una factura: la detracción es de las facturas.");
+        }
+
+        var effective = detraction;
+        if (string.IsNullOrWhiteSpace(detraction.AccountNumber))
+        {
+            var company = await companies.GetAsync(series.CompanyId, cancellationToken);
+            if (!company.IsSuccess)
+            {
+                return company.Error;
+            }
+
+            effective = detraction with { AccountNumber = company.Value.DetractionAccount };
+        }
+
+        // The amount of the detraction depends on the total of the note: a preview offers it, so it does not check it.
+        return !preview && ValidateDetractionData(effective, referenced.Currency, payable, "la factura que modifica la nota") is { } bad ? bad : effective;
     }
 
     /// <summary>
@@ -821,7 +933,7 @@ internal sealed partial class DocumentService(
             : null;
         return new DocumentDto(d.Id, d.TenantId, d.CompanyId, d.DocumentTypeCode, d.SeriesCode, d.Number, d.IssueDate, d.Currency, buyer, d.Status, lines, totals, d.CreatedAt, note, stored?.Adjustments,
             stored?.Installments is { Count: > 0 } storedInstallments ? storedInstallments.Where(i => i is not null).Select(i => i!).ToList() : null,
-            stored?.Detraction is { } storedDetraction ? OperationTypes.ForDetraction(storedDetraction.GoodsOrServiceCode) : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
+            note is null && stored?.Detraction is { } storedDetraction ? OperationTypes.ForDetraction(storedDetraction.GoodsOrServiceCode) : stored?.OperationTypeCode ?? OperationTypes.Sale, stored?.InitialPayment, stored?.Detraction,
             stored?.Retention is { } retention ? new IgvRetention(retention.Percentage, totals.PayableAmount, RetainedAmount(totals.PayableAmount, retention.Percentage)) : null, stored?.UsageCountryCode,
             stored?.LegendCodes is { Count: > 0 } legends ? legends.Where(c => c is not null).Select(c => c!.Trim()).ToList() : null);
     }
@@ -1013,30 +1125,9 @@ internal sealed partial class DocumentService(
 
         if (detraction is not null)
         {
-            if (request.Currency != "PEN")
+            if (ValidateDetractionData(detraction, request.Currency, payable, "la factura") is { } badDetraction)
             {
-                return Invalid("La detracción se declara en soles: la factura debe ser en soles.");
-            }
-
-            if (detraction.GoodsOrServiceCode is null || !DetractionCodes.Contains(detraction.GoodsOrServiceCode.Trim()))
-            {
-                return Invalid("El código del bien o servicio debe ser del catálogo 54.");
-            }
-
-            if (detraction.Percentage is <= 0 or > 100 || decimal.Round(detraction.Percentage, 5) != detraction.Percentage)
-            {
-                return Invalid("El porcentaje de la detracción debe ser mayor que 0 y no superar 100, con hasta 5 decimales.");
-            }
-
-            if (detraction.Amount <= 0 || decimal.Round(detraction.Amount, 2) != detraction.Amount || detraction.Amount > payable
-                || Math.Abs(detraction.Amount - (payable * detraction.Percentage / 100m)) >= 1m)
-            {
-                return Invalid($"El monto de la detracción debe ser positivo, con hasta 2 decimales, y coincidir con el porcentaje del importe total ({payable:0.00}) con un redondeo de hasta un sol.");
-            }
-
-            if (detraction.AccountNumber is null || !AccountNumberPattern().IsMatch(detraction.AccountNumber.Trim()))
-            {
-                return Invalid("Indique el número de cuenta de detracciones en el Banco de la Nación, en la solicitud o en los datos de la empresa (alfanumérico, hasta 100 caracteres).");
+                return badDetraction;
             }
 
             deducted = detraction.Amount;
@@ -1049,6 +1140,43 @@ internal sealed partial class DocumentService(
         }
 
         deducted = RetainedAmount(payable, retention.Percentage);
+        return null;
+    }
+
+    /// <summary>
+    /// The data of a detraction, of an invoice or of a debit note: in soles, a code of the catalogue 54, a percentage, an amount that agrees with the percentage of the payable amount of the
+    /// document (the deposit is rounded to whole soles, so within one sol) and the account of the Banco de la Nación.
+    /// </summary>
+    private static Error? ValidateDetractionData(Detraction detraction, string currency, decimal payable, string document)
+    {
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.InvalidDocument, "Detracción o retención inválida", detail);
+
+        if (currency != "PEN")
+        {
+            return Invalid($"La detracción se declara en soles: {document} debe ser en soles.");
+        }
+
+        if (detraction.GoodsOrServiceCode is null || !DetractionCodes.Contains(detraction.GoodsOrServiceCode.Trim()))
+        {
+            return Invalid("El código del bien o servicio debe ser del catálogo 54.");
+        }
+
+        if (detraction.Percentage is <= 0 or > 100 || decimal.Round(detraction.Percentage, 5) != detraction.Percentage)
+        {
+            return Invalid("El porcentaje de la detracción debe ser mayor que 0 y no superar 100, con hasta 5 decimales.");
+        }
+
+        if (detraction.Amount <= 0 || decimal.Round(detraction.Amount, 2) != detraction.Amount || detraction.Amount > payable
+            || Math.Abs(detraction.Amount - (payable * detraction.Percentage / 100m)) >= 1m)
+        {
+            return Invalid($"El monto de la detracción debe ser positivo, con hasta 2 decimales, y coincidir con el porcentaje del importe total ({payable:0.00}) con un redondeo de hasta un sol.");
+        }
+
+        if (detraction.AccountNumber is null || !AccountNumberPattern().IsMatch(detraction.AccountNumber.Trim()))
+        {
+            return Invalid("Indique el número de cuenta de detracciones en el Banco de la Nación, en la solicitud o en los datos de la empresa (alfanumérico, hasta 100 caracteres).");
+        }
+
         return null;
     }
 

@@ -29,7 +29,7 @@ La API emite facturas con detracción, con retención del IGV y de exportación,
 - 9 pruebas unitarias nuevas (`operations.test.ts`) y 5 recorridos de extremo a extremo (`operations.spec.ts`) contra el simulador: detracción calculada, emitida, mostrada y aceptada; retención; el cálculo que se descarta y un monto fuera de lo aceptado rechazado por la API; exportación de bienes (afectación fija, adquirente del exterior, sin detracción) y de servicios con país de uso. Accesibilidad (axe) del formulario con detracción y con exportación.
 
 ## Límites (P)
-- Siguen por la API: la entrega inicial de una venta al crédito y las notas con detracción. Las leyendas y el transporte de carga se agregaron en el ADR-047.
+- La entrega inicial de una venta al crédito y la detracción de la nota de débito se agregaron en el ADR-049. Las leyendas y el transporte de carga se agregaron en el ADR-047.
 - La vista previa muestra el importe total y estos dos montos; no hay aún una vista previa de todo el comprobante (por línea, por impuesto) antes de emitir.
 - El monto de la detracción no se redondea al sol aunque SUNAT lo haga en su operación de depósito: la fuente de esa regla no está registrada en `docs/regulatory/sources.md` y no se codifica sin ella.
 - La lista de países del uso es un campo libre de 2 letras (ISO 3166-1): el catálogo 04 solo remite al estándar y no trae la lista.

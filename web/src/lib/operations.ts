@@ -81,6 +81,8 @@ interface RequestInput {
   usageCountry: string
   deduction: DeductionInput
   legends?: string[]
+  /** Part of a credit sale paid on the issue date. */
+  initialPayment?: string
 }
 
 /**
@@ -106,6 +108,7 @@ export function buildDocumentRequest(input: RequestInput) {
     buyer: input.buyer,
     lines: input.lines,
     ...(input.installments ? { installments: input.installments } : {}),
+    ...(input.installments && Number(input.initialPayment) > 0 ? { initialPayment: Number(input.initialPayment) } : {}),
     ...(exporting ? { operationTypeCode: input.operation } : {}),
     ...(exporting && needsUsageCountry(input.operation) ? { usageCountryCode: input.usageCountry.trim().toUpperCase() } : {}),
     ...(detraction ? { detraction } : {}),

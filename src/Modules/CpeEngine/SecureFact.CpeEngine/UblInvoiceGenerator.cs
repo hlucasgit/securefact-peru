@@ -806,6 +806,9 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             SignatureInfo(data.Issuer),
             Supplier(data.Issuer),
             Customer(data.Buyer),
+            // The detraction of a debit note: the account in the payment means, then the terms (sheet NotaDebito2_0, rules 3313, 3314); the UBL order puts both before the tax total.
+            data.Detraction is { } detraction ? DetractionMeans(detraction) : null,
+            data.Detraction is { } detractionTerms ? DetractionTerms(detractionTerms) : null,
             data.ReasonCode == InstallmentAdjustmentReason ? PaymentTerms("Credito", data.Installments, currency) : null,
             TaxTotal(totals, data.IgvRate, currency),
             new XElement(
@@ -856,6 +859,30 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         return data.Totals.PayableAmount == 0 ? null : Invalid("El importe total de una nota de motivo 13 debe ser cero.");
     }
 
+    /// <summary>
+    /// A detraction on a note is of a debit note on an invoice, in soles (sheet NotaDebito2_0: rules 3313, 3314, 3127, 3033–3037, 3208); the sheet of the credit note has none and no rule
+    /// ties it to an operation type. The percentage and the amount are the issuer's data.
+    /// </summary>
+    private static Error? CheckNoteDetraction(UblNoteData data)
+    {
+        if (data.Detraction is not { } detraction)
+        {
+            return null;
+        }
+
+        static Error Invalid(string detail) => Error.Validation(ErrorCodes.CpeInvalidDocument, "Datos de nota inválidos", detail);
+
+        if (data.DocumentTypeCode != "08" || data.ReferencedDocumentTypeCode != "01" || data.Currency != "PEN")
+        {
+            return Invalid("La detracción es de una nota de débito sobre una factura, en soles.");
+        }
+
+        return string.IsNullOrWhiteSpace(detraction.GoodsOrServiceCode) || detraction.Percentage is <= 0 or > 100 || detraction.Amount <= 0 || detraction.Amount > data.Totals.PayableAmount
+            || string.IsNullOrWhiteSpace(detraction.AccountNumber)
+            ? Invalid("La detracción requiere un código del catálogo 54, un porcentaje de 0 a 100, un monto positivo que no supere el importe total de la nota y la cuenta del Banco de la Nación.")
+            : null;
+    }
+
     private static Error? ValidateNote(UblNoteData data)
     {
         static Error Unsupported(string detail) => Error.Validation(ErrorCodes.CpeUnsupported, "Nota no soportada por el generador", detail);
@@ -889,6 +916,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
         if (CheckNoteInstallments(data) is { } badInstallments)
         {
             return badInstallments;
+        }
+
+        if (CheckNoteDetraction(data) is { } badDetraction)
+        {
+            return badDetraction;
         }
 
         if (CheckSpecialTaxes(data.Lines, data.Totals, data.IssueDate, data.IcbperUnitAmount, "nota") is { } badSpecialTaxes)

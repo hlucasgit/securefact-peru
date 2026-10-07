@@ -153,7 +153,8 @@ public sealed record UblNoteData(
     decimal IgvRate,
     IReadOnlyList<UblInstallment>? Installments = null,
     decimal IvapRate = 0m,
-    decimal IcbperUnitAmount = 0m);
+    decimal IcbperUnitAmount = 0m,
+    UblDetraction? Detraction = null);
 
 public interface IUblDocumentGenerator
 {

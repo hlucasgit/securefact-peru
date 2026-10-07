@@ -163,6 +163,35 @@ public sealed class PreviewApiTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task The_preview_gives_what_is_left_to_pay_after_the_deduction_and_the_initial_payment_of_a_credit_sale()
+    {
+        var setup = await NewTenantAsync("Pendiente SAC");
+        object Credit(decimal? initial, object? detraction = null) => new
+        {
+            seriesId = setup.Invoice.Id,
+            issueDate = Today(),
+            currency = "PEN",
+            buyer = new { documentTypeCode = "6", documentNumber = "20100066603", name = "Cliente SAC" },
+            lines = new[] { new { description = "Servicio de consultoría", unitCode = "ZZ", tax = new { quantity = 2m, unitValue = 100m, igvAffectationCode = "10" } } },
+            initialPayment = initial,
+            detraction,
+        };
+
+        async Task<decimal> NetAsync(HttpResponseMessage response)
+        {
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return body.RootElement.GetProperty("netPendingAmount").GetDecimal();
+        }
+
+        Assert.Equal(236.00m, await NetAsync(await PreviewAsync(setup.Owner, Credit(null))));
+        Assert.Equal(186.00m, await NetAsync(await PreviewAsync(setup.Owner, Credit(50m))));
+        Assert.Equal(157.68m, await NetAsync(await PreviewAsync(setup.Owner, Credit(50m), detraction: 12m))); // 236.00 - 28.32 - 50
+        Assert.Equal(178.92m, await NetAsync(await PreviewAsync(setup.Owner, Credit(50m), retention: 3m) )); // 236.00 - 7.08 - 50 (the withholding is of 3 %)
+        // A detraction already typed, adjusted within what the rules accept, is the one that counts.
+        Assert.Equal(157.00m, await NetAsync(await PreviewAsync(setup.Owner, Credit(50m, new { goodsOrServiceCode = "037", percentage = 12m, amount = 29m }), detraction: 12m)));
+    }
+
+    [Fact]
     public async Task The_preview_needs_no_idempotency_key_takes_nothing_from_the_plan_and_is_for_those_who_issue()
     {
         using var admin = await api.AdminClientAsync();

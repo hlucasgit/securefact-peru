@@ -30,6 +30,6 @@ Sin cambios: el documento previsualizado conserva su detracción y su tipo de op
 - 3 recorridos de extremo a extremo contra el simulador (`line-details.spec.ts`): una venta de pesca de dos ítems con los datos copiados del primero, el monto de detracción que da el servidor, emitida, mostrada y aceptada; un hospedaje con su estadía, que no se ofrece en boletas, emitido y aceptado; y un paquete turístico con el huésped solo. Accesibilidad (axe) de los formularios.
 
 ## Límites (P)
-- Siguen por la API: la entrega inicial de una venta al crédito y las notas con detracción.
+- La entrega inicial y la nota de débito con detracción se agregaron en el ADR-049: con él, todo lo que emite la API se emite desde la interfaz.
 - Las operaciones del catálogo 51 que la API no soporta (por ejemplo 0301, 0302, 0401, 2001, 2002, 2100 a 2106) no están en el formulario porque no están en el producto; no es un límite de la interfaz.
 - La interfaz no comprueba el contenido de la matrícula, de la especie ni de las fechas más allá de lo que el campo permite (largo, formato, que la salida no sea anterior al ingreso); no hay una lista pública de embarcaciones ni de especies que la plataforma pueda consultar.

@@ -221,6 +221,7 @@ export interface Document {
   note: NoteInfo | null
   installments: { amount: number; dueDate: string }[] | null
   operationTypeCode: string
+  initialPayment?: number | null
   detraction: { goodsOrServiceCode: string; percentage: number; amount: number; accountNumber: string | null } | null
   retention: { percentage: number; baseAmount: number; amount: number } | null
   usageCountryCode: string | null
@@ -232,6 +233,8 @@ export interface DocumentPreview {
   totals: Totals
   detractionAmount: number | null
   retentionAmount: number | null
+  /** What is left to pay: the payable amount less the detraction or the withholding and the initial payment. The installments of a credit sale add up to it. */
+  netPendingAmount: number
 }
 
 export interface CdrObservation {

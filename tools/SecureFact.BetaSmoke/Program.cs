@@ -206,11 +206,15 @@ static async Task<int> NoteRoundTripAsync(IServiceProvider provider, X509Certifi
         ? new TaxableLine(noteQuantity, 100m, "10", Isc: original.Lines[0].Isc, PlasticBagCount: original.Lines[0].PlasticBagCount)
         : new TaxableLine(1, adjustInstallments ? 0m : 100m, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10");
     var totals = provider.GetRequiredService<ITaxCalculator>().Calculate(new TaxCalculationRequest([noteLine], new TaxRates(0.18m, 0.04m, 0.50m))).Value;
+    // SF_BETA_NOTE_DETRACTION: a debit note on an invoice that carries a detraction of its own amount (sheet NotaDebito2_0); SUNAT does not check the percentage, so 12 % is arbitrary here.
+    var noteDetraction = !credit && Environment.GetEnvironmentVariable("SF_BETA_NOTE_DETRACTION") is not null
+        ? new UblDetraction("037", 12m, Math.Round(totals.PayableAmount * 12m / 100m, 0, MidpointRounding.AwayFromZero), Environment.GetEnvironmentVariable("SF_BETA_DETRACTION_ACCOUNT") ?? "00000000000")
+        : null;
     var note = new UblNoteData(
         credit ? "07" : "08", original.DocumentTypeCode == "03" ? "BC01" : "FC01", number, original.IssueDate, TimeOnly.FromDateTime(lima.DateTime), "PEN", reason,
         credit ? "Anulacion de la operacion" : "Aumento en el valor", original.DocumentTypeCode, original.Series, original.Number, original.Issuer, original.Buyer,
         [new UblLine(1, adjustInstallments ? "Ajuste de cuotas" : "Servicio de prueba", special ? "NIU" : "ZZ", null, noteQuantity, adjustInstallments ? 0m : 100m, null, adjustInstallments ? affectation : ivapOriginal ? "17" : exportOriginal ? "40" : "10", Isc: noteLine.Isc, PlasticBagCount: noteLine.PlasticBagCount)], totals, 0.18m,
-        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null, 0.04m, original.IcbperUnitAmount);
+        adjustInstallments ? [new UblInstallment(40m, original.IssueDate.AddDays(45)), new UblInstallment(78m, original.IssueDate.AddDays(90))] : null, 0.04m, original.IcbperUnitAmount, noteDetraction);
     var generated = provider.GetRequiredService<IUblDocumentGenerator>().GenerateNote(note);
     if (!generated.IsSuccess) { Console.Error.WriteLine($"UBL note: {generated.Error.Code} {generated.Error.Detail}"); return 1; }
     var signed = provider.GetRequiredService<IXmlSigner>().Sign(generated.Value.Xml, certificate, algorithm);

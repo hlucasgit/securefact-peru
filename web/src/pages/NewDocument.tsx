@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCatalog, useCompanies, useCustomers, useIssueDocument, usePreviewDocument, useSeries } from '../api/queries'
+import { DetractionFields } from '../components/DetractionFields'
 import { emptyLine, lineIsFree, LinesEditor, toRequestLine, type LineState } from '../components/LinesEditor'
 import { ErrorAlert, Loading, PageHeader, SelectField, TextField, useToast } from '../components/ui'
 import { DOCUMENT_TYPES, money, todayInLima } from '../lib/format'
@@ -37,6 +38,7 @@ interface Calculation {
   payable: number
   detractionAmount: number | null
   retentionAmount: number | null
+  netPending: number
 }
 
 export function NewDocument() {
@@ -48,7 +50,6 @@ export function NewDocument() {
   const identity = useCatalog('06')
   const affectations = useCatalog('07')
   const operations = useCatalog('51')
-  const detractionCodes = useCatalog('54')
   const legendCatalog = useCatalog('52')
   const customers = useCustomers('')
 
@@ -61,6 +62,7 @@ export function NewDocument() {
   const [lines, setLines] = useState<LineState[]>([emptyLine()])
   const [credit, setCredit] = useState(false)
   const [installments, setInstallments] = useState<{ amount: string; dueDate: string }[]>([{ amount: '', dueDate: '' }])
+  const [initialPayment, setInitialPayment] = useState('')
   const [operation, setOperation] = useState('0101')
   const [usageCountry, setUsageCountry] = useState('')
   const [deduction, setDeduction] = useState<DeductionInput>(noDeduction())
@@ -114,20 +116,22 @@ export function NewDocument() {
     email: buyer.email.trim() || null,
   }
   const installmentsBody = credit && type === '01' ? installments.map((item) => ({ amount: Number(item.amount), dueDate: item.dueDate })) : undefined
-  const request = (deductionToSend: DeductionInput) =>
-    buildDocumentRequest({ seriesId, issueDate, currency, buyer: buyerBody, lines: requestLines, installments: installmentsBody, operation, usageCountry, deduction: deductionToSend, legends: legendsToSend })
+  const request = (deductionToSend: DeductionInput, withInstallments = true) =>
+    buildDocumentRequest({ seriesId, issueDate, currency, buyer: buyerBody, lines: requestLines, installments: withInstallments ? installmentsBody : credit && type === '01' ? [] : undefined, operation, usageCountry, deduction: deductionToSend, legends: legendsToSend, initialPayment })
 
   // The document without its deduction is what the API previews: the amounts of a detraction and of a withholding depend on the total.
   // The amount of the detraction is what the preview gives, so it is not part of what is previewed (nor of what makes the result stale).
-  const previewBody = { document: request({ ...activeDeduction, amount: '0' }), detractionPercentage: activeDeduction.kind === 'detraction' ? Number(activeDeduction.percentage) || null : null, retentionPercentage: activeDeduction.kind === 'retention' ? Number(activeDeduction.retentionPercentage) || null : null }
+  // What is previewed leaves out the installments too: typing one is not a change of the document.
+  const previewBody = { document: request({ ...activeDeduction, amount: '0' }, false), detractionPercentage: activeDeduction.kind === 'detraction' ? Number(activeDeduction.percentage) || null : null, retentionPercentage: activeDeduction.kind === 'retention' ? Number(activeDeduction.retentionPercentage) || null : null }
   const previewKey = JSON.stringify(previewBody)
   const shown = calculation && calculation.key === previewKey ? calculation : null
-  const canCalculate = Boolean(seriesId) && (previewBody.detractionPercentage !== null || previewBody.retentionPercentage !== null)
+  const onCredit = credit && type === '01'
+  const canCalculate = Boolean(seriesId) && (previewBody.detractionPercentage !== null || previewBody.retentionPercentage !== null || onCredit)
 
   function calculate() {
     preview.mutate(previewBody, {
       onSuccess: (result) => {
-        setCalculation({ key: previewKey, payable: result.totals.payableAmount, detractionAmount: result.detractionAmount, retentionAmount: result.retentionAmount })
+        setCalculation({ key: previewKey, payable: result.totals.payableAmount, detractionAmount: result.detractionAmount, retentionAmount: result.retentionAmount, netPending: result.netPendingAmount })
         if (result.detractionAmount !== null) setDeduction((current) => ({ ...current, amount: String(result.detractionAmount) }))
       },
     })
@@ -241,15 +245,7 @@ export function NewDocument() {
 
             {deduction.kind === 'detraction' && (
               <>
-                <div className="form-grid">
-                  <SelectField label="Bien o servicio" hint="catálogo 54" required value={deduction.goodsOrServiceCode} onChange={(event) => setDeduction({ ...deduction, goodsOrServiceCode: event.target.value })}>
-                    <option value="">Elija…</option>
-                    {(detractionCodes.data ?? []).map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {entry.description}</option>)}
-                  </SelectField>
-                  <TextField label="Porcentaje" hint="% de la detracción" type="number" min="0" max="100" step="any" required value={deduction.percentage} onChange={(event) => setDeduction({ ...deduction, percentage: event.target.value })} />
-                  <TextField label="Monto de la detracción" hint="en soles" type="number" min="0" step="0.01" required value={deduction.amount} onChange={(event) => setDeduction({ ...deduction, amount: event.target.value })} />
-                  <TextField label="Cuenta en el Banco de la Nación" hint={selectedCompany?.detractionAccount ? 'vacía: se usa la de la empresa' : 'obligatoria si la empresa no la tiene registrada'} required={!selectedCompany?.detractionAccount} maxLength={100} value={deduction.account} onChange={(event) => setDeduction({ ...deduction, account: event.target.value })} />
-                </div>
+                <DetractionFields value={deduction} onChange={setDeduction} companyAccount={selectedCompany?.detractionAccount ?? null} />
                 <p className="muted">Los porcentajes y los montos de la detracción son datos del emisor: SUNAT revisa su estructura, no su valor. El 004 (recursos hidrobiológicos) pide los datos de la embarcación y de la especie en cada ítem, y el 027 (transporte de carga) los del transporte, más abajo.</p>
               </>
             )}
@@ -292,6 +288,9 @@ export function NewDocument() {
             </label>
             {credit && (
               <>
+                <div className="form-grid">
+                  <TextField label="Entrega inicial" hint="pagada en la fecha de emisión; opcional" type="number" min="0" step="0.01" value={initialPayment} onChange={(event) => setInitialPayment(event.target.value)} />
+                </div>
                 {installments.map((item, index) => (
                   <div className="form-grid" key={index}>
                     <TextField label={`Cuota ${index + 1}: monto`} type="number" min="0" step="0.01" required value={item.amount} onChange={(event) => setInstallments(installments.map((row, i) => (i === index ? { ...row, amount: event.target.value } : row)))} />
@@ -302,7 +301,13 @@ export function NewDocument() {
                   <button className="btn" type="button" onClick={() => setInstallments([...installments, { amount: '', dueDate: '' }])}>Agregar cuota</button>
                   {installments.length > 1 && <button className="btn" type="button" onClick={() => setInstallments(installments.slice(0, -1))}>Quitar última</button>}
                 </div>
-                <p className="muted">Las cuotas deben sumar el total del comprobante{activeDeduction.kind === 'none' ? '' : ', menos la detracción o la retención'}.</p>
+                <p className="muted">Las cuotas deben sumar el monto neto pendiente de pago: el total del comprobante{activeDeduction.kind === 'none' ? '' : ', menos la detracción o la retención'}{Number(initialPayment) > 0 ? ' y menos la entrega inicial' : ''}.</p>
+                <div className="actions">
+                  <button className="btn" type="button" disabled={!canCalculate || preview.isPending} onClick={calculate}>
+                    {preview.isPending ? 'Calculando…' : 'Calcular el monto neto pendiente'}
+                  </button>
+                </div>
+                {shown && <div className="alert info" role="status">Monto neto pendiente de pago: <strong>{money(shown.netPending, currency)}</strong>. Las cuotas deben sumar exactamente esto.</div>}
               </>
             )}
           </div>

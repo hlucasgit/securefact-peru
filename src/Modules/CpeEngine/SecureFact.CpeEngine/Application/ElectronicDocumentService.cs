@@ -125,7 +125,8 @@ internal sealed class ElectronicDocumentService(
             ? ubl.GenerateNote(new UblNoteData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, note.ReasonCode, note.Reason,
                 note.ReferencedDocumentTypeCode, note.ReferencedSeries, note.ReferencedNumber, issuer, buyer, ublLines, d.Totals, igv.Value,
-                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, icbperUnitAmount))
+                d.Installments?.Select(i => new UblInstallment(i.Amount, i.DueDate)).ToList(), ivap.Value, icbperUnitAmount,
+                d.Detraction is { } noteDetraction ? new UblDetraction(noteDetraction.GoodsOrServiceCode, noteDetraction.Percentage, noteDetraction.Amount, noteDetraction.AccountNumber ?? string.Empty) : null))
             : ubl.GenerateInvoice(new UblInvoiceData(
                 d.DocumentTypeCode, d.Series, d.Number, d.IssueDate, null, d.Currency, d.OperationTypeCode, issuer, buyer, ublLines, d.Totals, igv.Value,
                 d.Installments is { Count: > 0 } ? "Credito" : "Contado", d.Adjustments,

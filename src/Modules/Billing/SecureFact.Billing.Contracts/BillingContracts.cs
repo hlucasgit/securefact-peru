@@ -262,7 +262,8 @@ public sealed record CreateDocumentRequest(
 /// A credit (07) or debit (08) note. The series decides which; the note modifies one issued invoice or receipt, takes its currency and buyer, and
 /// cannot be dated before it. <see cref="ReasonCode"/> is catalogue 09 (credit: 01-10 and 13) or 10 (debit: 01-03); <see cref="Reason"/> explains it.
 /// Reason 13 adjusts the installments of an invoice sold on credit: it gives the new <paramref name="Installments"/> and no lines (the note carries a single line worth
-/// zero, because nothing is sold or returned); every other reason gives lines and no installments.
+/// zero, because nothing is sold or returned); every other reason gives lines and no installments. A <b>debit</b> note on an invoice may carry a <paramref name="Detraction"/> of its own
+/// amount (sheet NotaDebito2_0, rules 3313, 3314, 3127, 3033–3037, 3208); SUNAT's sheet of the credit note has no detraction, so a credit note never does.
 /// </summary>
 public sealed record CreateNoteRequest(
     Guid SeriesId,
@@ -272,7 +273,8 @@ public sealed record CreateNoteRequest(
     string Reason,
     IReadOnlyList<DocumentLineRequest>? Lines,
     GlobalAdjustments? Adjustments = null,
-    IReadOnlyList<Installment>? Installments = null);
+    IReadOnlyList<Installment>? Installments = null,
+    Detraction? Detraction = null);
 
 /// <summary>What a note modifies and why.</summary>
 public sealed record NoteInfo(string ReasonCode, string Reason, Guid ReferencedDocumentId, string ReferencedDocumentTypeCode, string ReferencedSeries, long ReferencedNumber);
@@ -361,14 +363,21 @@ public sealed record PreviewRequest(CreateDocumentRequest Document, decimal? Det
 
 /// <summary>
 /// What issuing the document would calculate, without issuing it: the totals and, when a percentage was given, the amount of the detraction (a suggestion, to the cent, that the issuer may
-/// change within what the rules accept) or the exact amount of the IGV retention.
+/// change within what the rules accept) or the exact amount of the IGV retention. <paramref name="NetPendingAmount"/> is what is left to pay: the payable amount less the detraction or the
+/// withholding and less the initial payment of a credit sale; the installments add up to it.
 /// </summary>
-public sealed record DocumentPreview(TaxCalculationResult Totals, decimal? DetractionAmount, decimal? RetentionAmount);
+public sealed record DocumentPreview(TaxCalculationResult Totals, decimal? DetractionAmount, decimal? RetentionAmount, decimal NetPendingAmount);
+
+/// <summary>A debit note to preview, with the percentage of its detraction whose amount is wanted (it depends on the total of the note).</summary>
+public sealed record NotePreviewRequest(CreateNoteRequest Note, decimal? DetractionPercentage = null);
 
 public interface IDocumentService
 {
     /// <summary>Calculates a document as issuing would, with the same checks, and issues nothing: no number, no idempotency key and nothing against the plan.</summary>
     Task<Result<DocumentPreview>> PreviewAsync(PreviewRequest request, CancellationToken cancellationToken);
+
+    /// <summary>The same for a note: its totals and the suggested amount of its detraction. Nothing is issued.</summary>
+    Task<Result<DocumentPreview>> PreviewNoteAsync(NotePreviewRequest request, CancellationToken cancellationToken);
 
     /// <summary>How many documents the tenant issued from <paramref name="from"/> (inclusive) to <paramref name="to"/> (exclusive), notes and voided ones included: that is what a plan meters.</summary>
     Task<int> CountIssuedAsync(Guid tenantId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);

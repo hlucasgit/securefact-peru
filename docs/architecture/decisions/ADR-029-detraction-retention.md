@@ -20,5 +20,5 @@ Factura con detracción (código 037, 12 %, 14.00 sobre 118.00, cuenta de once c
 ## Límites (P)
 - **Agente de retención**: la plataforma no tiene el padrón; quien indica la retención afirma que el adquirente es agente. SUNAT puede rechazar o no según el padrón vigente (el beta no lo hizo).
 - Sin tabla de bienes y porcentajes de detracción ni umbral de S/ 700 (la hoja no los valida): son responsabilidad del emisor.
-- Tipos 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte): ADR-030; sin detracción en boletas ni en notas; sin retención de renta de segunda categoría (63).
+- Tipos 1002 (recursos hidrobiológicos), 1003 y 1004 (transporte): ADR-030; sin detracción en boletas ni en notas de crédito (la nota de débito sobre una factura sí puede llevarla: ADR-049); sin retención de renta de segunda categoría (63).
 - El texto original de la RS 037-2002 que se leyó fija 6 % y fue modificado: el porcentaje de la retención nunca se toma de él.

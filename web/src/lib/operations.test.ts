@@ -55,6 +55,15 @@ describe('buildDocumentRequest', () => {
   it('keeps the installments of a credit sale', () => {
     expect(buildDocumentRequest({ ...base, installments: [{ amount: 100, dueDate: '2026-11-06' }] }).installments).toHaveLength(1)
   })
+
+  it('sends the initial payment only with installments, and only when there is one', () => {
+    const credit = { ...base, installments: [{ amount: 100, dueDate: '2026-11-06' }] }
+
+    expect(buildDocumentRequest({ ...credit, initialPayment: '50' }).initialPayment).toBe(50)
+    expect(buildDocumentRequest({ ...credit, initialPayment: '' })).not.toHaveProperty('initialPayment')
+    expect(buildDocumentRequest({ ...credit, initialPayment: '0' })).not.toHaveProperty('initialPayment')
+    expect(buildDocumentRequest({ ...base, initialPayment: '50' })).not.toHaveProperty('initialPayment') // a sale in cash has none
+  })
 })
 
 describe('the export types', () => {
