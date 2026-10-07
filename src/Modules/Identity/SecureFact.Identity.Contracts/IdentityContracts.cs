@@ -76,10 +76,16 @@ public interface IPasswordResetService
     Task<Result<Unit>> ConfirmAsync(string token, string newPassword, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// What the notifier needs to deliver a reset: the address, the one-time token, when it stops working, and where the account belongs (its tenant, or its reseller for a reseller user),
+/// so the message carries the brand of the reseller (ADR-052).
+/// </summary>
+public sealed record PasswordResetDelivery(string Email, string Token, DateTimeOffset ExpiresAt, Guid? TenantId, Guid? ResellerId);
+
 /// <summary>Delivers the one-time reset token to the account holder. The token must never be logged or returned by the API.</summary>
 public interface IPasswordResetNotifier
 {
-    Task SendAsync(string email, string token, DateTimeOffset expiresAt, CancellationToken cancellationToken);
+    Task SendAsync(PasswordResetDelivery delivery, CancellationToken cancellationToken);
 }
 
 /// <summary>One-time creation of the first platform administrator (run from the operator command line, never from HTTP).</summary>

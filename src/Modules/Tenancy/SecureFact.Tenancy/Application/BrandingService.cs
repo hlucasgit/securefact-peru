@@ -59,6 +59,13 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
         return Effective(await db.Resellers.AsNoTracking().SingleOrDefaultAsync(r => r.Id == resellerId, cancellationToken));
     }
 
+    public async Task<string?> PortalHostAsync(Guid resellerId, CancellationToken cancellationToken)
+    {
+        using var elevated = scope.Elevate("branding: portal of a reseller");
+        var reseller = await db.Resellers.AsNoTracking().SingleOrDefaultAsync(r => r.Id == resellerId, cancellationToken);
+        return reseller is { IsActive: true, HostStatus: DomainStatus.Verified } ? reseller.Host : null;
+    }
+
     public async Task<BrandLogo?> LogoAsync(Guid resellerId, CancellationToken cancellationToken)
     {
         using var elevated = scope.Elevate("branding: logo of a reseller");

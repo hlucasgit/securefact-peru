@@ -11,6 +11,8 @@ import { Dashboard } from './pages/Dashboard'
 import { DocumentDetail } from './pages/DocumentDetail'
 import { Documents } from './pages/Documents'
 import { Login } from './pages/Login'
+import { RecoverPassword } from './pages/RecoverPassword'
+import { ResetPassword } from './pages/ResetPassword'
 import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
 import { NewNote } from './pages/NewNote'
@@ -39,6 +41,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/ingresar" element={<Login />} />
+      <Route path="/recuperar" element={<RecoverPassword />} />
+      <Route path="/restablecer" element={<ResetPassword />} />
       <Route element={<Protected />}>
         <Route index element={<Home />} />
         <Route path="plataforma/inquilinos" element={<Tenants />} />

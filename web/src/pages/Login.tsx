@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { ApiError, errorMessage } from '../api/http'
 import { useSession } from '../auth/session'
 import { BrandMark, useBrand } from '../branding/BrandingProvider'
@@ -55,6 +55,9 @@ export function Login() {
         <button className="btn primary" type="submit" disabled={busy}>
           {busy ? 'Ingresando…' : 'Ingresar'}
         </button>
+        <p>
+          <Link to="/recuperar">¿Olvidó su contraseña?</Link>
+        </p>
         {brand?.supportEmail && (
           <p className="muted">
             ¿Necesita ayuda? <a href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>

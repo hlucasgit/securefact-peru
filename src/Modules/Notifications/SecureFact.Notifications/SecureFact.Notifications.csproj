@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="SecureFact.Security.Tests" />
+    <InternalsVisibleTo Include="SecureFact.Unit.Tests" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\SecureFact.Notifications.Contracts\SecureFact.Notifications.Contracts.csproj" />
+  </ItemGroup>
+</Project>

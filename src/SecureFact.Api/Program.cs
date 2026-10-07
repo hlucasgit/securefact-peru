@@ -14,6 +14,7 @@ using SecureFact.Products;
 using SecureFact.Identity;
 using SecureFact.Organizations;
 using SecureFact.Identity.Contracts;
+using SecureFact.Notifications;
 using SecureFact.Platform;
 using SecureFact.Platform.Security;
 using SecureFact.Platform.Storage;
@@ -102,7 +103,15 @@ else
 {
     builder.Services.AddInMemoryObjectStorage();
 }
-builder.Services.AddScoped<IPasswordResetNotifier, UnconfiguredPasswordResetNotifier>();
+builder.Services.AddNotificationsModule(builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions(), builder.Environment.IsProduction());
+var webOptions = builder.Configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions();
+if (builder.Environment.IsProduction() && !(Uri.TryCreate(webOptions.PublicUrl, UriKind.Absolute, out var publicUrl) && publicUrl.Scheme == Uri.UriSchemeHttps))
+{
+    throw new InvalidOperationException("Web:PublicUrl is required in production and must be an https address: it is the base of the links that go out in e-mails.");
+}
+
+builder.Services.AddSingleton(webOptions);
+builder.Services.AddScoped<IPasswordResetNotifier, EmailPasswordResetNotifier>();
 builder.Services.AddSecureFactRateLimiting(builder.Configuration);
 builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
 

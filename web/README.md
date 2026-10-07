@@ -30,7 +30,8 @@ npm ci && npx playwright install chromium
 SF_E2E_ADMIN_EMAIL=admin@ejemplo.local SF_E2E_ADMIN_PASSWORD='<su clave>' npm run e2e
 ```
 
-- Variables: `SF_E2E_API_URL` (por defecto `http://localhost:5180`), `SF_E2E_WEB_URL` (si ya sirve la interfaz; si no, Playwright la compila y la sirve), `OPENSSL` (ruta del comando `openssl`, que genera los certificados de prueba).
+- La API de las pruebas escribe el correo como archivos (`Email__Provider=Sandbox`, `Email__From`, `Email__Sandbox__Directory`; en Docker, `SF_EMAIL_PROVIDER=Sandbox` y `SF_EMAIL_FROM`) y las pruebas los leen en `SF_E2E_MAIL_DIR` (la carpeta de `SF_MAIL_DIR`, `./.data/mail` por defecto): sin eso fallan las de recuperación de contraseña (ADR-052).
+- Variables: `SF_E2E_API_URL` (por defecto `http://localhost:5180`), `SF_E2E_MAIL_DIR` (carpeta de los correos), `SF_E2E_WEB_URL` (si ya sirve la interfaz; si no, Playwright la compila y la sirve), `OPENSSL` (ruta del comando `openssl`, que genera los certificados de prueba).
 - La API de las pruebas necesita `RateLimiting__AuthPermitPerMinute=1000` (en Docker, `SF_AUTH_RATE_LIMIT=1000`: se inicia sesión muchas veces desde una dirección) y los workers `Cpe__WorkerIntervalSeconds=3` (`SF_CPE_WORKER_INTERVAL=3`), para que la baja y el archivo no tarden.
 - `npm run e2e:ui` abre el modo interactivo. Un fallo deja captura, traza y el informe en `playwright-report/`.
 - Cada prueba crea su cuenta: no hace falta limpiar nada entre corridas.

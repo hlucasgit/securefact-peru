@@ -26,6 +26,13 @@ export DOTNET_ENVIRONMENT=Development
 export Sunat__Environment=Sandbox
 # The simulator of the DNS of the domains of the resellers (ADR-051): every check passes. Never in production.
 export Domains__Dns__Provider=Sandbox
+# The e-mail goes to files that the tests read (ADR-052): the link of a password reset arrives there. Never in production.
+MAIL_DIR="${RUNNER_TEMP:-/tmp}/sf-mail"
+mkdir -p "${MAIL_DIR}"
+export Email__Provider=Sandbox
+export Email__From=no-responder@securefact.test
+export Email__Sandbox__Directory="${MAIL_DIR}"
+export Web__PublicUrl=http://localhost:5173
 # The tests sign in many times from one address; the limit of the sign-in endpoint is raised for them only.
 export RateLimiting__AuthPermitPerMinute=1000
 # The workers look for work every 3 seconds instead of every 15.
@@ -40,6 +47,7 @@ SF_BOOTSTRAP_ADMIN_EMAIL="${ADMIN_EMAIL}" SF_BOOTSTRAP_ADMIN_PASSWORD="${ADMIN_P
 {
   echo "SF_E2E_ADMIN_EMAIL=${ADMIN_EMAIL}"
   echo "SF_E2E_ADMIN_PASSWORD=${ADMIN_PASSWORD}"
+  echo "SF_E2E_MAIL_DIR=${MAIL_DIR}"
 } >> "${GITHUB_ENV:?GITHUB_ENV is not set}"
 
 mkdir -p logs

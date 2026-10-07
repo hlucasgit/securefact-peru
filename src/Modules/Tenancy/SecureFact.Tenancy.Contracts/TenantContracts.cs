@@ -192,6 +192,9 @@ public interface IBranding
 
     Task<BrandingDto?> ForResellerAsync(Guid resellerId, CancellationToken cancellationToken);
 
+    /// <summary>The verified domain at which the portal of a reseller is served, or null when it has none, it is not verified or the reseller is off. For the links in the e-mails (ADR-052).</summary>
+    Task<string?> PortalHostAsync(Guid resellerId, CancellationToken cancellationToken);
+
     Task<BrandLogo?> LogoAsync(Guid resellerId, CancellationToken cancellationToken);
 
     Task<Result<BrandingSettings>> GetAsync(Guid resellerId, CancellationToken cancellationToken);

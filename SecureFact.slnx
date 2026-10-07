@@ -36,6 +36,10 @@
     <Project Path="src/Modules/Identity/SecureFact.Identity.Contracts/SecureFact.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/SecureFact.Identity/SecureFact.Identity.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Notifications/">
+    <Project Path="src/Modules/Notifications/SecureFact.Notifications.Contracts/SecureFact.Notifications.Contracts.csproj" />
+    <Project Path="src/Modules/Notifications/SecureFact.Notifications/SecureFact.Notifications.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Organizations/">
     <Project Path="src/Modules/Organizations/SecureFact.Organizations.Contracts/SecureFact.Organizations.Contracts.csproj" />
     <Project Path="src/Modules/Organizations/SecureFact.Organizations/SecureFact.Organizations.csproj" />

@@ -134,9 +134,22 @@ services:
       Domains__Dns__Provider: ${SF_DOMAINS_DNS_PROVIDER:-Sandbox}
       Domains__EdgeHost: ${SF_EDGE_HOST:-}
       Domains__EdgeSecret: ${SF_EDGE_SECRET:-}
+      # Outgoing e-mail (ADR-052): None sends nothing; Smtp sends through your server (SF_SMTP_*); Sandbox writes each e-mail as an .eml file under SF_MAIL_DIR (development and tests only).
+      Email__Provider: ${SF_EMAIL_PROVIDER:-None}
+      Email__From: ${SF_EMAIL_FROM:-}
+      Email__Smtp__Host: ${SF_SMTP_HOST:-}
+      Email__Smtp__Port: ${SF_SMTP_PORT:-587}
+      Email__Smtp__Security: ${SF_SMTP_SECURITY:-StartTls}
+      Email__Smtp__User: ${SF_SMTP_USER:-}
+      Email__Smtp__Password: ${SF_SMTP_PASSWORD:-}
+      Email__Sandbox__Directory: /var/lib/securefact/mail
+      # The address of the web interface, base of the links in the e-mails (a reseller with a verified domain gets its own).
+      Web__PublicUrl: ${SF_PUBLIC_URL:-http://localhost:5173}
       # Sign-ins allowed per minute and address (the end-to-end tests raise it).
       RateLimiting__AuthPermitPerMinute: ${SF_AUTH_RATE_LIMIT:-20}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${SF_OTLP_ENDPOINT:-}
+    volumes:
+      - ${SF_MAIL_DIR:-./.data/mail}:/var/lib/securefact/mail
     ports:
       - "127.0.0.1:${SF_API_PORT:-5180}:8080"
 

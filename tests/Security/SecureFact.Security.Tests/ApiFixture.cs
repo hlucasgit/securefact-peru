@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -8,31 +9,50 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using SecureFact.Identity.Contracts;
+using SecureFact.Notifications.Contracts;
 
 namespace SecureFact.Security.Tests;
 
-/// <summary>Captures password-reset tokens that a real notifier would e-mail, so tests can complete the flow.</summary>
-public sealed class CapturingNotifier : IPasswordResetNotifier
+/// <summary>The outgoing e-mail of the tests: keeps what would leave, so a test reads the message the real notifier composed.</summary>
+public sealed class CapturingEmailSender : IEmailSender
 {
-    private readonly Dictionary<string, string> _tokens = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<EmailMessage> _sent = [];
 
-    public Task SendAsync(string email, string token, DateTimeOffset expiresAt, CancellationToken cancellationToken)
+    /// <summary>While true, the channel fails as an SMTP server that is down would.</summary>
+    public bool Fail { get; set; }
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
     {
-        lock (_tokens)
+        if (Fail)
         {
-            _tokens[email] = token;
+            throw new EmailDeliveryException("simulated: the mail server is down");
+        }
+
+        lock (_sent)
+        {
+            _sent.Add(message);
         }
 
         return Task.CompletedTask;
     }
 
-    public string? TokenFor(string email)
+    public IReadOnlyList<EmailMessage> To(string email)
     {
-        lock (_tokens)
+        lock (_sent)
         {
-            return _tokens.GetValueOrDefault(email);
+            return _sent.Where(m => string.Equals(m.To, email, StringComparison.OrdinalIgnoreCase)).ToList();
         }
     }
+}
+
+/// <summary>Reads the password-reset token out of the e-mail that the real notifier sent, so tests complete the flow exactly as a person does: from the link.</summary>
+public sealed partial class CapturingNotifier(CapturingEmailSender mail)
+{
+    [GeneratedRegex(@"#token=([^\s""<]+)")]
+    private static partial Regex TokenPattern();
+
+    public string? TokenFor(string email) =>
+        mail.To(email).Select(m => TokenPattern().Match(m.Text)).LastOrDefault(m => m.Success) is { } match ? Uri.UnescapeDataString(match.Groups[1].Value) : null;
 }
 
 public sealed record TestUser(string Email, string Password, Guid Id);
@@ -41,6 +61,7 @@ public sealed class ApiFixture : IAsyncLifetime
 {
     public const string AdminEmail = "platform.admin@securefact.test";
     public const string AdminPassword = "Platform-admin passphrase 2026";
+    public const string PublicUrl = "https://app.securefact.test";
     public const string StrongPassword = "A long and unusual passphrase 42";
 
     private readonly PostgresFixture _postgres;
@@ -51,7 +72,9 @@ public sealed class ApiFixture : IAsyncLifetime
         _postgres = new PostgresFixture();
     }
 
-    public CapturingNotifier Notifier { get; } = new();
+    public CapturingEmailSender Mail { get; } = new();
+
+    public CapturingNotifier Notifier => new(Mail);
 
     public LogSink Logs { get; } = new();
 
@@ -81,11 +104,12 @@ public sealed class ApiFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Domains__PlatformHosts__0", FakeDomainNameSystem.PlatformHost);
         Environment.SetEnvironmentVariable("Domains__EdgeSecret", FakeDomainNameSystem.EdgeSecret);
         Environment.SetEnvironmentVariable("Domains__MinimumCheckSeconds", "2");
+        Environment.SetEnvironmentVariable("Web__PublicUrl", PublicUrl);
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.AddSingleton<IPasswordResetNotifier>(Notifier);
+                services.AddSingleton<IEmailSender>(Mail);
                 services.AddSingleton<SecureFact.CpeEngine.Contracts.ICpeSubmissionChannel>(Sunat);
                 services.AddSingleton<SecureFact.Tenancy.Contracts.IDomainNameSystem>(Dns);
                 services.AddLogging(logging => logging.AddProvider(Logs));

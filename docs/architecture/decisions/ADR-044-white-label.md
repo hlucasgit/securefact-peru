@@ -43,7 +43,7 @@ Lo que lee un visitante son **cuatro campos** (nombre, color, correo de soporte,
 
 ## Límites (P)
 - **El PDF, el XML y el CDR no llevan la marca del revendedor.** Son del contribuyente emisor y de SUNAT; su contenido lo fijan las normas, no el revendedor. Un logotipo del propio emisor en la representación impresa es un asunto distinto (pendiente).
-- **Sin correos con marca**: la plataforma aún no envía correos a los usuarios. Cuando los envíe, necesitarán plantillas por revendedor.
+- **Correos con marca**: desde el ADR-052 la plataforma envía el correo de recuperación de contraseña con el nombre y el soporte del revendedor; los demás avisos y las plantillas editables por el revendedor siguen pendientes.
 - **El dominio** se verifica y obtiene su certificado como dice el ADR-051 (prueba por DNS, un *edge* con TLS bajo demanda); desde él, **solo un dominio verificado muestra la marca**.
 - La API de un dominio propio es la misma: el portal de un revendedor no tiene un origen de API distinto, y la política CSP es la misma.
 - Un solo color. No hay temas completos, modo oscuro de marca, tipografías, favicon propio ni textos personalizados.
