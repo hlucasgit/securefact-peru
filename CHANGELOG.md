@@ -3,6 +3,9 @@
 Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado semántico cuando haya releases.
 
 ## [Unreleased]
+### Changed
+- El *refresh token* de la interfaz web va en una cookie `HttpOnly` (`sf_rt`, `SameSite=Strict`, ruta `/api/v1/auth`) en lugar de `sessionStorage` (ADR-050). Se pide con el encabezado `X-SecureFact-Session: cookie`; sin él, la API devuelve el token en el cuerpo como antes.
+
 ### Added
 - Detracción en la nota de débito (ADR-049, R-061; aceptada en el beta), entrega inicial de la venta al crédito en la interfaz, `POST /api/v1/notes/preview` y `netPendingAmount` en las vistas previas: lo que las cuotas deben sumar lo da el servidor.
 - Recursos hidrobiológicos (detracción 004), hospedaje (0202) y paquete turístico (0205) en la interfaz de emisión (ADR-048): los datos de cada ítem se piden según la operación, se copian del primero y el detalle del comprobante los muestra.

@@ -15,4 +15,4 @@
 - El personal de plataforma **no** lee datos de negocio de los tenants (RLS `TenantOnly`); el soporte requerirá una delegación explícita y auditada (futuro).
 
 ## Consecuencias
-+ Revocación inmediata y detección de robo de refresh tokens. − Una lectura por request para validar la sesión. − Roles personalizados por tenant no existen todavía (se añadirán con tablas cuando haya demanda).
++ Revocación inmediata y detección de robo de refresh tokens (el navegador lo guarda en una cookie `HttpOnly`: ADR-050). − Una lectura por request para validar la sesión. − Roles personalizados por tenant no existen todavía (se añadirán con tablas cuando haya demanda).

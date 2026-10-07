@@ -43,12 +43,15 @@ interface RequestOptions {
   idempotencyKey?: string
   anonymous?: boolean
   signal?: AbortSignal
+  /** Ask the API to keep the refresh token in an HttpOnly cookie (login and refresh): the page never sees it (ADR-050). */
+  cookieSession?: boolean
 }
 
 async function send(method: string, path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = {}
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
+  if (options.cookieSession) headers['X-SecureFact-Session'] = 'cookie'
   const token = options.anonymous ? null : tokens.accessToken()
   if (token) headers.Authorization = `Bearer ${token}`
   return fetch(path, { method, headers, body: options.body === undefined ? undefined : JSON.stringify(options.body), signal: options.signal })

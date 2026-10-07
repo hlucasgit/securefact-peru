@@ -28,7 +28,33 @@ test.describe('autenticación', () => {
     await page.reload()
 
     await expect(page).toHaveURL(/\/ingresar$/)
-    expect(await page.evaluate(() => sessionStorage.getItem('sf.refresh'))).toBeNull()
+    expect(await page.evaluate('localStorage.getItem("sf.session")')).toBeNull()
+    expect((await page.context().cookies()).filter((cookie) => cookie.name === 'sf_rt')).toHaveLength(0) // the logout cleared the cookie
+  })
+
+  test('el token de renovación va en una cookie HttpOnly que la página no puede leer', async ({ page, tenant }) => {
+    await signIn(page, tenant.owner)
+    await expect(page.getByRole('heading', { name: 'Panel' })).toBeVisible()
+
+    const cookie = (await page.context().cookies()).find((item) => item.name === 'sf_rt')
+    expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'Strict', path: '/api/v1/auth' })
+    expect(await page.evaluate('document.cookie')).not.toContain('sf_rt')
+    // Nothing of the session that a script could read: no token in the storage of the page, only the hint that there is a session.
+    expect(await page.evaluate('JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)])')).not.toMatch(/eyJ|sf_rt/)
+    expect(await page.evaluate('Object.keys(localStorage).join(",")')).toBe('sf.session')
+  })
+
+  test('una segunda pestaña del mismo navegador entra sin volver a ingresar y las dos renuevan sin romper la sesión', async ({ page, tenant, context }) => {
+    await signIn(page, tenant.owner)
+    await expect(page.getByRole('heading', { name: 'Panel' })).toBeVisible()
+
+    const other = await context.newPage()
+    await other.goto('/')
+    await expect(other.getByRole('heading', { name: 'Panel' })).toBeVisible()
+    // Both tabs renew at once on reload: the cookie rotates and the lock keeps them from spending the same token twice.
+    await Promise.all([page.reload(), other.reload()])
+    await expect(page.getByRole('heading', { name: 'Panel' })).toBeVisible()
+    await expect(other.getByRole('heading', { name: 'Panel' })).toBeVisible()
   })
 
   test('recargar la página conserva la sesión', async ({ page, tenant }) => {

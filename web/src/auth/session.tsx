@@ -1,12 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, setTokenSource } from '../api/http'
 
-interface Tokens {
+/** What the API returns in the cookie mode: the access token only. The refresh token is in an HttpOnly cookie that the page cannot read. */
+interface LoginResponse {
   accessToken: string
-  refreshToken: string
-}
-
-interface LoginResponse extends Tokens {
   expiresInSeconds: number
 }
 
@@ -24,7 +21,8 @@ interface SessionValue {
   hasRole(...roles: string[]): boolean
 }
 
-const REFRESH_KEY = 'sf.refresh'
+/** A hint, not a secret: it says that this browser had a session, so the page tries to restore it. Without it a visitor is not asked for a refresh that the server would refuse. */
+const SESSION_HINT = 'sf.session'
 const Session = createContext<SessionValue | null>(null)
 
 /** Reads the claims of a JWT for display and menu decisions only: the API decides what is allowed. */
@@ -39,49 +37,53 @@ export function decodeToken(token: string): Principal | null {
   }
 }
 
-function storedRefresh(): string | null {
+function hasSessionHint(): boolean {
   try {
-    return sessionStorage.getItem(REFRESH_KEY)
+    return localStorage.getItem(SESSION_HINT) !== null
   } catch {
-    return null
+    return false
   }
 }
 
-function storeRefresh(token: string | null): void {
+function setSessionHint(on: boolean): void {
   try {
-    if (token) sessionStorage.setItem(REFRESH_KEY, token)
-    else sessionStorage.removeItem(REFRESH_KEY)
+    if (on) localStorage.setItem(SESSION_HINT, '1')
+    else localStorage.removeItem(SESSION_HINT)
   } catch {
-    // storage blocked: the session lasts until the page is reloaded
+    // storage blocked: the session is restored only while the page is not reloaded
   }
+}
+
+/**
+ * The refresh token rotates and its cookie is shared by every tab of the browser, so two tabs that renew at the same moment would spend the same token twice and the server would take it
+ * for a theft. The browser's lock serialises the renewals of all the tabs: the second one goes on with the cookie that the first one left.
+ */
+function exclusively<T>(work: () => Promise<T>): Promise<T> {
+  return typeof navigator !== 'undefined' && navigator.locks ? navigator.locks.request('sf-refresh', work) : work()
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  // The access token lives in memory only; the refresh token survives a reload in sessionStorage (cleared when the tab closes).
+  // The access token lives in memory only. The refresh token is an HttpOnly cookie that the page cannot read, so a script injected in the page cannot take it (ADR-050).
   const access = useRef<string | null>(null)
-  const refreshToken = useRef<string | null>(storedRefresh())
   const pending = useRef<Promise<boolean> | null>(null)
   const [principal, setPrincipal] = useState<Principal | null>(null)
-  const [restoring, setRestoring] = useState(() => storedRefresh() !== null)
+  const [restoring, setRestoring] = useState(hasSessionHint)
 
-  const accept = useCallback((tokens: Tokens) => {
+  const accept = useCallback((tokens: LoginResponse) => {
     access.current = tokens.accessToken
-    refreshToken.current = tokens.refreshToken
-    storeRefresh(tokens.refreshToken)
+    setSessionHint(true)
     setPrincipal(decodeToken(tokens.accessToken))
   }, [])
 
   const clear = useCallback(() => {
     access.current = null
-    refreshToken.current = null
-    storeRefresh(null)
+    setSessionHint(false)
     setPrincipal(null)
   }, [])
 
-  // One refresh at a time: the refresh token rotates, so concurrent calls would invalidate each other.
+  // One refresh at a time in this tab, and one at a time across the tabs (exclusively).
   const refresh = useCallback((): Promise<boolean> => {
-    if (!refreshToken.current) return Promise.resolve(false)
-    pending.current ??= api<LoginResponse>('POST', '/api/v1/auth/refresh', { body: { refreshToken: refreshToken.current }, anonymous: true })
+    pending.current ??= exclusively(() => api<LoginResponse>('POST', '/api/v1/auth/refresh', { anonymous: true, cookieSession: true }))
       .then((tokens) => {
         accept(tokens)
         return true
@@ -98,7 +100,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh, clear])
 
   useEffect(() => {
-    if (refreshToken.current === null) return
+    if (!hasSessionHint()) return
     let active = true
     void refresh().then((ok) => {
       if (!ok) clear()
@@ -114,7 +116,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       principal,
       restoring,
       async login(email, password, totpCode) {
-        accept(await api<LoginResponse>('POST', '/api/v1/auth/login', { body: { email, password, totpCode: totpCode || null }, anonymous: true }))
+        accept(await api<LoginResponse>('POST', '/api/v1/auth/login', { body: { email, password, totpCode: totpCode || null }, anonymous: true, cookieSession: true }))
       },
       async logout() {
         try {

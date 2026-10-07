@@ -99,6 +99,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public HttpClient NewClient() => _factory!.CreateClient();
 
+    /// <summary>A client that keeps no cookies of its own: a test that sends and reads the cookies by hand sees exactly what the server says.</summary>
+    public HttpClient NewCookielessClient() => _factory!.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });
+
     public async Task<HttpResponseMessage> LoginAsync(string email, string password, string? totp = null)
     {
         using var client = NewClient();

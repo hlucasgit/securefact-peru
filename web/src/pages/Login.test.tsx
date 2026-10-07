@@ -23,6 +23,7 @@ function renderLogin() {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  localStorage.clear()
   sessionStorage.clear()
 })
 
@@ -40,7 +41,7 @@ describe('Login', () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(json(400, { code: 'SF-AUTH-005', title: 'Segundo factor requerido' }))
-      .mockResolvedValueOnce(json(200, { accessToken: jwt({ sub: 'u1', role: ['TenantOwner'] }), refreshToken: 'r1', expiresInSeconds: 600 }))
+      .mockResolvedValueOnce(json(200, { accessToken: jwt({ sub: 'u1', role: ['TenantOwner'] }), refreshToken: '', expiresInSeconds: 600 }))
     renderLogin()
 
     await user.type(screen.getByLabelText('Correo electrónico'), 'a@b.pe')
@@ -52,7 +53,11 @@ describe('Login', () => {
     expect(await screen.findByText('Panel')).toBeInTheDocument()
     const second = JSON.parse(fetchMock.mock.calls[1][1]!.body as string) as { totpCode: string }
     expect(second.totpCode).toBe('123456')
-    expect(sessionStorage.getItem('sf.refresh')).toBe('r1')
+    // The page asked for the cookie mode and keeps no token of renewal anywhere it could be read: only a hint that it had a session.
+    expect((fetchMock.mock.calls[1][1]!.headers as Record<string, string>)['X-SecureFact-Session']).toBe('cookie')
+    expect(sessionStorage.length).toBe(0)
+    expect(Object.keys(localStorage)).toEqual(['sf.session'])
+    expect(JSON.stringify([...Object.values(localStorage), ...Object.values(sessionStorage)])).not.toMatch(/eyJ/)
   })
 
   it('shows the error of a wrong password without leaving the page', async () => {

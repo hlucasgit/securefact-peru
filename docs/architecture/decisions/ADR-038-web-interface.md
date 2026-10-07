@@ -15,9 +15,9 @@ Hasta ahora la plataforma era solo API. El MVP necesita que un contribuyente con
 - **Los textos de error** son los de la API (Problem Details, código estable `SF-…`); la interfaz solo los muestra.
 
 ### Sesión
-- El *access token* vive **solo en memoria**; el *refresh token* en `sessionStorage` (sobrevive a recargar, no a cerrar la pestaña). Un solo `refresh` a la vez (el token rota). Ante un 401 se renueva una vez y se repite la petición; si falla, se cierra la sesión.
+- El *access token* vive **solo en memoria**; el *refresh token* va en una **cookie `HttpOnly`** que la página no puede leer (ADR-050; antes estaba en `sessionStorage`). Un solo `refresh` a la vez, también entre pestañas (el token rota). Ante un 401 se renueva una vez y se repite la petición; si falla, se cierra la sesión.
 - El segundo factor se pide cuando la API contesta `SF-AUTH-005`. Los roles del token se usan **solo para mostrar u ocultar menús**: la autorización es de la API.
-- **Límite (P)**: un *refresh token* en `sessionStorage` es legible por un script de la página (XSS). La CSP lo mitiga; moverlo a una cookie `HttpOnly` pide un cambio de la API (cookie, `SameSite`, protección CSRF) que no se hizo.
+- El límite de que el *refresh token* fuera legible por un script de la página (XSS) se cerró con ADR-050.
 
 ### Pantallas del MVP
 Administración de plataforma: ADR-041. Ingreso (con segundo factor) · Panel (empresas, certificados por vencer, últimos documentos) · Empresas (datos, establecimientos, series, certificado digital, credenciales SOL) · Clientes y productos · **Emitir** factura o boleta (ítems con afectación, descuento, ISC y bolsas de plástico; venta al crédito) · Documentos (lista paginada, detalle, generar y firmar, enviar, consultar, reintentar, XML, PDF, CDR, archivo conservado con su hash, baja) · **Notas** de crédito y débito desde el documento · Resumen diario · Usuarios · Seguridad (activar el segundo factor) · Reglas (valor, fuente y verificación).
