@@ -8,6 +8,9 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 - El *refresh token* de la interfaz web va en una cookie `HttpOnly` (`sf_rt`, `SameSite=Strict`, ruta `/api/v1/auth`) en lugar de `sessionStorage` (ADR-050). Se pide con el encabezado `X-SecureFact-Session: cookie`; sin él, la API devuelve el token en el cuerpo como antes.
 
+### Fixed
+- `deploy/edge/Caddyfile`: la ruta `/api/v1/edge/*` (la pregunta del *edge*) llegaba a la API desde fuera porque `respond` corre después de los bloques `handle`; ahora un `handle @internal` listado primero la contesta con 404. Validado con `caddy validate` y probado con Caddy real.
+
 ### Added
 - Aprovisionamiento de dominios (ADR-051): estado del dominio (pendiente, verificado, sin respuesta), prueba por registro TXT y ruta por CNAME o A/AAAA verificadas por DNS (`DnsClient`), un worker que revisa y promueve, `GET /api/v1/reseller/domain` y `POST …/domain/verify`, `GET /api/v1/edge/tls-allowed` para el *edge* con TLS bajo demanda (`deploy/edge/Caddyfile`, `docker-compose.edge.yml`, no ejecutados) y `docs/deployment/domains.md`. La pantalla de la marca muestra los registros a crear y su estado.
 - Detracción en la nota de débito (ADR-049, R-061; aceptada en el beta), entrega inicial de la venta al crédito en la interfaz, `POST /api/v1/notes/preview` y `netPendingAmount` en las vistas previas: lo que las cuotas deben sumar lo da el servidor.

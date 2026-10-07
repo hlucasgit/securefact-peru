@@ -1,8 +1,8 @@
 # Edge of the platform: terminates TLS for the portals of the resellers (ADR-051). One certificate per name, issued the first time the name is seen, and only for the names that the
 # platform says may have one (the verified domains of the resellers that are on, and the platform's own hosts).
 #
-# NOT RUN: this file was written from Caddy's documentation and the container image was not pulled to validate it. Run `caddy validate --config Caddyfile` before using it
-# (docs/deployment/domains.md).
+# Validated with `caddy validate` (caddy:2) and run against a local ask endpoint with `local_certs`: the certificate is issued only when the ask answers 200, and /api/v1/edge/*
+# answers 404 from the outside. NOT validated: issuance by a real certificate authority (docs/deployment/domains.md).
 
 {
 	email {$SF_ACME_EMAIL}
@@ -21,8 +21,11 @@ https:// {
 	}
 
 	# The question of the edge is the edge's alone: it must never be reachable from the outside through the edge itself.
+	# It is a handle block, listed first: `respond` alone would run after the `handle` blocks, which would already have sent the request to the API.
 	@internal path /api/v1/edge/*
-	respond @internal 404
+	handle @internal {
+		respond 404
+	}
 
 	handle /api/* {
 		reverse_proxy api:8080
