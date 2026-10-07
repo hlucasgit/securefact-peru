@@ -154,6 +154,8 @@ export interface DocumentLine {
   isc: IscInput | null
   plasticBagCount: number
   transport?: CargoTransport | null
+  fishing?: { vesselRegistration: string; vesselName: string; speciesType: string; unloadingPlace: string; unloadingDate: string; speciesQuantity: number } | null
+  guest?: { name: string; documentTypeCode: string; documentNumber: string; passportCountryCode: string; residenceCountryCode: string | null; checkInDate: string | null; checkOutDate: string | null; stayDays: number | null } | null
 }
 
 export interface CargoTransport {

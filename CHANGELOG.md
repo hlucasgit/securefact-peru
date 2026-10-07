@@ -4,6 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Added
+- Recursos hidrobiológicos (detracción 004), hospedaje (0202) y paquete turístico (0205) en la interfaz de emisión (ADR-048): los datos de cada ítem se piden según la operación, se copian del primero y el detalle del comprobante los muestra.
 - Leyendas de venta exonerada y transporte de carga (detracción 027) en la interfaz de emisión (ADR-047). La vista previa conserva la detracción del documento para conocer la operación que fija su código.
 - Detracción, retención y exportación en la interfaz de emisión (ADR-046), y `POST /api/v1/documents/preview`: calcula un comprobante con las mismas reglas que la emisión y sin emitirlo, y da el monto sugerido de la detracción y el de la retención. El detalle del comprobante muestra su operación.
 - Suspensión por el revendedor (ADR-045): `POST /api/v1/reseller/tenants/{id}/status` (permiso `reseller.tenants.suspend`). Suspende y reactiva cuentas propias con motivo auditado; no cierra ni levanta una suspensión de la plataforma (`SF-TEN-004`). `suspended_by` en la cuenta; la plataforma puede tomar la suspensión del revendedor. En la interfaz, Suspender y Reactivar en el detalle de la cuenta del revendedor y quién suspendió en el de la plataforma.

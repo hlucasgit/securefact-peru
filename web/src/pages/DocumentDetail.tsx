@@ -224,6 +224,17 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
                       {line.isc && <Badge tone="info">ISC {line.isc.system === 'AdValorem' ? `${Math.round(line.isc.rateOrUnitAmount * 10000) / 100} %` : money(line.isc.rateOrUnitAmount, doc.currency)}</Badge>}
                       {line.plasticBagCount > 0 && <Badge tone="info">{line.plasticBagCount} bolsas</Badge>}
                     </div>
+                    {line.fishing && (
+                      <div className="muted">
+                        Pesca: {line.fishing.speciesType} · {line.fishing.speciesQuantity} t · {line.fishing.vesselName} ({line.fishing.vesselRegistration}) · descarga en {line.fishing.unloadingPlace} el {date(line.fishing.unloadingDate)}
+                      </div>
+                    )}
+                    {line.guest && (
+                      <div className="muted">
+                        Huésped: {line.guest.name} ({line.guest.documentNumber}), pasaporte de {line.guest.passportCountryCode}
+                        {line.guest.stayDays !== null && line.guest.stayDays !== undefined && <> · {line.guest.stayDays} {line.guest.stayDays === 1 ? 'día' : 'días'} de permanencia, del {date(line.guest.checkInDate)} al {date(line.guest.checkOutDate)}</>}
+                      </div>
+                    )}
                     {line.transport && (
                       <div className="muted">
                         Transporte: {line.transport.originAddress} ({line.transport.originUbigeo}) → {line.transport.destinationAddress} ({line.transport.destinationUbigeo}) · {line.transport.tripDetail}

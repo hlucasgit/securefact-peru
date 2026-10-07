@@ -22,8 +22,8 @@ test.describe('detracción, retención y exportación', () => {
   test('una factura con detracción: el sistema calcula el monto, se emite, se muestra y SUNAT la acepta', async ({ app }) => {
     await fillBasics(app)
     await app.getByLabel('Esta factura tiene').selectOption('detraction')
-    // El 004 pide datos de la embarcación en cada línea y se emite por la API; el 027 (transporte de carga) sí se ofrece.
-    await expect(app.getByRole('option', { name: /^004 ·/ })).toHaveCount(0)
+    // El 004 (pesca) y el 027 (transporte de carga) se ofrecen y piden datos en cada ítem.
+    await expect(app.getByRole('option', { name: /^004 ·/ })).toHaveCount(1)
     await expect(app.getByRole('option', { name: /^027 ·/ })).toHaveCount(1)
     await app.getByLabel('Bien o servicio').selectOption('037')
     await app.getByLabel('Porcentaje', { exact: false }).fill('12')

@@ -1,15 +1,20 @@
 // Operations of an invoice that go beyond a plain domestic sale: exports, detraction and IGV withholding. What the API checks is not repeated here beyond what shapes the form
 // (which choices to offer); the API refuses the rest. Nothing here calculates an amount: the totals, the detraction and the withholding come from the preview of the API.
 
-/** Catalogue 51 export types that the form issues. 0202 (lodging) and 0205 (tourist package) need data of the guest of each line and are issued through the API. */
+/**
+ * Catalogue 51 export types that the form issues. 0202 (lodging) and 0205 (tourist package) are of invoices only and state the non-domiciled guest in every line (`guest`: the lodging adds the
+ * data of the stay).
+ */
 export const EXPORT_TYPES = [
-  { code: '0200', usageCountry: false, foreignBuyerOnly: true },
-  { code: '0201', usageCountry: true, foreignBuyerOnly: true },
-  { code: '0203', usageCountry: false, foreignBuyerOnly: false },
-  { code: '0204', usageCountry: false, foreignBuyerOnly: true },
-  { code: '0206', usageCountry: false, foreignBuyerOnly: false },
-  { code: '0207', usageCountry: false, foreignBuyerOnly: false },
-  { code: '0208', usageCountry: true, foreignBuyerOnly: false },
+  { code: '0200', usageCountry: false, foreignBuyerOnly: true, invoiceOnly: false, guest: null },
+  { code: '0201', usageCountry: true, foreignBuyerOnly: true, invoiceOnly: false, guest: null },
+  { code: '0202', usageCountry: false, foreignBuyerOnly: false, invoiceOnly: true, guest: 'lodging' },
+  { code: '0203', usageCountry: false, foreignBuyerOnly: false, invoiceOnly: false, guest: null },
+  { code: '0204', usageCountry: false, foreignBuyerOnly: true, invoiceOnly: false, guest: null },
+  { code: '0205', usageCountry: false, foreignBuyerOnly: false, invoiceOnly: true, guest: 'package' },
+  { code: '0206', usageCountry: false, foreignBuyerOnly: false, invoiceOnly: false, guest: null },
+  { code: '0207', usageCountry: false, foreignBuyerOnly: false, invoiceOnly: false, guest: null },
+  { code: '0208', usageCountry: true, foreignBuyerOnly: false, invoiceOnly: false, guest: null },
 ] as const
 
 /** Affectation of the lines of an export (catalogue 07, tax 9995). */
@@ -18,8 +23,8 @@ export const EXPORT_AFFECTATION = '40'
 /** Identity documents of a buyer abroad (catalogue 06): no document, foreigner card, passport, diplomatic ID. */
 export const FOREIGN_IDENTITY = ['0', '4', '7', 'A']
 
-/** Catalogue 54 codes whose operation needs data on every line that the form does not take yet: 004, the vessel and the species of a fishing sale. */
-export const DETRACTION_NEEDS_LINE_DETAILS = ['004']
+/** Catalogue 54 code of the fishing resources (operation 1002): every line states its vessel, species, place and date of unloading and the quantity in tonnes. */
+export const FISHING_CODE = '004'
 
 /** Catalogue 54 code of the cargo transport (operation 1004): every line states its origin, destination, trip and reference values, and optionally the legs with their vehicles. */
 export const CARGO_TRANSPORT_CODE = '027'
@@ -29,6 +34,19 @@ export const EXEMPTION_LEGENDS = ['2001', '2002', '2003', '2008']
 
 /** Tax code of the exonerated operations (catalogue 07): a legend of exoneration needs a line with one of those affectations. */
 export const EXEMPT_TAX_CODE = '9997'
+
+/** The export types that a document of this type can be issued with (lodging and tourist package are of invoices only). */
+export const exportsFor = (documentType: '01' | '03') => EXPORT_TYPES.filter((type) => documentType === '01' || !type.invoiceOnly)
+
+/** What every line of the document states besides its amounts, as the operation and the code of the detraction decide. */
+export type LineDetail = 'transport' | 'fishing' | 'lodging' | 'package'
+
+export function lineDetailOf(operation: string, detraction: { kind: string; goodsOrServiceCode: string }): LineDetail | undefined {
+  const guest = EXPORT_TYPES.find((type) => type.code === operation)?.guest
+  if (guest) return guest
+  if (detraction.kind !== 'detraction') return undefined
+  return detraction.goodsOrServiceCode === CARGO_TRANSPORT_CODE ? 'transport' : detraction.goodsOrServiceCode === FISHING_CODE ? 'fishing' : undefined
+}
 
 export const isExport = (code: string) => EXPORT_TYPES.some((type) => type.code === code)
 

@@ -1,5 +1,7 @@
 import { useCatalog, useProducts } from '../api/queries'
 import type { DocumentLine, Product } from '../api/types'
+import type { LineDetail } from '../lib/operations'
+import { emptyFishing, emptyGuest, FishingEditor, GuestEditor, toRequestFishing, toRequestGuest, type FishingState, type GuestState } from './LineDetailEditors'
 import { copyTransport, emptyTransport, toRequestTransport, TransportEditor, type TransportState } from './TransportEditor'
 import { SelectField, TextField } from './ui'
 
@@ -16,14 +18,16 @@ export interface LineState {
   isc: 'none' | 'AdValorem' | 'FixedAmount'
   iscValue: string
   bags: boolean
-  /** Cargo transport data: sent only in a detraction 027. */
+  /** The data that a line states in some operations; only the one the document asks for is sent. */
   transport: TransportState
+  fishing: FishingState
+  guest: GuestState
 }
 
 let counter = 0
 
 export function emptyLine(): LineState {
-  return { key: ++counter, description: '', unitCode: 'NIU', productCode: null, quantity: '1', unitValue: '', affectation: '10', discount: '', referenceValue: '', isc: 'none', iscValue: '', bags: false, transport: emptyTransport() }
+  return { key: ++counter, description: '', unitCode: 'NIU', productCode: null, quantity: '1', unitValue: '', affectation: '10', discount: '', referenceValue: '', isc: 'none', iscValue: '', bags: false, transport: emptyTransport(), fishing: emptyFishing(), guest: emptyGuest() }
 }
 
 /** A line prefilled from a document line (to adjust it with a note). */
@@ -45,13 +49,15 @@ export function lineFrom(line: DocumentLine): LineState {
 const num = (text: string) => (text.trim() === '' ? 0 : Number(text))
 
 /** The `tax` of a line request. Amounts go as typed: the API calculates every total and every tax. */
-export function toRequestLine(line: LineState, isFree: boolean, withTransport = false) {
+export function toRequestLine(line: LineState, isFree: boolean, detail?: LineDetail) {
   const quantity = num(line.quantity)
   return {
     description: line.description.trim(),
     unitCode: line.unitCode.trim().toUpperCase(),
     productCode: line.productCode,
-    ...(withTransport ? { transport: toRequestTransport(line.transport) } : {}),
+    ...(detail === 'transport' ? { transport: toRequestTransport(line.transport) } : {}),
+    ...(detail === 'fishing' ? { fishing: toRequestFishing(line.fishing) } : {}),
+    ...(detail === 'lodging' || detail === 'package' ? { guest: toRequestGuest(line.guest, detail === 'lodging') } : {}),
     tax: {
       quantity,
       unitValue: isFree ? 0 : num(line.unitValue),
@@ -69,11 +75,11 @@ interface Props {
   onChange: (lines: LineState[]) => void
   /** Every line has this affectation and it cannot be changed (the lines of an export). */
   fixedAffectation?: string
-  /** Every line states the data of a cargo transport (detraction 027). */
-  withTransport?: boolean
+  /** What every line states besides its amounts (cargo transport, fishing resource or guest). */
+  detail?: LineDetail
 }
 
-export function LinesEditor({ lines, onChange, fixedAffectation, withTransport = false }: Props) {
+export function LinesEditor({ lines, onChange, fixedAffectation, detail }: Props) {
   const affectations = useCatalog('07')
   const products = useProducts('')
   const isFree = (code: string) => affectations.data?.find((entry) => entry.code === code)?.metadata['Codigo de tributo'] === '9996'
@@ -139,7 +145,9 @@ export function LinesEditor({ lines, onChange, fixedAffectation, withTransport =
                 <span>Bolsas de plástico (ICBPER): una por unidad</span>
               </label>
             </div>
-            {withTransport && <TransportEditor transport={line.transport} onChange={(transport) => update(line.key, { transport })} />}
+            {detail === 'transport' && <TransportEditor transport={line.transport} onChange={(transport) => update(line.key, { transport })} />}
+            {detail === 'fishing' && <FishingEditor fishing={line.fishing} onChange={(fishing) => update(line.key, { fishing })} />}
+            {(detail === 'lodging' || detail === 'package') && <GuestEditor guest={line.guest} lodging={detail === 'lodging'} onChange={(guest) => update(line.key, { guest })} />}
           </div>
         </fieldset>
       ))}
@@ -147,9 +155,19 @@ export function LinesEditor({ lines, onChange, fixedAffectation, withTransport =
         <button className="btn" type="button" onClick={() => onChange([...lines, emptyLine()])}>
           Agregar ítem
         </button>
-        {withTransport && lines.length > 1 && (
-          <button className="btn" type="button" onClick={() => onChange(lines.map((line, index) => (index === 0 ? line : { ...line, transport: copyTransport(lines[0].transport) })))}>
-            Usar el transporte del ítem 1 en todos
+        {detail !== undefined && lines.length > 1 && (
+          <button
+            className="btn"
+            type="button"
+            onClick={() =>
+              onChange(
+                lines.map((line, index) =>
+                  index === 0 ? line : detail === 'transport' ? { ...line, transport: copyTransport(lines[0].transport) } : detail === 'fishing' ? { ...line, fishing: { ...lines[0].fishing } } : { ...line, guest: { ...lines[0].guest } },
+                ),
+              )
+            }
+          >
+            {detail === 'transport' ? 'Usar el transporte del ítem 1 en todos' : detail === 'fishing' ? 'Usar los datos de pesca del ítem 1 en todos' : 'Usar el huésped del ítem 1 en todos'}
           </button>
         )}
       </div>

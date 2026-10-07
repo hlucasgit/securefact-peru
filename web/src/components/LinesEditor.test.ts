@@ -1,4 +1,5 @@
 import { emptyLine, lineFrom, toRequestLine } from './LinesEditor'
+import { emptyFishing, emptyGuest } from './LineDetailEditors'
 import { copyTransport, emptyLeg } from './TransportEditor'
 
 describe('toRequestLine', () => {
@@ -72,7 +73,7 @@ describe('the cargo transport of a line', () => {
     const line = { ...emptyLine(), description: 'Flete', unitValue: '100', transport }
 
     expect(toRequestLine(line, false)).not.toHaveProperty('transport')
-    expect(toRequestLine(line, false, true).transport).toMatchObject({
+    expect(toRequestLine(line, false, 'transport').transport).toMatchObject({
       originUbigeo: '150101',
       originAddress: 'Av. Argentina 123, Callao',
       destinationUbigeo: '040101',
@@ -80,12 +81,12 @@ describe('the cargo transport of a line', () => {
       effectiveLoadReferenceValue: 1.5,
       nominalLoadReferenceValue: 2.25,
     })
-    expect(toRequestLine(line, false, true).transport).not.toHaveProperty('legs')
+    expect(toRequestLine(line, false, 'transport').transport).not.toHaveProperty('legs')
   })
 
   it('sends the legs with their vehicles and leaves out what was not typed', () => {
     const leg = { ...emptyLeg(), originUbigeo: '150101', destinationUbigeo: '040101', vehicleConfiguration: ' T3S3 ', usefulLoadTonnes: '28', description: '', effectiveLoadTonnes: '20.5', returnEmpty: true }
-    const sent = toRequestLine({ ...emptyLine(), transport: { ...transport, legs: [leg] } }, false, true).transport
+    const sent = toRequestLine({ ...emptyLine(), transport: { ...transport, legs: [leg] } }, false, 'transport').transport
 
     expect(sent?.legs).toEqual([{ originUbigeo: '150101', destinationUbigeo: '040101', vehicleConfiguration: 'T3S3', usefulLoadTonnes: 28, effectiveLoadTonnes: 20.5, returnEmpty: true }])
   })
@@ -96,5 +97,46 @@ describe('the cargo transport of a line', () => {
 
     expect(copy).toEqual({ ...first, legs: [{ ...first.legs[0], key: copy.legs[0].key }] })
     expect(copy.legs[0].key).not.toBe(first.legs[0].key)
+  })
+})
+
+describe('the fishing resource and the guest of a line', () => {
+  it('sends the fishing data only in a detraction 004, with the quantity as a number', () => {
+    const fishing = { ...emptyFishing(), vesselRegistration: ' CE-1234-PM ', vesselName: 'Don Pepe', speciesType: 'Anchoveta', unloadingPlace: 'Chimbote', unloadingDate: '2026-10-01', speciesQuantity: '12.5' }
+    const line = { ...emptyLine(), description: 'Anchoveta', unitValue: '1000', fishing }
+
+    expect(toRequestLine(line, false)).not.toHaveProperty('fishing')
+    expect(toRequestLine(line, false, 'fishing').fishing).toEqual({ vesselRegistration: 'CE-1234-PM', vesselName: 'Don Pepe', speciesType: 'Anchoveta', unloadingPlace: 'Chimbote', unloadingDate: '2026-10-01', speciesQuantity: 12.5 })
+  })
+
+  it('sends the guest of a tourist package alone and the guest of a lodging with the data of the stay', () => {
+    const guest = {
+      ...emptyGuest(),
+      name: ' John Smith ',
+      documentNumber: ' P1234567 ',
+      passportCountryCode: 'us',
+      residenceCountryCode: 'us',
+      countryEntryDate: '2026-09-28',
+      checkInDate: '2026-09-29',
+      checkOutDate: '2026-10-02',
+      consumptionDate: '2026-10-02',
+      stayDays: '3',
+    }
+    const line = { ...emptyLine(), guest }
+
+    expect(toRequestLine(line, false, 'package').guest).toEqual({ name: 'John Smith', documentTypeCode: '7', documentNumber: 'P1234567', passportCountryCode: 'US' })
+    expect(toRequestLine(line, false, 'lodging').guest).toEqual({
+      name: 'John Smith',
+      documentTypeCode: '7',
+      documentNumber: 'P1234567',
+      passportCountryCode: 'US',
+      residenceCountryCode: 'US',
+      countryEntryDate: '2026-09-28',
+      checkInDate: '2026-09-29',
+      checkOutDate: '2026-10-02',
+      consumptionDate: '2026-10-02',
+      stayDays: 3,
+    })
+    expect(toRequestLine(line, false)).not.toHaveProperty('guest')
   })
 })

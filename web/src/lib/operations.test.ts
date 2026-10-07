@@ -1,4 +1,4 @@
-import { buildDocumentRequest, buyerMustBeForeign, isExport, needsUsageCountry, noDeduction, type DeductionInput } from './operations'
+import { buildDocumentRequest, buyerMustBeForeign, exportsFor, isExport, lineDetailOf, needsUsageCountry, noDeduction, type DeductionInput } from './operations'
 
 const base = {
   seriesId: 's1',
@@ -60,7 +60,8 @@ describe('buildDocumentRequest', () => {
 describe('the export types', () => {
   it('knows which are exports and which need the country of use', () => {
     expect(['0200', '0201', '0203', '0208'].every(isExport)).toBe(true)
-    expect(['0101', '1001', '0202', '0205'].some(isExport)).toBe(false) // lodging and tourist package are issued through the API
+    expect(['0202', '0205'].every(isExport)).toBe(true) // lodging and tourist package are exports too
+    expect(['0101', '1001', '0301'].some(isExport)).toBe(false)
     expect(['0201', '0208'].every(needsUsageCountry)).toBe(true)
     expect(['0200', '0203', '0206'].some(needsUsageCountry)).toBe(false)
   })
@@ -82,5 +83,28 @@ describe('legends of exoneration', () => {
 
   it('never sends a legend in an export, whose total cannot be exonerated', () => {
     expect(buildDocumentRequest({ ...base, operation: '0200', legends: ['2001'] })).not.toHaveProperty('legendCodes')
+  })
+})
+
+describe('what a document asks of every line', () => {
+  const none = noDeduction()
+
+  it('asks for the guest in a lodging or a tourist package, whatever the detraction says', () => {
+    expect(lineDetailOf('0202', none)).toBe('lodging')
+    expect(lineDetailOf('0205', none)).toBe('package')
+  })
+
+  it('asks for the transport in a detraction 027 and for the fishing data in a detraction 004, and for nothing in any other', () => {
+    expect(lineDetailOf('0101', detraction({ goodsOrServiceCode: '027' }))).toBe('transport')
+    expect(lineDetailOf('0101', detraction({ goodsOrServiceCode: '004' }))).toBe('fishing')
+    expect(lineDetailOf('0101', detraction({ goodsOrServiceCode: '037' }))).toBeUndefined()
+    expect(lineDetailOf('0101', { ...none, goodsOrServiceCode: '027' })).toBeUndefined() // the code counts only while a detraction is chosen
+    expect(lineDetailOf('0200', none)).toBeUndefined()
+  })
+
+  it('keeps the lodging and the tourist package for invoices', () => {
+    expect(exportsFor('01').map((type) => type.code)).toEqual(expect.arrayContaining(['0202', '0205']))
+    expect(exportsFor('03').map((type) => type.code)).not.toContain('0202')
+    expect(exportsFor('03').map((type) => type.code)).not.toContain('0205')
   })
 })

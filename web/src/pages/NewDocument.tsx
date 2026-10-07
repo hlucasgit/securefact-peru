@@ -7,14 +7,13 @@ import { DOCUMENT_TYPES, money, todayInLima } from '../lib/format'
 import {
   buildDocumentRequest,
   buyerMustBeForeign,
-  CARGO_TRANSPORT_CODE,
-  DETRACTION_NEEDS_LINE_DETAILS,
   EXEMPT_TAX_CODE,
   EXEMPTION_LEGENDS,
   EXPORT_AFFECTATION,
-  EXPORT_TYPES,
+  exportsFor,
   FOREIGN_IDENTITY,
   isExport,
+  lineDetailOf,
   needsUsageCountry,
   noDeduction,
   type DeductionInput,
@@ -84,6 +83,7 @@ export function NewDocument() {
 
   function changeType(next: '01' | '03') {
     setType(next)
+    if (next === '03' && !exportsFor('03').some((entry) => entry.code === operation)) setOperation('0101')
     setBuyer((current) => (next === '01' && current.documentTypeCode !== '6' ? emptyBuyer('6') : next === '03' && current.documentTypeCode === '6' ? emptyBuyer('1') : current))
     if (next === '03' && buyerMustBeForeign('03', operation)) setBuyer(emptyBuyer('7'))
   }
@@ -101,8 +101,8 @@ export function NewDocument() {
   const noBuyer = buyer.documentTypeCode === '0'
   const foreignOnly = buyerMustBeForeign(type, operation)
 
-  const cargo = activeDeduction.kind === 'detraction' && activeDeduction.goodsOrServiceCode === CARGO_TRANSPORT_CODE
-  const requestLines = lines.map((line) => toRequestLine({ ...line, affectation: exporting ? EXPORT_AFFECTATION : line.affectation }, exporting ? false : lineIsFree(line.affectation, affectations.data), cargo))
+  const detail = lineDetailOf(operation, activeDeduction)
+  const requestLines = lines.map((line) => toRequestLine({ ...line, affectation: exporting ? EXPORT_AFFECTATION : line.affectation }, exporting ? false : lineIsFree(line.affectation, affectations.data), detail))
   // A legend of exoneration needs a line that is exonerated: the card appears only then, and the API checks the rest.
   const hasExempt = !exporting && lines.some((line) => affectations.data?.find((entry) => entry.code === line.affectation)?.metadata['Codigo de tributo'] === EXEMPT_TAX_CODE)
   const legendsToSend = hasExempt ? legends : []
@@ -178,7 +178,7 @@ export function NewDocument() {
             </SelectField>
             <SelectField label="Tipo de operación" value={operation} onChange={(event) => changeOperation(event.target.value)}>
               <option value="0101">Venta interna</option>
-              {EXPORT_TYPES.map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {describe(entry.code)}</option>)}
+              {exportsFor(type).map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {describe(entry.code)}</option>)}
             </SelectField>
             {needsUsageCountry(operation) && (
               <TextField label="País del uso o aprovechamiento" hint="código de 2 letras, no PE" required maxLength={2} pattern="[A-Za-z]{2}" value={usageCountry} onChange={(event) => setUsageCountry(event.target.value.toUpperCase())} />
@@ -212,7 +212,7 @@ export function NewDocument() {
 
         <div className="card">
           <h2>Ítems</h2>
-          <LinesEditor lines={lines} onChange={setLines} fixedAffectation={exporting ? EXPORT_AFFECTATION : undefined} withTransport={cargo} />
+          <LinesEditor lines={lines} onChange={setLines} fixedAffectation={exporting ? EXPORT_AFFECTATION : undefined} detail={detail} />
         </div>
 
         {hasExempt && (
@@ -244,13 +244,13 @@ export function NewDocument() {
                 <div className="form-grid">
                   <SelectField label="Bien o servicio" hint="catálogo 54" required value={deduction.goodsOrServiceCode} onChange={(event) => setDeduction({ ...deduction, goodsOrServiceCode: event.target.value })}>
                     <option value="">Elija…</option>
-                    {(detractionCodes.data ?? []).filter((entry) => !DETRACTION_NEEDS_LINE_DETAILS.includes(entry.code)).map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {entry.description}</option>)}
+                    {(detractionCodes.data ?? []).map((entry) => <option key={entry.code} value={entry.code}>{entry.code} · {entry.description}</option>)}
                   </SelectField>
                   <TextField label="Porcentaje" hint="% de la detracción" type="number" min="0" max="100" step="any" required value={deduction.percentage} onChange={(event) => setDeduction({ ...deduction, percentage: event.target.value })} />
                   <TextField label="Monto de la detracción" hint="en soles" type="number" min="0" step="0.01" required value={deduction.amount} onChange={(event) => setDeduction({ ...deduction, amount: event.target.value })} />
                   <TextField label="Cuenta en el Banco de la Nación" hint={selectedCompany?.detractionAccount ? 'vacía: se usa la de la empresa' : 'obligatoria si la empresa no la tiene registrada'} required={!selectedCompany?.detractionAccount} maxLength={100} value={deduction.account} onChange={(event) => setDeduction({ ...deduction, account: event.target.value })} />
                 </div>
-                <p className="muted">Los porcentajes y los montos de la detracción son datos del emisor: SUNAT revisa su estructura, no su valor. El código 004 (recursos hidrobiológicos) pide datos de la embarcación en cada línea y se emite por la API. El 027 (transporte de carga) pide los datos del transporte en cada ítem, más abajo.</p>
+                <p className="muted">Los porcentajes y los montos de la detracción son datos del emisor: SUNAT revisa su estructura, no su valor. El 004 (recursos hidrobiológicos) pide los datos de la embarcación y de la especie en cada ítem, y el 027 (transporte de carga) los del transporte, más abajo.</p>
               </>
             )}
 

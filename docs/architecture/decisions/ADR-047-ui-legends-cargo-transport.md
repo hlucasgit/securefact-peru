@@ -26,6 +26,6 @@ Para calcular el monto de una detracción 027, la vista previa (ADR-046) tiene q
 - 4 recorridos de extremo a extremo (`legends-transport.spec.ts`) contra el simulador: una venta exonerada con su leyenda 2001, mostrada y aceptada; la leyenda que no viaja cuando la línea vuelve a ser gravada; un transporte de dos ítems (copiado del primero) con un tramo, con el monto de detracción que da el servidor, emitido, mostrado y aceptado; y los datos del transporte que aparecen solo con 027 y no viajan con otro código. Accesibilidad (axe) de los formularios.
 
 ## Límites (P)
-- Siguen por la API: la detracción **004** (recursos hidrobiológicos: embarcación y especie en cada línea), los tipos **0202** y **0205** (huésped), la entrega inicial de una venta al crédito y las notas con detracción.
+- Siguen por la API: la entrega inicial de una venta al crédito y las notas con detracción. La detracción 004 y los tipos 0202 y 0205 se agregaron en el ADR-048.
 - El formulario no comprueba el contenido de los ubigeos, de las direcciones ni de las configuraciones vehiculares más allá del largo y del formato; el servidor tampoco, porque SUNAT no los valida contra una lista pública que la plataforma tenga.
 - Las leyendas del catálogo 52 que no son de venta exonerada (por ejemplo 2006, «operación sujeta a detracción», o 2011) no se ofrecen: la API solo admite las cuatro de exoneración.
