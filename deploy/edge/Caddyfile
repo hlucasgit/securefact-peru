@@ -1,0 +1,36 @@
+# Edge of the platform: terminates TLS for the portals of the resellers (ADR-051). One certificate per name, issued the first time the name is seen, and only for the names that the
+# platform says may have one (the verified domains of the resellers that are on, and the platform's own hosts).
+#
+# NOT RUN: this file was written from Caddy's documentation and the container image was not pulled to validate it. Run `caddy validate --config Caddyfile` before using it
+# (docs/deployment/domains.md).
+
+{
+	email {$SF_ACME_EMAIL}
+
+	# Before it asks the certificate authority for a certificate, Caddy asks this endpoint, adding ?domain=<name>. 200 = yes, anything else = no.
+	# The secret in the query is the one of Domains:EdgeSecret in the API: without it the API answers 404 to everyone.
+	on_demand_tls {
+		ask http://api:8080/api/v1/edge/tls-allowed?secret={$SF_EDGE_SECRET}
+	}
+}
+
+# Every name that reaches the edge over HTTPS. The certificate is requested on the first handshake for a name that the platform allows.
+https:// {
+	tls {
+		on_demand
+	}
+
+	# The question of the edge is the edge's alone: it must never be reachable from the outside through the edge itself.
+	@internal path /api/v1/edge/*
+	respond @internal 404
+
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
+}
+
+# Plain HTTP needs no block: Caddy redirects it to HTTPS by itself and answers the ACME HTTP challenge before any route.

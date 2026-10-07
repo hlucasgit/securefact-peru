@@ -44,6 +44,20 @@ public sealed class BrandingApiTests(ApiFixture api)
     private static Task<HttpResponseMessage> SetLogoAsync(HttpClient client, byte[] data, string path = "/api/v1/reseller/branding/logo") =>
         client.PutAsJsonAsync(path, new { dataBase64 = Convert.ToBase64String(data) });
 
+    /// <summary>Assigns the domain to the reseller, publishes in the DNS of the test what the platform asks for, and checks it: the domain is verified.</summary>
+    private async Task SetAndVerifyHostAsync(HttpClient admin, Guid resellerId, string host)
+    {
+        var set = await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{resellerId}/host", new { host });
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        using var body = JsonDocument.Parse(await set.Content.ReadAsStringAsync());
+        var name = body.RootElement.GetProperty("host").GetString()!;
+        api.Dns.PublishTxt(body.RootElement.GetProperty("txtName").GetString()!, body.RootElement.GetProperty("txtValue").GetString()!);
+        api.Dns.PointAt(name, FakeDomainNameSystem.EdgeHost);
+        var verified = await admin.PostAsync($"/api/v1/platform/resellers/{resellerId}/domain/verify", null);
+        Assert.Equal(HttpStatusCode.OK, verified.StatusCode);
+        Assert.Equal("Verified", JsonDocument.Parse(await verified.Content.ReadAsStringAsync()).RootElement.GetProperty("status").GetString());
+    }
+
     private async Task<HttpResponseMessage> ForHostAsync(string host)
     {
         using var anonymous = api.NewClient();
@@ -56,7 +70,7 @@ public sealed class BrandingApiTests(ApiFixture api)
         using var admin = await api.AdminClientAsync();
         var reseller = await NewResellerAsync(admin);
         var host = NewHost();
-        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{reseller.Row.Id}/host", new { host })).StatusCode);
+        await SetAndVerifyHostAsync(admin, reseller.Row.Id, host);
         Assert.Equal(HttpStatusCode.NoContent, (await ForHostAsync(host)).StatusCode); // a reseller with no brand shows the default look
 
         var saved = await SetBrandAsync(reseller.Client);
@@ -107,7 +121,7 @@ public sealed class BrandingApiTests(ApiFixture api)
         using var admin = await api.AdminClientAsync();
         var reseller = await NewResellerAsync(admin);
         var host = NewHost();
-        await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{reseller.Row.Id}/host", new { host });
+        await SetAndVerifyHostAsync(admin, reseller.Row.Id, host);
         await SetBrandAsync(reseller.Client);
 
         foreach (var (what, data) in new (string, byte[])[]
@@ -164,10 +178,10 @@ public sealed class BrandingApiTests(ApiFixture api)
         {
             var refused = await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{one.Row.Id}/host", new { host = bad });
             Assert.True(refused.StatusCode == HttpStatusCode.UnprocessableEntity, bad);
-            Assert.Equal("SF-BRAND-001", await CodeAsync(refused));
+            Assert.Equal("SF-DOM-001", await CodeAsync(refused));
         }
 
-        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{one.Row.Id}/host", new { host = host.ToUpperInvariant() })).StatusCode);
+        await SetAndVerifyHostAsync(admin, one.Row.Id, host.ToUpperInvariant());
         var taken = await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{two.Row.Id}/host", new { host });
         Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
         Assert.Equal("SF-BRAND-003", await CodeAsync(taken));
@@ -182,7 +196,7 @@ public sealed class BrandingApiTests(ApiFixture api)
 
         // Clearing the domain frees it for another reseller.
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{one.Row.Id}/host", new { host = (string?)null })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{two.Row.Id}/host", new { host })).StatusCode);
+        await SetAndVerifyHostAsync(admin, two.Row.Id, host);
         Assert.Equal("Otra marca", (await (await ForHostAsync(host)).Content.ReadFromJsonAsync<Brand>(ApiFixture.JsonOptions))!.BrandName);
     }
 
@@ -253,7 +267,7 @@ public sealed class BrandingApiTests(ApiFixture api)
         using var admin = await api.AdminClientAsync();
         var reseller = await NewResellerAsync(admin);
         var host = NewHost();
-        await admin.PutAsJsonAsync($"/api/v1/platform/resellers/{reseller.Row.Id}/host", new { host });
+        await SetAndVerifyHostAsync(admin, reseller.Row.Id, host);
         await SetBrandAsync(reseller.Client);
         await SetLogoAsync(reseller.Client, Png());
 
@@ -263,7 +277,8 @@ public sealed class BrandingApiTests(ApiFixture api)
 
         var events = (await admin.GetFromJsonAsync<List<JsonElement>>("/api/v1/audit?entityType=reseller&take=50", ApiFixture.JsonOptions))!
             .Where(e => e.GetProperty("entityId").GetString() == reseller.Row.Id.ToString("D")).ToList();
-        Assert.True(events.Count(e => e.GetProperty("action").GetString() == "tenancy.reseller.branding_updated") >= 2); // the domain and the brand
+        Assert.Single(events, e => e.GetProperty("action").GetString() == "tenancy.reseller.branding_updated");
+        Assert.Contains(events, e => e.GetProperty("action").GetString() == "tenancy.reseller.domain_changed"); // the domain has its own events (ADR-051)
         var logo = Assert.Single(events, e => e.GetProperty("action").GetString() == "tenancy.reseller.logo_changed");
         Assert.DoesNotContain("iVBOR", logo.GetProperty("newValues").GetRawText(), StringComparison.Ordinal); // the bytes of the logo are not in the audit trail
     }

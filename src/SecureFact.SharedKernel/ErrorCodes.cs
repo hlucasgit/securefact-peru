@@ -38,6 +38,12 @@ public static class ErrorCodes
 
     public const string HostInUse = "SF-BRAND-003";
 
+    public const string InvalidDomain = "SF-DOM-001";
+
+    public const string DomainCheckTooSoon = "SF-DOM-002";
+
+    public const string NoDomain = "SF-DOM-003";
+
     public const string InvalidSeriesConfiguration = "SF-BIL-001";
     public const string SeriesNotFound = "SF-BIL-002";
     public const string SeriesAlreadyExists = "SF-BIL-003";

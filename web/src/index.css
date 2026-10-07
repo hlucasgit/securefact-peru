@@ -210,3 +210,4 @@ table.table { width: 100%; border-collapse: collapse; }
 .transport, .leg { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; margin: 0; min-width: 0; }
 .transport > legend, .leg > legend { padding: 0 6px; font-weight: 600; }
 .leg { background: var(--surface-2); }
+.wrap { overflow-wrap: anywhere; }

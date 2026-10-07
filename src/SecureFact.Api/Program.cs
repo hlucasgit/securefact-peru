@@ -110,6 +110,7 @@ if (appConnection is not null)
 {
     builder.Services.AddAuditModule(appConnection);
     builder.Services.AddTenancyModule(appConnection);
+    builder.Services.AddDomainProvisioning(builder.Configuration.GetSection(DomainsOptions.SectionName).Get<DomainsOptions>() ?? new DomainsOptions(), builder.Environment.IsProduction());
     builder.Services.AddPlanUsage();
     builder.Services.AddOrganizationsModule(appConnection);
     builder.Services.AddTaxEngineModule();
@@ -203,6 +204,7 @@ app.MapUserAndTenantEndpoints();
 app.MapPlanEndpoints();
 app.MapResellerEndpoints();
 app.MapBrandingEndpoints();
+app.MapDomainEndpoints();
 app.MapAuditEndpoints();
 app.MapCompanyEndpoints();
 app.MapBillingEndpoints();

@@ -1,0 +1,30 @@
+# The edge that serves the portals of the resellers on their own domains, with a certificate for each (ADR-051, docs/deployment/domains.md). Use it together with the main file:
+#   docker compose -f docker-compose.yml -f docker-compose.edge.yml up -d
+# It needs SF_EDGE_SECRET (the same one the API reads as Domains:EdgeSecret) and SF_ACME_EMAIL in .env, ports 80 and 443 reachable from the Internet, and the API running with
+# SF_DOMAINS_DNS_PROVIDER=System: with the simulator of the DNS every domain would be "verified" and the edge would ask for certificates it cannot get.
+#
+# NOT RUN: written from the documentation of Caddy; see the note in deploy/edge/Caddyfile.
+name: securefact
+
+services:
+  edge:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    environment:
+      SF_ACME_EMAIL: ${SF_ACME_EMAIL:?set in .env}
+      SF_EDGE_SECRET: ${SF_EDGE_SECRET:?set in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/edge/Caddyfile:/etc/caddy/Caddyfile:ro
+      - edge_data:/data
+      - edge_config:/config
+
+volumes:
+  edge_data:
+  edge_config:

@@ -30,22 +30,19 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
     [GeneratedRegex("^#[0-9a-fA-F]{6}$")]
     private static partial Regex ColorPattern();
 
-    // Two or more labels of letters, digits and hyphens, the last one with a letter (so an IP address is not a host name).
-    [GeneratedRegex(@"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$")]
-    private static partial Regex HostPattern();
-
     // ---------- what any visitor may read ----------
 
     public async Task<BrandingDto?> ForHostAsync(string host, CancellationToken cancellationToken)
     {
-        var clean = NormalizeHost(host);
+        var clean = HostNames.Normalize(host);
         if (clean is null)
         {
             return null;
         }
 
         using var elevated = scope.Elevate("branding: portal of a host");
-        var reseller = await db.Resellers.AsNoTracking().SingleOrDefaultAsync(r => r.Host == clean, cancellationToken);
+        // A domain that is not verified shows no brand: nobody has proved yet that the portal is the reseller's (ADR-051).
+        var reseller = await db.Resellers.AsNoTracking().SingleOrDefaultAsync(r => r.Host == clean && r.HostStatus == DomainStatus.Verified, cancellationToken);
         return Effective(reseller);
     }
 
@@ -115,41 +112,6 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
 
         var before = Values(reseller);
         reseller.SetBrand(name, color, string.IsNullOrEmpty(email) ? null : email);
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.RecordAsync(new AuditEvent(AuditActions.ResellerBrandingUpdated, "reseller", reseller.Id.ToString("D"), null, OldValues: before, NewValues: Values(reseller)), cancellationToken);
-        return ToSettings(reseller);
-    }
-
-    public async Task<Result<BrandingSettings>> SetHostAsync(Guid resellerId, string? host, CancellationToken cancellationToken)
-    {
-        if (scope.Kind != DataScopeKind.Platform || !actor.IsPlatform)
-        {
-            return Error.Forbidden(ErrorCodes.Forbidden, "Operación no permitida", "Solo el personal de la plataforma asigna el dominio de un revendedor.");
-        }
-
-        string? clean = null;
-        if (!string.IsNullOrWhiteSpace(host))
-        {
-            clean = NormalizeHost(host);
-            if (clean is null || !HostPattern().IsMatch(clean))
-            {
-                return Error.Validation(ErrorCodes.InvalidBranding, "Dominio inválido", "Indique un nombre de dominio, por ejemplo portal.ejemplo.pe, sin protocolo ni puerto.");
-            }
-        }
-
-        var reseller = await db.Resellers.SingleOrDefaultAsync(r => r.Id == resellerId, cancellationToken);
-        if (reseller is null)
-        {
-            return ResellerMissing;
-        }
-
-        if (clean is not null && await db.Resellers.AnyAsync(r => r.Host == clean && r.Id != resellerId, cancellationToken))
-        {
-            return Error.Conflict(ErrorCodes.HostInUse, "Dominio en uso", "Otro revendedor ya usa ese dominio.");
-        }
-
-        var before = Values(reseller);
-        reseller.SetHost(clean);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.ResellerBrandingUpdated, "reseller", reseller.Id.ToString("D"), null, OldValues: before, NewValues: Values(reseller)), cancellationToken);
         return ToSettings(reseller);
@@ -278,32 +240,18 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
         return null;
     }
 
-    private static string? NormalizeHost(string? host)
-    {
-        var value = host?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(value))
-        {
-            return null;
-        }
-
-        // A browser reports host:port; the portal is identified by the host alone.
-        var colon = value.IndexOf(':', StringComparison.Ordinal);
-        return (colon >= 0 ? value[..colon] : value).TrimEnd('.');
-    }
-
     /// <summary>Only an active reseller that has set a brand is shown; otherwise the default look of the platform.</summary>
     private static BrandingDto? Effective(Reseller? r) =>
         r is { IsActive: true, BrandName: { } name, PrimaryColor: { } color }
             ? new BrandingDto(r.Id, name, color, r.SupportEmail, r.LogoVersion)
             : null;
 
-    private static BrandingSettings ToSettings(Reseller r) => new(r.Id, r.Name, r.BrandName, r.PrimaryColor, r.SupportEmail, r.Host, r.LogoVersion);
+    private static BrandingSettings ToSettings(Reseller r) => new(r.Id, r.Name, r.BrandName, r.PrimaryColor, r.SupportEmail, r.Host, r.LogoVersion, r.HostStatus);
 
     private static Dictionary<string, object?> Values(Reseller r) => new()
     {
         ["brandName"] = r.BrandName,
         ["primaryColor"] = r.PrimaryColor,
         ["supportEmail"] = r.SupportEmail,
-        ["host"] = r.Host,
     };
 }

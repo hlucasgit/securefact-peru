@@ -710,6 +710,7 @@
       "securefact.tenancy": {
         "type": "Project",
         "dependencies": {
+          "DnsClient": "[1.8.0, )",
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
@@ -730,6 +731,12 @@
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.8, 5.0.0)"
         }
+      },
+      "DnsClient": {
+        "type": "CentralTransitive",
+        "requested": "[1.8.0, )",
+        "resolved": "1.8.0",
+        "contentHash": "RRwtaCXkXWsx0mmsReGDqCbRLtItfUbkRJlet1FpdciVhyMGKcPd57T1+8Jki9ojHlq9fntVhXQroOOgRak8DQ=="
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
         "type": "CentralTransitive",

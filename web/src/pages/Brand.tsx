@@ -1,7 +1,8 @@
 import { useState, type ChangeEvent, type CSSProperties } from 'react'
-import { useBrandSettings, useRemoveLogo, useSaveBrand, useSetHost, useSetLogo } from '../api/queries'
+import { useBrandSettings, useRemoveLogo, useSaveBrand, useSetLogo } from '../api/queries'
 import type { BrandScope, BrandSettings } from '../api/types'
 import { ConfirmButton, ErrorAlert, Loading, PageHeader, TextField, useToast } from '../components/ui'
+import { DomainCard } from './Domain'
 
 const DEFAULT_COLOR = '#0f4c81'
 
@@ -17,10 +18,8 @@ function BrandForm({ scope, settings, canSetHost }: { scope: BrandScope; setting
   const save = useSaveBrand(scope)
   const setLogo = useSetLogo(scope)
   const removeLogo = useRemoveLogo(scope)
-  const setHost = useSetHost(settings.resellerId)
   const toast = useToast()
   const [value, setValue] = useState({ brandName: settings.brandName ?? '', primaryColor: settings.primaryColor ?? DEFAULT_COLOR, supportEmail: settings.supportEmail ?? '' })
-  const [host, setHostValue] = useState(settings.host ?? '')
   const [logoError, setLogoError] = useState<string | null>(null)
 
   async function pickLogo(event: ChangeEvent<HTMLInputElement>) {
@@ -91,25 +90,7 @@ function BrandForm({ scope, settings, canSetHost }: { scope: BrandScope; setting
         <p className="hint">PNG, JPEG o WebP de hasta 200 KB. Se verifica por su contenido; el SVG no se admite.</p>
       </div>
 
-      {canSetHost && (
-        <form
-          className="card stack"
-          onSubmit={(event) => {
-            event.preventDefault()
-            setHost.mutate(host.trim() || null, { onSuccess: () => toast.ok('Dominio guardado.') })
-          }}
-        >
-          <h2>Dominio del portal</h2>
-          <ErrorAlert error={setHost.error} />
-          <TextField label="Dominio" placeholder="portal.ejemplo.pe" hint="sin protocolo ni puerto" value={host} onChange={(event) => setHostValue(event.target.value)} />
-          <p className="hint">Con el dominio asignado, el ingreso en ese dominio ya muestra la marca. El registro DNS y el certificado del dominio los configura el operador de la plataforma; aquí solo se registra a qué revendedor pertenece.</p>
-          <div className="actions">
-            <button className="btn primary" type="submit" disabled={setHost.isPending}>
-              Guardar dominio
-            </button>
-          </div>
-        </form>
-      )}
+      <DomainCard scope={scope} canAssign={canSetHost} />
     </div>
   )
 }

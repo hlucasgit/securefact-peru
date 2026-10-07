@@ -348,7 +348,24 @@ export interface BrandSettings {
   primaryColor: string | null
   supportEmail: string | null
   host: string | null
+  hostStatus: DomainStatus
   logoUrl: string | null
+}
+
+export type DomainStatus = 'None' | 'Pending' | 'Verified' | 'Unreachable'
+
+/** The domain of the portal of a reseller and what is left for it to work (ADR-051). */
+export interface DomainInfo {
+  resellerId: string
+  host: string | null
+  status: DomainStatus
+  txtName: string | null
+  txtValue: string | null
+  cnameTarget: string | null
+  edgeAddresses: string[]
+  verifiedAt: string | null
+  checkedAt: string | null
+  error: string | null
 }
 
 export interface BrandInput {

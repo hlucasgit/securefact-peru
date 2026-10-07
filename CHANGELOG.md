@@ -4,9 +4,12 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 ### Changed
+- Solo un dominio **verificado** muestra la marca de un revendedor (ADR-051); los que ya existían quedan verificados. `PUT /api/v1/platform/resellers/{id}/host` devuelve ahora el estado del dominio.
+
 - El *refresh token* de la interfaz web va en una cookie `HttpOnly` (`sf_rt`, `SameSite=Strict`, ruta `/api/v1/auth`) en lugar de `sessionStorage` (ADR-050). Se pide con el encabezado `X-SecureFact-Session: cookie`; sin él, la API devuelve el token en el cuerpo como antes.
 
 ### Added
+- Aprovisionamiento de dominios (ADR-051): estado del dominio (pendiente, verificado, sin respuesta), prueba por registro TXT y ruta por CNAME o A/AAAA verificadas por DNS (`DnsClient`), un worker que revisa y promueve, `GET /api/v1/reseller/domain` y `POST …/domain/verify`, `GET /api/v1/edge/tls-allowed` para el *edge* con TLS bajo demanda (`deploy/edge/Caddyfile`, `docker-compose.edge.yml`, no ejecutados) y `docs/deployment/domains.md`. La pantalla de la marca muestra los registros a crear y su estado.
 - Detracción en la nota de débito (ADR-049, R-061; aceptada en el beta), entrega inicial de la venta al crédito en la interfaz, `POST /api/v1/notes/preview` y `netPendingAmount` en las vistas previas: lo que las cuotas deben sumar lo da el servidor.
 - Recursos hidrobiológicos (detracción 004), hospedaje (0202) y paquete turístico (0205) en la interfaz de emisión (ADR-048): los datos de cada ítem se piden según la operación, se copian del primero y el detalle del comprobante los muestra.
 - Leyendas de venta exonerada y transporte de carga (detracción 027) en la interfaz de emisión (ADR-047). La vista previa conserva la detracción del documento para conocer la operación que fija su código.

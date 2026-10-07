@@ -11,7 +11,11 @@ const portalOf = (host: string) => `http://${host}:${new URL(process.env.SF_E2E_
 async function brandViaApi(resellerId: string, brand: { name: string; color: string }, host?: string): Promise<void> {
   const admin = await login(adminCredentials())
   await admin.put(`/api/v1/platform/resellers/${resellerId}/branding`, { brandName: brand.name, primaryColor: brand.color, supportEmail: 'soporte@marca.e2e.test' })
-  if (host) await admin.put(`/api/v1/platform/resellers/${resellerId}/host`, { host })
+  if (host) {
+    await admin.put(`/api/v1/platform/resellers/${resellerId}/host`, { host })
+    // The e2e stack runs the simulator of the DNS (Domains__Dns__Provider=Sandbox): the check passes, and only a verified domain shows its brand (ADR-051).
+    await admin.post(`/api/v1/platform/resellers/${resellerId}/domain/verify`)
+  }
 }
 
 async function rootColor(page: Page): Promise<string> {
@@ -112,5 +116,42 @@ test.describe('marca blanca', () => {
     await dialog.getByRole('button', { name: 'Guardar dominio' }).click()
     await expect(dialog.getByLabel('Dominio')).toHaveValue(`libre-${stamp}.e2e.test`)
     expect(await seriousViolations(page)).toEqual([])
+  })
+
+  test('el revendedor ve los registros DNS que debe crear, verifica el dominio y el ingreso en él ya muestra su marca', async ({ page, browser }) => {
+    const stamp = Date.now()
+    const reseller = await createReseller('dominio')
+    const name = `Portal ${stamp}`
+    const host = `portal-${stamp}.e2e.test`
+    const admin = await login(adminCredentials())
+    await admin.put(`/api/v1/platform/resellers/${reseller.id}/branding`, { brandName: name, primaryColor: '#0b5394', supportEmail: null })
+
+    await signIn(page, reseller.admin)
+    await page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('link', { name: 'Marca' }).click()
+    await expect(page.getByText('La plataforma aún no le asignó un dominio.')).toBeVisible()
+
+    // La plataforma asigna el dominio; el revendedor ve qué crear en su DNS.
+    await admin.put(`/api/v1/platform/resellers/${reseller.id}/host`, { host })
+    await page.reload()
+    await expect(page.getByText('Pendiente de verificar')).toBeVisible()
+    await expect(page.getByText(`_securefact-challenge.${host}`)).toBeVisible()
+    await expect(page.getByText(/securefact-verification=[0-9a-f]{48}/)).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Copiar el valor de TXT/ })).toBeVisible()
+    expect(await seriousViolations(page)).toEqual([])
+
+    // Mientras no se verifica, el ingreso en el dominio muestra la marca de la plataforma.
+    const visitor = await browser.newContext()
+    const portal = await visitor.newPage()
+    await portal.goto(`${portalOf(host)}/ingresar`)
+    await expect(portal.getByRole('heading', { name: 'SecureFact Perú' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Verificar ahora' }).click()
+    await expect(page.getByText('Verificado', { exact: true })).toBeVisible()
+    await expect(page.getByText('El dominio está verificado')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Verificar ahora' })).toHaveCount(0)
+
+    await portal.reload()
+    await expect(portal.getByRole('heading', { name })).toBeVisible()
+    await visitor.close()
   })
 })

@@ -57,6 +57,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public FakeSunatChannel Sunat { get; } = new();
 
+    /// <summary>The DNS that the verification of the domains asks: what a test publishes is what it finds.</summary>
+    public FakeDomainNameSystem Dns { get; } = new();
+
     public PostgresFixture Postgres => _postgres;
 
     public IServiceProvider Services => _factory!.Services;
@@ -72,12 +75,19 @@ public sealed class ApiFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Identity__MaxFailedAttempts", "5");
         Environment.SetEnvironmentVariable("Security__LocalDevKek", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         Environment.SetEnvironmentVariable("RateLimiting__AuthPermitPerMinute", "100000");
+        // The domains of the resellers (ADR-051): the platform's edge and its own hosts, the secret of the edge and a check that may be repeated after two seconds.
+        Environment.SetEnvironmentVariable("Domains__EdgeHost", FakeDomainNameSystem.EdgeHost);
+        Environment.SetEnvironmentVariable("Domains__EdgeAddresses__0", FakeDomainNameSystem.EdgeAddress);
+        Environment.SetEnvironmentVariable("Domains__PlatformHosts__0", FakeDomainNameSystem.PlatformHost);
+        Environment.SetEnvironmentVariable("Domains__EdgeSecret", FakeDomainNameSystem.EdgeSecret);
+        Environment.SetEnvironmentVariable("Domains__MinimumCheckSeconds", "2");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IPasswordResetNotifier>(Notifier);
                 services.AddSingleton<SecureFact.CpeEngine.Contracts.ICpeSubmissionChannel>(Sunat);
+                services.AddSingleton<SecureFact.Tenancy.Contracts.IDomainNameSystem>(Dns);
                 services.AddLogging(logging => logging.AddProvider(Logs));
             }));
 

@@ -130,6 +130,10 @@ services:
       Storage__S3__SecretKey: ${S3_SECRET_KEY:?set in .env}
       # SUNAT is never reached implicitly: leave empty to only prepare and sign, set Sandbox for the in-process simulator (ADR-039), or Beta / Production explicitly. Same value as the workers.
       Sunat__Environment: ${SF_SUNAT_ENVIRONMENT:-}
+      # Domains of the resellers (ADR-051): the simulator of the DNS answers every check; a real deployment sets System and the edge (deploy/edge).
+      Domains__Dns__Provider: ${SF_DOMAINS_DNS_PROVIDER:-Sandbox}
+      Domains__EdgeHost: ${SF_EDGE_HOST:-}
+      Domains__EdgeSecret: ${SF_EDGE_SECRET:-}
       # Sign-ins allowed per minute and address (the end-to-end tests raise it).
       RateLimiting__AuthPermitPerMinute: ${SF_AUTH_RATE_LIMIT:-20}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${SF_OTLP_ENDPOINT:-}
@@ -159,6 +163,8 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
       SF__Environment: ${SF_ENVIRONMENT:-Local}
+      Domains__Dns__Provider: ${SF_DOMAINS_DNS_PROVIDER:-Sandbox}
+      Domains__EdgeHost: ${SF_EDGE_HOST:-}
       ConnectionStrings__App: Host=postgres;Database=${POSTGRES_DB};Username=${SF_APP_DB_USER};Password=${SF_APP_DB_PASSWORD}
       Security__LocalDevKek: ${SF_LOCAL_DEV_KEK:?set in .env}
       # Signed XML and CDR are archived in the object store (ADR-005, ADR-036); the credentials are the ones of the s3 container, from .env.

@@ -65,6 +65,7 @@ internal static class WorkerHost
 
         builder.Services.AddAuditModule(appConnection);
         builder.Services.AddTenancyModule(appConnection);
+        builder.Services.AddDomainProvisioning(builder.Configuration.GetSection(DomainsOptions.SectionName).Get<DomainsOptions>() ?? new DomainsOptions(), builder.Environment.IsProduction());
         builder.Services.AddOrganizationsModule(appConnection);
         builder.Services.AddTaxEngineModule();
         builder.Services.AddCatalogsModule(appConnection);
@@ -105,6 +106,7 @@ internal static class WorkerHost
 
         builder.Services.AddHostedService<OutboxWorker>();
         builder.Services.AddHostedService<CpeWorker>();
+        builder.Services.AddHostedService<DomainWorker>();
 
         return builder;
     }

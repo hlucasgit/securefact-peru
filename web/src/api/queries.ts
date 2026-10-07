@@ -9,6 +9,7 @@ import type {
   BrandInput,
   BrandScope,
   BrandSettings,
+  DomainInfo,
   PlanInput,
   PlanRow,
   ResellerRow,
@@ -236,8 +237,19 @@ export const useBrandSettings = (scope: BrandScope) => useQuery({ queryKey: bran
 export const useSaveBrand = (scope: BrandScope) => useAction((input: BrandInput) => put<BrandSettings>(brandBase(scope), input), brandInvalidations(scope))
 export const useSetLogo = (scope: BrandScope) => useAction((dataBase64: string) => put<BrandSettings>(`${brandBase(scope)}/logo`, { dataBase64 }), brandInvalidations(scope))
 export const useRemoveLogo = (scope: BrandScope) => useAction(() => del<BrandSettings>(`${brandBase(scope)}/logo`), brandInvalidations(scope))
-export const useSetHost = (resellerId: string) =>
-  useAction((host: string | null) => put<BrandSettings>(`/api/v1/platform/resellers/${resellerId}/host`, { host }), [brandKey({ kind: 'platform', resellerId }), ['branding'], ['audit']])
+// Domains (ADR-051): the reseller reads and checks its own; platform staff assign and check any. A domain that is still waiting for its DNS is looked at again by itself.
+const domainBase = (scope: BrandScope) => (scope.kind === 'own' ? '/api/v1/reseller/domain' : `/api/v1/platform/resellers/${scope.resellerId}/domain`)
+const domainKey = (scope: BrandScope) => ['domain', scope.kind === 'own' ? 'own' : scope.resellerId] as const
+
+export const useDomain = (scope: BrandScope) =>
+  useQuery({
+    queryKey: domainKey(scope),
+    queryFn: () => get<DomainInfo>(domainBase(scope)),
+    refetchInterval: (query) => (query.state.data?.status === 'Pending' || query.state.data?.status === 'Unreachable' ? 20_000 : false),
+  })
+export const useVerifyDomain = (scope: BrandScope) => useAction(() => post<DomainInfo>(`${domainBase(scope)}/verify`), [domainKey(scope), ['branding'], brandKey(scope)])
+export const useAssignDomain = (resellerId: string) =>
+  useAction((host: string | null) => put<DomainInfo>(`/api/v1/platform/resellers/${resellerId}/host`, { host }), [domainKey({ kind: 'platform', resellerId }), ['branding'], brandKey({ kind: 'platform', resellerId }), ['audit']])
 
 export interface AuditFilters {
   tenantId: string

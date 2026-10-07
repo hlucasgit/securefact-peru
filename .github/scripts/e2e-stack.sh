@@ -24,6 +24,8 @@ export ASPNETCORE_ENVIRONMENT=Development
 export ASPNETCORE_URLS=http://localhost:5180
 export DOTNET_ENVIRONMENT=Development
 export Sunat__Environment=Sandbox
+# The simulator of the DNS of the domains of the resellers (ADR-051): every check passes. Never in production.
+export Domains__Dns__Provider=Sandbox
 # The tests sign in many times from one address; the limit of the sign-in endpoint is raised for them only.
 export RateLimiting__AuthPermitPerMinute=1000
 # The workers look for work every 3 seconds instead of every 15.

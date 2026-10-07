@@ -4,6 +4,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="DnsClient" />
     <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
     <ProjectReference Include="..\..\Audit\SecureFact.Audit.Contracts\SecureFact.Audit.Contracts.csproj" />

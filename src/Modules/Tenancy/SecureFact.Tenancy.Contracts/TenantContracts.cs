@@ -172,7 +172,7 @@ public interface IResellerAdministration
 public sealed record BrandingDto(Guid ResellerId, string BrandName, string PrimaryColor, string? SupportEmail, string? LogoVersion);
 
 /// <summary>What a reseller or the platform edits. <paramref name="Host"/> is the host name at which the portal of the reseller is served; only the platform sets it.</summary>
-public sealed record BrandingSettings(Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, string? LogoVersion);
+public sealed record BrandingSettings(Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, string? LogoVersion, DomainStatus HostStatus = DomainStatus.None);
 
 public sealed record BrandingInput(string? BrandName, string? PrimaryColor, string? SupportEmail);
 
@@ -184,7 +184,7 @@ public sealed record BrandLogo(byte[] Data, string ContentType, string Version);
 /// </summary>
 public interface IBranding
 {
-    /// <summary>The brand of the reseller whose portal is served at <paramref name="host"/>, or null.</summary>
+    /// <summary>The brand of the reseller whose portal is served at <paramref name="host"/>, or null. Only a verified domain answers (ADR-051).</summary>
     Task<BrandingDto?> ForHostAsync(string host, CancellationToken cancellationToken);
 
     /// <summary>The brand of the reseller of a tenant, or null for a tenant without reseller (or whose reseller has no brand or is off).</summary>
@@ -199,11 +199,69 @@ public interface IBranding
     /// <summary>Sets name, colour and support e-mail. A null name removes the brand (the default look returns). The colour must keep the white text readable on it (WCAG contrast 4.5:1).</summary>
     Task<Result<BrandingSettings>> UpdateAsync(Guid resellerId, BrandingInput input, CancellationToken cancellationToken);
 
-    /// <summary>Points a host name at the portal of the reseller (platform staff only): the DNS record and the certificate are the operator's. Null clears it.</summary>
-    Task<Result<BrandingSettings>> SetHostAsync(Guid resellerId, string? host, CancellationToken cancellationToken);
-
     /// <summary>A PNG, JPEG or WebP of at most 200 KB, checked by its content and not by what the caller says it is.</summary>
     Task<Result<BrandingSettings>> SetLogoAsync(Guid resellerId, byte[] data, CancellationToken cancellationToken);
 
     Task<Result<BrandingSettings>> RemoveLogoAsync(Guid resellerId, CancellationToken cancellationToken);
+}
+
+public enum DomainStatus
+{
+    /// <summary>The reseller has no domain.</summary>
+    None,
+
+    /// <summary>The platform assigned a domain and the reseller has not yet proved it controls it, nor pointed it at the platform.</summary>
+    Pending,
+
+    /// <summary>The ownership proof (a TXT record) and the route (the name leads to the platform's edge) were both found. Only a verified domain shows the brand and gets a certificate.</summary>
+    Verified,
+
+    /// <summary>It was verified and the checks fail now (several times in a row): the brand and the certificates stop, and the domain comes back by itself when the DNS is right again.</summary>
+    Unreachable,
+}
+
+/// <summary>
+/// The domain of a reseller's portal and what is left to do for it to work. The reseller creates two DNS records, which this describes; nothing else is its work: the certificate is
+/// issued by the platform's edge once the domain is verified (ADR-051).
+/// </summary>
+public sealed record DomainDto(
+    Guid ResellerId,
+    string? Host,
+    DomainStatus Status,
+    string? TxtName,
+    string? TxtValue,
+    string? CnameTarget,
+    IReadOnlyList<string> EdgeAddresses,
+    DateTimeOffset? VerifiedAt,
+    DateTimeOffset? CheckedAt,
+    string? Error);
+
+/// <summary>What the DNS says about a name: the aliases it goes through and the addresses it ends in.</summary>
+public sealed record DomainRoute(IReadOnlyList<string> Cnames, IReadOnlyList<string> Addresses);
+
+/// <summary>The DNS lookups that verify a domain. A lookup that cannot be done (the resolver does not answer) throws; a name that does not exist or has no such record answers empty.</summary>
+public interface IDomainNameSystem
+{
+    Task<IReadOnlyList<string>> TxtAsync(string name, CancellationToken cancellationToken);
+
+    Task<DomainRoute> RouteAsync(string name, CancellationToken cancellationToken);
+}
+
+/// <summary>Domains of the resellers (ADR-051): assigning one, proving it, and telling the platform's edge which names may have a certificate.</summary>
+public interface IDomains
+{
+    /// <summary>The state of the domain of a reseller. Platform staff for any reseller; a reseller user for its own.</summary>
+    Task<Result<DomainDto>> GetAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    /// <summary>Assigns the domain (platform staff only), or clears it with null. A new domain starts pending with a new proof to publish; the same one changes nothing.</summary>
+    Task<Result<DomainDto>> SetAsync(Guid resellerId, string? host, CancellationToken cancellationToken);
+
+    /// <summary>Checks the DNS now. A check is not repeated within seconds of the last one (<c>SF-DOM-002</c>).</summary>
+    Task<Result<DomainDto>> VerifyAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    /// <summary>The background pass: checks the pending domains, and the verified ones that are due again. Platform scope; returns how many it checked.</summary>
+    Task<int> VerifyDueAsync(CancellationToken cancellationToken);
+
+    /// <summary>Whether the edge may ask for a certificate for this name: one of the platform's own hosts, or the verified domain of a reseller that is on.</summary>
+    Task<bool> IsAllowedForCertificateAsync(string host, CancellationToken cancellationToken);
 }
