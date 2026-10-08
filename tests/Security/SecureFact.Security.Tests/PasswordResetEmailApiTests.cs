@@ -137,7 +137,8 @@ public sealed class PasswordResetEmailApiTests(ApiFixture api)
         var first = "A first new passphrase for 2026";
         Assert.Equal(HttpStatusCode.NoContent, (await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new { token = api.Notifier.TokenFor(owner.Email), newPassword = first })).StatusCode);
 
-        var notice = api.Mail.To(owner.Email).Last();
+        var sent = api.Mail.To(owner.Email);
+        var notice = sent[^1];
         Assert.Contains("cambió", notice.Subject, StringComparison.Ordinal);
         Assert.Contains($"{ApiFixture.PublicUrl}/recuperar", notice.Text, StringComparison.Ordinal);
         Assert.Contains("se cerraron todas sus sesiones", notice.Text, StringComparison.Ordinal);
