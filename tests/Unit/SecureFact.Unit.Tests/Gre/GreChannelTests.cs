@@ -218,4 +218,142 @@ public class GreChannelTests
         Assert.Equal(GreSubmitStatus.Refused, refused.Status);
         Assert.Equal("502", refused.ErrorCode);
     }
+
+    [Fact]
+    public async Task A_ticket_that_is_blank_is_not_asked()
+    {
+        var (channel, handler) = Channel(_ => Token());
+
+        var outcome = await channel.QueryTicketAsync(Credentials("client-blank"), " ", CancellationToken.None);
+
+        Assert.Equal(GreTicketStatus.Error, outcome.Status);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_ticket_that_SUNAT_does_not_know_is_an_error_and_an_unknown_code_is_transient()
+    {
+        var answers = new Queue<HttpResponseMessage>([Json(HttpStatusCode.NotFound, """{"cod":"1033","msg":"Ticket no existe"}"""), Json(HttpStatusCode.OK, """{"codRespuesta":"77"}""")]);
+        var (channel, _) = Channel(seen => ApiOrToken(seen, _ => answers.Dequeue()));
+        var credentials = Credentials("client-unknown-ticket");
+
+        var missing = await channel.QueryTicketAsync(credentials, "t1", CancellationToken.None);
+        var unknown = await channel.QueryTicketAsync(credentials, "t1", CancellationToken.None);
+
+        Assert.Equal(GreTicketStatus.Error, missing.Status);
+        Assert.Equal("1033", missing.ErrorCode);
+        Assert.Equal(GreTicketStatus.Transient, unknown.Status);
+        Assert.Equal("SF-GRE-UNKNOWN", unknown.ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_token_that_keeps_being_revoked_ends_in_a_transient_failure()
+    {
+        var (channel, handler) = Channel(seen => ApiOrToken(seen, _ => Json(HttpStatusCode.Unauthorized, "{}")));
+
+        var outcome = await channel.SubmitAsync(Submission(Credentials("client-always-401")), CancellationToken.None);
+
+        Assert.Equal(GreSubmitStatus.Transient, outcome.Status);
+        Assert.Equal(2, handler.Requests.Count(r => r.Uri.Host == "seguridad.test"));
+    }
+
+    [Fact]
+    public async Task A_token_service_that_answers_nonsense_is_a_transient_failure()
+    {
+        var bodies = new Queue<string>(["not json", "{}"]);
+        var (channel, _) = Channel(_ => Json(HttpStatusCode.OK, bodies.Dequeue()));
+
+        var notJson = await channel.SubmitAsync(Submission(Credentials("client-nonsense-1")), CancellationToken.None);
+        var noToken = await channel.SubmitAsync(Submission(Credentials("client-nonsense-2")), CancellationToken.None);
+
+        Assert.Equal("SF-GRE-AUTH", notJson.ErrorCode);
+        Assert.Equal("SF-GRE-AUTH", noToken.ErrorCode);
+        Assert.Equal(GreSubmitStatus.Transient, notJson.Status);
+        Assert.Equal(GreSubmitStatus.Transient, noToken.Status);
+    }
+
+    [Fact]
+    public async Task A_timeout_and_an_answer_that_is_too_big_are_transient()
+    {
+        var timeouts = true;
+        var (channel, _) = Channel(seen =>
+        {
+            if (seen.Uri.Host == "seguridad.test")
+            {
+                return Token();
+            }
+
+            if (timeouts)
+            {
+                throw new TaskCanceledException("timeout");
+            }
+
+            var big = Json(HttpStatusCode.OK, "{}");
+            big.Content.Headers.ContentLength = 50_000_000;
+            return big;
+        });
+        var credentials = Credentials("client-limits");
+
+        var timedOut = await channel.SubmitAsync(Submission(credentials), CancellationToken.None);
+        timeouts = false;
+        var tooBig = await channel.SubmitAsync(Submission(credentials), CancellationToken.None);
+
+        Assert.Equal("SF-GRE-TIMEOUT", timedOut.ErrorCode);
+        Assert.Equal("SF-GRE-TOOBIG", tooBig.ErrorCode);
+    }
+
+    [Fact]
+    public async Task An_answer_that_is_not_JSON_is_told_apart_by_its_status()
+    {
+        var plain = (HttpStatusCode status) => new HttpResponseMessage(status) { Content = new StringContent("<html>oops</html>", Encoding.UTF8, "text/html") };
+        var status = HttpStatusCode.OK;
+        var (channel, _) = Channel(seen => ApiOrToken(seen, _ => plain(status)));
+        var credentials = Credentials("client-html");
+
+        var ok = await channel.SubmitAsync(Submission(credentials), CancellationToken.None);
+        status = HttpStatusCode.BadRequest;
+        var bad = await channel.SubmitAsync(Submission(credentials), CancellationToken.None);
+
+        Assert.Equal("SF-GRE-BADBODY", ok.ErrorCode);
+        Assert.Equal(GreSubmitStatus.Transient, ok.Status);
+        Assert.Equal("HTTP-400", bad.ErrorCode);
+        Assert.Equal(GreSubmitStatus.Refused, bad.Status);
+    }
+
+    [Fact]
+    public async Task A_send_without_a_ticket_and_a_CDR_that_is_not_base64_are_handled()
+    {
+        var answers = new Queue<string>(["""{"fecRecepcion":"2026-10-08"}""", """{"codRespuesta":"0","arcCdr":"%%%"}""", """{"codRespuesta":"0","arcCdr":""}"""]);
+        var (channel, _) = Channel(seen => ApiOrToken(seen, _ => Json(HttpStatusCode.OK, answers.Dequeue())));
+        var credentials = Credentials("client-shapes");
+
+        var noTicket = await channel.SubmitAsync(Submission(credentials), CancellationToken.None);
+        var badCdr = await channel.QueryTicketAsync(credentials, "t1", CancellationToken.None);
+        var emptyCdr = await channel.QueryTicketAsync(credentials, "t1", CancellationToken.None);
+
+        Assert.Equal("SF-GRE-NOTICKET", noTicket.ErrorCode);
+        Assert.Equal(GreTicketStatus.Done, badCdr.Status);
+        Assert.Null(badCdr.CdrZip);
+        Assert.Null(emptyCdr.CdrZip);
+    }
+
+    [Fact]
+    public async Task The_simulator_refuses_a_bad_name_a_bad_zip_and_a_ticket_that_is_not_its_own()
+    {
+        var packager = new ZipCpePackager();
+        var simulator = new SandboxGreChannel(packager, TimeProvider.System);
+        var credentials = Credentials("client-sbx-bad");
+
+        var badName = await simulator.SubmitAsync(Submission(credentials) with { FileBaseName = "nombre-malo" }, CancellationToken.None);
+        var badZip = await simulator.SubmitAsync(Submission(credentials) with { Zip = [1, 2, 3] }, CancellationToken.None);
+        var foreign = await simulator.QueryTicketAsync(credentials, "otro-ticket", CancellationToken.None);
+        var nonsense = await simulator.QueryTicketAsync(credentials, "SBX.@@@", CancellationToken.None);
+        var short_ = await simulator.QueryTicketAsync(credentials, "SBX." + Convert.ToBase64String(Encoding.UTF8.GetBytes("solo")), CancellationToken.None);
+
+        Assert.Equal("503", badName.ErrorCode);
+        Assert.Equal("504", badZip.ErrorCode);
+        Assert.Equal(GreTicketStatus.Error, foreign.Status);
+        Assert.Equal(GreTicketStatus.Error, nonsense.Status);
+        Assert.Equal(GreTicketStatus.Error, short_.Status);
+    }
 }

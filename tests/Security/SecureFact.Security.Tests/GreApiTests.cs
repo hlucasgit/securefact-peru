@@ -12,10 +12,10 @@ using SecureFact.Organizations.Contracts;
 namespace SecureFact.Security.Tests;
 
 [Collection(ApiTestGroup.Name)]
-public sealed class GreApiTests(ApiFixture api)
+public sealed partial class GreApiTests(ApiFixture api)
 {
-    private const string SolPassword = "Sol-Clave-gre-secret-9";
-    private const string ApiSecret = "api-client-secret-gre-5521";
+    private const string SolPassword = "Sol-Clave-gre-7";
+    private const string ApiSecret = "api-gre-client-value-5521";
     private static int _rucCounter = 8_000_000;
 
     private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, GreSeriesDto Series);
@@ -39,7 +39,7 @@ public sealed class GreApiTests(ApiFixture api)
         return Convert.ToBase64String(certificate.Export(X509ContentType.Pfx, "pw"));
     }
 
-    private async Task<Setup> NewTenantAsync(string name, bool apiCredentials = true, bool certificate = true)
+    private async Task<Setup> NewTenantAsync(string name, bool apiCredentials = true, bool certificate = true, bool solCredentials = true)
     {
         api.Gre.Reset();
         var tenantId = await api.CreateTenantAsync(name);
@@ -54,8 +54,12 @@ public sealed class GreApiTests(ApiFixture api)
             Assert.Equal(HttpStatusCode.Created, (await owner.PostAsJsonAsync("/api/v1/certificates", new { companyId = company.Id, pfxBase64 = PfxFor(ruc), password = "pw" })).StatusCode);
         }
 
-        Assert.Equal(HttpStatusCode.OK, (await owner.PutAsJsonAsync("/api/v1/sol-credentials", new { companyId = company.Id, solUser = "MODDATOS", solPassword = SolPassword })).StatusCode);
-        if (apiCredentials)
+        if (solCredentials)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await owner.PutAsJsonAsync("/api/v1/sol-credentials", new { companyId = company.Id, solUser = "MODDATOS", solPassword = SolPassword })).StatusCode);
+        }
+
+        if (apiCredentials && solCredentials)
         {
             Assert.Equal(HttpStatusCode.OK, (await owner.PutAsJsonAsync($"/api/v1/sol-credentials/{company.Id}/api", new { clientId = "client-id-gre", clientSecret = ApiSecret })).StatusCode);
         }

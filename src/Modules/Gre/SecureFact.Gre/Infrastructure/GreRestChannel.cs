@@ -58,7 +58,7 @@ internal sealed class GreRestChannel : IGreChannel
             },
         };
 
-        var reply = await CallAsync(submission.Credentials, HttpMethod.Post, path, JsonContent.Create(body), cancellationToken);
+        var reply = await CallAsync(submission.Credentials, HttpMethod.Post, path, () => JsonContent.Create(body), cancellationToken);
         if (reply.Failure is { } failure)
         {
             return new GreSubmitOutcome(failure.Transient ? GreSubmitStatus.Transient : GreSubmitStatus.Refused, null, failure.Code, failure.Message);
@@ -107,34 +107,35 @@ internal sealed class GreRestChannel : IGreChannel
 
     private sealed record Reply(JsonElement? Json, Failure? Failure);
 
-    private async Task<Reply> CallAsync(GreChannelCredentials credentials, HttpMethod method, string path, HttpContent? content, CancellationToken cancellationToken)
+    /// <param name="content">Builds the body for each send: a request disposes its content, so the second send after a revoked token needs a new one.</param>
+    private async Task<Reply> CallAsync(GreChannelCredentials credentials, HttpMethod method, string path, Func<HttpContent>? content, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_options.Timeout);
         try
         {
-            for (var attempt = 0; attempt < 2; attempt++)
+            var token = await TokenAsync(credentials, forceNew: false, timeout.Token);
+            if (token.Failure is not null)
             {
-                var token = await TokenAsync(credentials, forceNew: attempt > 0, timeout.Token);
-                if (token.Failure is not null)
-                {
-                    return new Reply(null, token.Failure);
-                }
-
-                using var request = new HttpRequestMessage(method, new Uri(_options.ApiBase, path)) { Content = content };
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
-                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-                if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
-                {
-                    Forget(credentials);
-                    continue; // the token may have been revoked before its time: ask for another one, once
-                }
-
-                var body = await ReadCappedAsync(response, timeout.Token).ConfigureAwait(false);
-                return Interpret(response.StatusCode, body);
+                return new Reply(null, token.Failure);
             }
 
-            return new Reply(null, new Failure(true, "SF-GRE-AUTH", "SUNAT rechazó el token de acceso."));
+            var first = await SendAsync(method, path, content, token.Value!, timeout.Token);
+            if (first.Status != HttpStatusCode.Unauthorized)
+            {
+                return Interpret(first.Status, first.Body);
+            }
+
+            // The token may have been revoked before its time: ask for another one, once.
+            Forget(credentials);
+            token = await TokenAsync(credentials, forceNew: true, timeout.Token);
+            if (token.Failure is not null)
+            {
+                return new Reply(null, token.Failure);
+            }
+
+            var second = await SendAsync(method, path, content, token.Value!, timeout.Token);
+            return Interpret(second.Status, second.Body);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -148,6 +149,16 @@ internal sealed class GreRestChannel : IGreChannel
         {
             return new Reply(null, new Failure(true, "SF-GRE-TOOBIG", "La respuesta de SUNAT excede el tamaño permitido."));
         }
+    }
+
+    private sealed record Answer(HttpStatusCode Status, byte[] Body);
+
+    private async Task<Answer> SendAsync(HttpMethod method, string path, Func<HttpContent>? content, string token, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(_options.ApiBase, path)) { Content = content?.Invoke() };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        return new Answer(response.StatusCode, await ReadCappedAsync(response, cancellationToken).ConfigureAwait(false));
     }
 
     private sealed record TokenResult(string? Value, Failure? Failure);
