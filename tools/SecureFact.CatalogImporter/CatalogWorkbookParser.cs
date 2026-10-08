@@ -29,7 +29,12 @@ public static partial class CatalogWorkbookParser
     [GeneratedRegex(@"^\d{1,3}$")]
     private static partial Regex NumberPattern();
 
-    public static CatalogSeedFile Parse(string xlsxPath)
+    /// <param name="xlsxPath">The workbook.</param>
+    /// <param name="only">
+    /// The catalogue numbers to keep, or null for all. The workbook of the GRE (S27) repeats catalogues that the workbook of the CPE (S16) also has, and the GRE ones are only authoritative
+    /// for what the GRE uses: 18, 20, 61, 63, 64 and 65.
+    /// </param>
+    public static CatalogSeedFile Parse(string xlsxPath, IReadOnlySet<string>? only = null)
     {
         // ExcelDataReader needs legacy code pages for .xls support even when reading .xlsx.
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
@@ -50,7 +55,7 @@ public static partial class CatalogWorkbookParser
 
         void Flush()
         {
-            if (name is not null && number is not null && headers is not null && entries is { Count: > 0 })
+            if (name is not null && number is not null && headers is not null && entries is { Count: > 0 } && (only is null || only.Contains(number)))
             {
                 catalogs.Add(new CatalogSeed(number, name, headers, entries));
             }

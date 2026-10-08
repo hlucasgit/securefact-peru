@@ -50,6 +50,22 @@ public sealed class CatalogsTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task The_catalogues_of_the_gre_come_from_the_newer_workbook_of_the_gre_and_the_rest_from_the_one_of_the_cpe()
+    {
+        using var client = await TenantClientAsync("Catalog Gre SAC");
+
+        var motives = (await client.GetFromJsonAsync<List<CatalogEntryDto>>("/api/v1/catalogs/20", ApiFixture.JsonOptions))!;
+        Assert.Equal(14, motives.Count);
+        Assert.Contains(motives, e => e.Code == "19" && e.Version == 2 && e.Source == "reglas-validacion-publicado-2026-09-25.xlsx");
+        var related = (await client.GetFromJsonAsync<List<CatalogEntryDto>>("/api/v1/catalogs/61", ApiFixture.JsonOptions))!;
+        Assert.Equal("solo transportista", Assert.Single(related, e => e.Code == "31").Metadata["GRE Aplicable"]);
+        var igv = (await client.GetFromJsonAsync<List<CatalogEntryDto>>("/api/v1/catalogs/07", ApiFixture.JsonOptions))!;
+        Assert.All(igv, e => Assert.Equal(1, e.Version)); // a catalogue the GRE does not use stays as the CPE gave it
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/catalogs/18")).StatusCode);
+    }
+
+    [Fact]
     public async Task Unknown_catalogues_are_reported_with_a_stable_code()
     {
         using var client = await TenantClientAsync("Catalog Unknown SAC");

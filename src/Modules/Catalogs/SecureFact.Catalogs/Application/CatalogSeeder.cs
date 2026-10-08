@@ -12,10 +12,14 @@ namespace SecureFact.Catalogs.Application;
 /// Idempotent: an edition whose source SHA-256 is already loaded is skipped; a new source becomes version N+1, effective from the
 /// workbook date, and closes the previous version the day before. The first edition has no published start date, so it is effective
 /// from <see cref="Baseline"/>.
+/// There are two sources, applied in this order: the workbook of the CPE (S16, all catalogues) and the one of the GRE (S27, only the catalogues of the GRE that are newer there:
+/// 18, 20, 61, 63, 64 and 65), which becomes the next version of those catalogues from 2026-09-25.
 /// </summary>
 internal static partial class CatalogSeeder
 {
     public const string ResourceName = "SecureFact.Catalogs.Seeds.sunat-catalogs-2026-08-26.json";
+
+    public const string GreResourceName = "SecureFact.Catalogs.Seeds.sunat-catalogs-gre-2026-09-25.json";
 
     /// <summary>"Since always": the source does not publish when each code became effective.</summary>
     public static readonly DateOnly Baseline = new(1900, 1, 1);
@@ -33,11 +37,28 @@ internal static partial class CatalogSeeder
 
     internal sealed record SeedFile(SeedSource Source, List<SeedCatalog> Catalogs);
 
-    internal static SeedFile LoadEmbedded()
+    internal static SeedFile LoadEmbedded() => Load(ResourceName);
+
+    internal static SeedFile Load(string resourceName)
     {
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourceName)
-            ?? throw new InvalidOperationException($"Embedded resource {ResourceName} not found.");
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded resource {resourceName} not found.");
         return JsonSerializer.Deserialize<SeedFile>(stream, Json) ?? throw new InvalidDataException("Catalogue seed is empty.");
+    }
+
+    /// <summary>Every embedded source, oldest first.</summary>
+    internal static IReadOnlyList<SeedFile> LoadAllEmbedded() => [Load(ResourceName), Load(GreResourceName)];
+
+    /// <returns>Number of catalogue editions loaded from all the embedded sources.</returns>
+    public static async Task<int> SeedAllAsync(CatalogsDbContext db, TimeProvider clock, CancellationToken cancellationToken)
+    {
+        var loaded = 0;
+        foreach (var source in LoadAllEmbedded())
+        {
+            loaded += await SeedAsync(db, clock, cancellationToken, source);
+        }
+
+        return loaded;
     }
 
     /// <returns>Number of catalogue editions loaded (0 when everything was already present).</returns>

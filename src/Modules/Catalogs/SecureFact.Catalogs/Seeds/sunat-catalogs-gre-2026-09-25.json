@@ -1,0 +1,2114 @@
+{
+  "Source": {
+    "File": "reglas-validacion-publicado-2026-09-25.xlsx",
+    "Bytes": 279669,
+    "Sha256": "f328721b1c530669598ed907a1e4b47004468375dd872959580bbd8c466fa066",
+    "Sheet": "Catálogos"
+  },
+  "Catalogs": [
+    {
+      "Number": "18",
+      "Name": "Código de modalidad de transporte",
+      "Headers": [
+        "Código",
+        "Descripción"
+      ],
+      "Entries": [
+        {
+          "Code": "01",
+          "Description": "Transporte público",
+          "Extra": {}
+        },
+        {
+          "Code": "02",
+          "Description": "Transporte privado",
+          "Extra": {}
+        }
+      ]
+    },
+    {
+      "Number": "20",
+      "Name": "Código de motivo de traslado",
+      "Headers": [
+        "Código",
+        "Descripción"
+      ],
+      "Entries": [
+        {
+          "Code": "01",
+          "Description": "Venta",
+          "Extra": {}
+        },
+        {
+          "Code": "02",
+          "Description": "Compra",
+          "Extra": {}
+        },
+        {
+          "Code": "03",
+          "Description": "Venta con entrega a terceros",
+          "Extra": {}
+        },
+        {
+          "Code": "04",
+          "Description": "Traslado entre establecimientos de la misma empresa",
+          "Extra": {}
+        },
+        {
+          "Code": "05",
+          "Description": "Consignación",
+          "Extra": {}
+        },
+        {
+          "Code": "06",
+          "Description": "Devolución",
+          "Extra": {}
+        },
+        {
+          "Code": "07",
+          "Description": "Recojo de bienes transformados",
+          "Extra": {}
+        },
+        {
+          "Code": "08",
+          "Description": "Importación",
+          "Extra": {}
+        },
+        {
+          "Code": "09",
+          "Description": "Exportación",
+          "Extra": {}
+        },
+        {
+          "Code": "13",
+          "Description": "Otros",
+          "Extra": {}
+        },
+        {
+          "Code": "14",
+          "Description": "Venta sujeta a confirmación del comprador",
+          "Extra": {}
+        },
+        {
+          "Code": "17",
+          "Description": "Traslado de bienes para transformación",
+          "Extra": {}
+        },
+        {
+          "Code": "18",
+          "Description": "Traslado emisor itinerante CP",
+          "Extra": {}
+        },
+        {
+          "Code": "19",
+          "Description": "Traslado de mercancía extranjera",
+          "Extra": {}
+        }
+      ]
+    },
+    {
+      "Number": "61",
+      "Name": "Documentos relacionados aplicables a las GRE (versión 2.0)",
+      "Headers": [
+        "Código",
+        "Nombre",
+        "GRE Aplicable"
+      ],
+      "Entries": [
+        {
+          "Code": "01",
+          "Description": "Factura",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "03",
+          "Description": "Boleta de Venta",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "04",
+          "Description": "Liquidación de Compra",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "09",
+          "Description": "Guía de Remisión Remitente",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "12",
+          "Description": "Ticket o cinta emitido por máquina registradora",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "31",
+          "Description": "Guía de Remisión Transportista",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "48",
+          "Description": "Comprobante de Operaciones – Ley N° 29972",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "49",
+          "Description": "Constancia de Depósito - IVAP (Ley 28211)",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "50",
+          "Description": "Declaración Aduanera de Mercancías",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "52",
+          "Description": "Declaración Simplificada (DS)",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "65",
+          "Description": "Autorización de Circulación para transportar MATPEL – Callao",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "66",
+          "Description": "Autorización de Circulación para transporte de carga y mercancías en Lima Metropolitana",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "67",
+          "Description": "Permiso de Operación Especial para el servicio de transporte de MATPEL - MTC",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "68",
+          "Description": "Habilitación Sanitaria de Transporte Terrestre de Productos Pesqueros y Acuícolas",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "69",
+          "Description": "Permiso / Autorización de operación de transporte de mercancías",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "71",
+          "Description": "Resolución de Adjudicación de bienes – SUNAT",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "72",
+          "Description": "Resolución de Comiso de bienes – SUNAT",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "73",
+          "Description": "Guía de Transporte Forestal o de Fauna - SERFOR",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "74",
+          "Description": "Guía de Tránsito – SUCAMEC",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "75",
+          "Description": "Autorización para operar como empresa de Saneamiento Ambiental – MINSA -",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "76",
+          "Description": "Autorización para manejo y recojo de residuos sólidos peligrosos y no peligrosos",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "77",
+          "Description": "Certificado fitosanitario la movilización de plantas, productos vegetales, y otros artículos reglamentados",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "78",
+          "Description": "Registro Único de Usuarios y Transportistas de Alcohol Etílico",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "80",
+          "Description": "Constancia de Depósito – Detracción",
+          "Extra": {
+            "GRE Aplicable": "remitente, transportista"
+          }
+        },
+        {
+          "Code": "81",
+          "Description": "Código de autorización emitida por el SCOP",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "82",
+          "Description": "Declaración jurada de mudanza",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "91",
+          "Description": "Manifiesto de carga (MC)",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "92",
+          "Description": "Cita/Orden Entrega Mercancías del Terminal Portuario",
+          "Extra": {
+            "GRE Aplicable": "solo remitente"
+          }
+        },
+        {
+          "Code": "93",
+          "Description": "Documento ZOFRATACNA",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "94",
+          "Description": "Solicitud traslado - ZED",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        },
+        {
+          "Code": "95",
+          "Description": "Solicitud de traslado - ZOFRATACNA",
+          "Extra": {
+            "GRE Aplicable": "solo transportista"
+          }
+        }
+      ]
+    },
+    {
+      "Number": "63",
+      "Name": "Puertos del Perú",
+      "Headers": [
+        "Código",
+        "Nombre",
+        "Ubigeo"
+      ],
+      "Entries": [
+        {
+          "Code": "PUB",
+          "Description": "Bayóvar",
+          "Extra": {
+            "Ubigeo": "200801"
+          }
+        },
+        {
+          "Code": "CLL",
+          "Description": "Callao",
+          "Extra": {
+            "Ubigeo": "070101"
+          }
+        },
+        {
+          "Code": "CON",
+          "Description": "Conchán",
+          "Extra": {
+            "Ubigeo": "150119"
+          }
+        },
+        {
+          "Code": "CHY",
+          "Description": "Chancay",
+          "Extra": {
+            "Ubigeo": "150605"
+          }
+        },
+        {
+          "Code": "CHM",
+          "Description": "Chimbote",
+          "Extra": {
+            "Ubigeo": "021801"
+          }
+        },
+        {
+          "Code": "EEN",
+          "Description": "Eten",
+          "Extra": {
+            "Ubigeo": "140113"
+          }
+        },
+        {
+          "Code": "HCO",
+          "Description": "Huacho",
+          "Extra": {
+            "Ubigeo": "150801"
+          }
+        },
+        {
+          "Code": "HUY",
+          "Description": "Huarmey",
+          "Extra": {
+            "Ubigeo": "021101"
+          }
+        },
+        {
+          "Code": "ILQ",
+          "Description": "Ilo",
+          "Extra": {
+            "Ubigeo": "180301"
+          }
+        },
+        {
+          "Code": "IQT",
+          "Description": "Iquitos",
+          "Extra": {
+            "Ubigeo": "160101"
+          }
+        },
+        {
+          "Code": "MRI",
+          "Description": "Matarani",
+          "Extra": {
+            "Ubigeo": "040701"
+          }
+        },
+        {
+          "Code": "PAI",
+          "Description": "Paita",
+          "Extra": {
+            "Ubigeo": "200501"
+          }
+        },
+        {
+          "Code": "PIO",
+          "Description": "Pisco",
+          "Extra": {
+            "Ubigeo": "110505"
+          }
+        },
+        {
+          "Code": "PCL",
+          "Description": "Pucallpa",
+          "Extra": {
+            "Ubigeo": "250101"
+          }
+        },
+        {
+          "Code": "PUN",
+          "Description": "Puno",
+          "Extra": {
+            "Ubigeo": "210101"
+          }
+        },
+        {
+          "Code": "SVY",
+          "Description": "Salaverry",
+          "Extra": {
+            "Ubigeo": "130109"
+          }
+        },
+        {
+          "Code": "SNX",
+          "Description": "San Nicolas",
+          "Extra": {
+            "Ubigeo": "110304"
+          }
+        },
+        {
+          "Code": "SUP",
+          "Description": "Supe",
+          "Extra": {
+            "Ubigeo": "150204"
+          }
+        },
+        {
+          "Code": "TYL",
+          "Description": "Talara",
+          "Extra": {
+            "Ubigeo": "200701"
+          }
+        },
+        {
+          "Code": "YMS",
+          "Description": "Yurimaguas",
+          "Extra": {
+            "Ubigeo": "160201"
+          }
+        },
+        {
+          "Code": "ZOR",
+          "Description": "Zorritos",
+          "Extra": {
+            "Ubigeo": "240103"
+          }
+        }
+      ]
+    },
+    {
+      "Number": "64",
+      "Name": "Aeropuertos del Perú",
+      "Headers": [
+        "Código",
+        "Nombre",
+        "Ubigeo"
+      ],
+      "Entries": [
+        {
+          "Code": "AQP",
+          "Description": "Rodríguez Ballón",
+          "Extra": {
+            "Ubigeo": "040104"
+          }
+        },
+        {
+          "Code": "ANS",
+          "Description": "Andahuaylas",
+          "Extra": {
+            "Ubigeo": "030201"
+          }
+        },
+        {
+          "Code": "ATA",
+          "Description": "Comandante FAP Germán Arias Graciani",
+          "Extra": {
+            "Ubigeo": "020604"
+          }
+        },
+        {
+          "Code": "AYP",
+          "Description": "Coronel FAP Alfredo Mendívil Duarte",
+          "Extra": {
+            "Ubigeo": "050113"
+          }
+        },
+        {
+          "Code": "CJA",
+          "Description": "Mayor Gral. FAP Armando Revoredo Iglesias",
+          "Extra": {
+            "Ubigeo": "060108"
+          }
+        },
+        {
+          "Code": "CHM",
+          "Description": "Tnte. FAP Jaime De Montruil M.",
+          "Extra": {
+            "Ubigeo": "021809"
+          }
+        },
+        {
+          "Code": "CUZ",
+          "Description": "Alejandro Velazco Astete",
+          "Extra": {
+            "Ubigeo": "080108"
+          }
+        },
+        {
+          "Code": "CHH",
+          "Description": "Chachapoyas",
+          "Extra": {
+            "Ubigeo": "010101"
+          }
+        },
+        {
+          "Code": "CIX",
+          "Description": "Capitán FAP José Quiñones G.",
+          "Extra": {
+            "Ubigeo": "140101"
+          }
+        },
+        {
+          "Code": "HUU",
+          "Description": "Alférez FAP David Figueroa Fernandini",
+          "Extra": {
+            "Ubigeo": "100101"
+          }
+        },
+        {
+          "Code": "ILO",
+          "Description": "Ilo",
+          "Extra": {
+            "Ubigeo": "180301"
+          }
+        },
+        {
+          "Code": "IQT",
+          "Description": "Coronel FAP Francisco Secada Vignetta",
+          "Extra": {
+            "Ubigeo": "160101"
+          }
+        },
+        {
+          "Code": "JAE",
+          "Description": "Jaén - Shumba",
+          "Extra": {
+            "Ubigeo": "060802"
+          }
+        },
+        {
+          "Code": "JJI",
+          "Description": "Juanjuí",
+          "Extra": {
+            "Ubigeo": "220601"
+          }
+        },
+        {
+          "Code": "JUL",
+          "Description": "Manco Cápac",
+          "Extra": {
+            "Ubigeo": "211101"
+          }
+        },
+        {
+          "Code": "JAU",
+          "Description": "Francisco Carlé",
+          "Extra": {
+            "Ubigeo": "120430"
+          }
+        },
+        {
+          "Code": "LIM",
+          "Description": "Internacional Jorge Chávez",
+          "Extra": {
+            "Ubigeo": "070101"
+          }
+        },
+        {
+          "Code": "MBP",
+          "Description": "Moyobamba",
+          "Extra": {
+            "Ubigeo": "220101"
+          }
+        },
+        {
+          "Code": "PIO",
+          "Description": "Capitán FAP Renán Elías Olivera",
+          "Extra": {
+            "Ubigeo": "110506"
+          }
+        },
+        {
+          "Code": "PIU",
+          "Description": "Capitán FAP Carlos Concha Iberico",
+          "Extra": {
+            "Ubigeo": "200104"
+          }
+        },
+        {
+          "Code": "PCL",
+          "Description": "Capitán FAP David Abensur Rengifo",
+          "Extra": {
+            "Ubigeo": "250105"
+          }
+        },
+        {
+          "Code": "PEM",
+          "Description": "Padre Aldamiz",
+          "Extra": {
+            "Ubigeo": "170101"
+          }
+        },
+        {
+          "Code": "RIJ",
+          "Description": "Juan Simons Vela - Rioja",
+          "Extra": {
+            "Ubigeo": "220801"
+          }
+        },
+        {
+          "Code": "TCQ",
+          "Description": "Coronel FAP Carlos Ciriani Santa Rosa",
+          "Extra": {
+            "Ubigeo": "230101"
+          }
+        },
+        {
+          "Code": "TYL",
+          "Description": "Capitán FAP Montes Arias",
+          "Extra": {
+            "Ubigeo": "200701"
+          }
+        },
+        {
+          "Code": "TPP",
+          "Description": "Cadete FAP Guillermo del Castillo Paredes",
+          "Extra": {
+            "Ubigeo": "220901"
+          }
+        },
+        {
+          "Code": "TIG",
+          "Description": "Tingo María",
+          "Extra": {
+            "Ubigeo": "100601"
+          }
+        },
+        {
+          "Code": "TRU",
+          "Description": "Capitán FAP Carlos Martínez Pinillos",
+          "Extra": {
+            "Ubigeo": "130104"
+          }
+        },
+        {
+          "Code": "TBP",
+          "Description": "Capitán FAP Pedro Canga Rodríguez",
+          "Extra": {
+            "Ubigeo": "240101"
+          }
+        },
+        {
+          "Code": "ATG",
+          "Description": "Atalaya - Tnte. Gral. Gerardo Pérez Pinedo",
+          "Extra": {
+            "Ubigeo": "250201"
+          }
+        },
+        {
+          "Code": "YMS",
+          "Description": "Moisés Benzaquen Rengifo",
+          "Extra": {
+            "Ubigeo": "160201"
+          }
+        }
+      ]
+    },
+    {
+      "Number": "65",
+      "Name": "Código de unidades de medida (para uso solo para la GRE en DAM o DS)",
+      "Headers": [
+        "Código",
+        "Descripción"
+      ],
+      "Entries": [
+        {
+          "Code": "126",
+          "Description": "DOCENA POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "12U",
+          "Description": "DOCENA (12U)",
+          "Extra": {}
+        },
+        {
+          "Code": "2U",
+          "Description": "PAR",
+          "Extra": {}
+        },
+        {
+          "Code": "2U6",
+          "Description": "PAR POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "AM",
+          "Description": "AMPOLLA",
+          "Extra": {}
+        },
+        {
+          "Code": "BAL",
+          "Description": "BALDE",
+          "Extra": {}
+        },
+        {
+          "Code": "BID",
+          "Description": "BIDONES",
+          "Extra": {}
+        },
+        {
+          "Code": "BLS",
+          "Description": "BOLSA",
+          "Extra": {}
+        },
+        {
+          "Code": "BOB",
+          "Description": "BOBINAS",
+          "Extra": {}
+        },
+        {
+          "Code": "BOT",
+          "Description": "BOTELLAS",
+          "Extra": {}
+        },
+        {
+          "Code": "BRR",
+          "Description": "BARRILES",
+          "Extra": {}
+        },
+        {
+          "Code": "CAJ",
+          "Description": "CAJA",
+          "Extra": {}
+        },
+        {
+          "Code": "CIL",
+          "Description": "CILINDRO",
+          "Extra": {}
+        },
+        {
+          "Code": "CM",
+          "Description": "CENTIMETRO LINEAL",
+          "Extra": {}
+        },
+        {
+          "Code": "CM2",
+          "Description": "CENTIMETRO CUADRADO",
+          "Extra": {}
+        },
+        {
+          "Code": "CM3",
+          "Description": "CENTIMETRO CUBICO",
+          "Extra": {}
+        },
+        {
+          "Code": "CON",
+          "Description": "CONOS",
+          "Extra": {}
+        },
+        {
+          "Code": "CRT",
+          "Description": "CARTONES",
+          "Extra": {}
+        },
+        {
+          "Code": "FDO",
+          "Description": "FARDO",
+          "Extra": {}
+        },
+        {
+          "Code": "FRC",
+          "Description": "FRASCOS",
+          "Extra": {}
+        },
+        {
+          "Code": "GAL",
+          "Description": "US GALON (3,7843 L)",
+          "Extra": {}
+        },
+        {
+          "Code": "GLE",
+          "Description": "GALON INGLES (4,545956L)",
+          "Extra": {}
+        },
+        {
+          "Code": "GR",
+          "Description": "GRAMO",
+          "Extra": {}
+        },
+        {
+          "Code": "GRU",
+          "Description": "GRUESA",
+          "Extra": {}
+        },
+        {
+          "Code": "HL",
+          "Description": "HECTOLITRO",
+          "Extra": {}
+        },
+        {
+          "Code": "HOJ",
+          "Description": "HOJA",
+          "Extra": {}
+        },
+        {
+          "Code": "JGS",
+          "Description": "JUEGO",
+          "Extra": {}
+        },
+        {
+          "Code": "KG",
+          "Description": "KILOGRAMO",
+          "Extra": {}
+        },
+        {
+          "Code": "KG3",
+          "Description": "KILOGRAMO POR 10**3 (TM)",
+          "Extra": {}
+        },
+        {
+          "Code": "KG6",
+          "Description": "KILOGRAMO POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "KGA",
+          "Description": "KILOGRAMO INGREDIENTE ACTIVO",
+          "Extra": {}
+        },
+        {
+          "Code": "KI",
+          "Description": "QUILATE",
+          "Extra": {}
+        },
+        {
+          "Code": "KI6",
+          "Description": "QUILATE 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "KIT",
+          "Description": "KIT",
+          "Extra": {}
+        },
+        {
+          "Code": "KL6",
+          "Description": "KILOS X 10 EXP - 6 (MG)",
+          "Extra": {}
+        },
+        {
+          "Code": "KL9",
+          "Description": "KILOS X 10 EXP -9",
+          "Extra": {}
+        },
+        {
+          "Code": "KM",
+          "Description": "KILOMETRO",
+          "Extra": {}
+        },
+        {
+          "Code": "KW3",
+          "Description": "KILOVATIO HORA POR 10**3 (1000KWH)",
+          "Extra": {}
+        },
+        {
+          "Code": "KW6",
+          "Description": "KILOVATIO HORA POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "KWH",
+          "Description": "KILOVATIO HORA",
+          "Extra": {}
+        },
+        {
+          "Code": "L",
+          "Description": "LITRO",
+          "Extra": {}
+        },
+        {
+          "Code": "L 6",
+          "Description": "LITRO POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "LAT",
+          "Description": "LATAS",
+          "Extra": {}
+        },
+        {
+          "Code": "LB",
+          "Description": "LIBRAS (LB)",
+          "Extra": {}
+        },
+        {
+          "Code": "M",
+          "Description": "METRO",
+          "Extra": {}
+        },
+        {
+          "Code": "M 6",
+          "Description": "METRO POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "M2",
+          "Description": "METRO CUADRADO",
+          "Extra": {}
+        },
+        {
+          "Code": "M26",
+          "Description": "METRO CUADRADO POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "M3",
+          "Description": "METRO CUBICO",
+          "Extra": {}
+        },
+        {
+          "Code": "M36",
+          "Description": "METRO CUBICO POR 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "MGA",
+          "Description": "MILIGRAMO ACTIVO",
+          "Extra": {}
+        },
+        {
+          "Code": "MGR",
+          "Description": "MILIGRAMOS",
+          "Extra": {}
+        },
+        {
+          "Code": "ML",
+          "Description": "MILILITRO",
+          "Extra": {}
+        },
+        {
+          "Code": "MLL",
+          "Description": "MILLARES",
+          "Extra": {}
+        },
+        {
+          "Code": "MM",
+          "Description": "MILIMETRO",
+          "Extra": {}
+        },
+        {
+          "Code": "MM2",
+          "Description": "MILIMETRO CUADRADO",
+          "Extra": {}
+        },
+        {
+          "Code": "MM3",
+          "Description": "MILIMETRO CUBICO",
+          "Extra": {}
+        },
+        {
+          "Code": "MU",
+          "Description": "MUESTRAS",
+          "Extra": {}
+        },
+        {
+          "Code": "MWH",
+          "Description": "MEGAWATT HORA",
+          "Extra": {}
+        },
+        {
+          "Code": "OZ",
+          "Description": "ONZAS (OZ)",
+          "Extra": {}
+        },
+        {
+          "Code": "PAI",
+          "Description": "PAILAS",
+          "Extra": {}
+        },
+        {
+          "Code": "PAL",
+          "Description": "PALETAS",
+          "Extra": {}
+        },
+        {
+          "Code": "PAQ",
+          "Description": "PAQUETE",
+          "Extra": {}
+        },
+        {
+          "Code": "PL",
+          "Description": "PLACAS",
+          "Extra": {}
+        },
+        {
+          "Code": "PLC",
+          "Description": "PLANCHAS (PLC)",
+          "Extra": {}
+        },
+        {
+          "Code": "PLG",
+          "Description": "PLIEGO",
+          "Extra": {}
+        },
+        {
+          "Code": "PS",
+          "Description": "PIES",
+          "Extra": {}
+        },
+        {
+          "Code": "PS2",
+          "Description": "PIES CUADRADOS",
+          "Extra": {}
+        },
+        {
+          "Code": "PS3",
+          "Description": "PIES CUBICOS",
+          "Extra": {}
+        },
+        {
+          "Code": "PST",
+          "Description": "PIES TABLARES(MADERA)",
+          "Extra": {}
+        },
+        {
+          "Code": "PUL",
+          "Description": "PULGADAS (PUL)",
+          "Extra": {}
+        },
+        {
+          "Code": "PZA",
+          "Description": "PIEZAS (PZA)",
+          "Extra": {}
+        },
+        {
+          "Code": "QQ",
+          "Description": "QUINTAL METRICO (100 KG)",
+          "Extra": {}
+        },
+        {
+          "Code": "QUT",
+          "Description": "QUINTAL USA (100 LB)",
+          "Extra": {}
+        },
+        {
+          "Code": "RAM",
+          "Description": "RAMOS",
+          "Extra": {}
+        },
+        {
+          "Code": "RES",
+          "Description": "RESMA",
+          "Extra": {}
+        },
+        {
+          "Code": "ROL",
+          "Description": "ROLLOS (ROL)",
+          "Extra": {}
+        },
+        {
+          "Code": "SAC",
+          "Description": "SACO",
+          "Extra": {}
+        },
+        {
+          "Code": "SET",
+          "Description": "SET",
+          "Extra": {}
+        },
+        {
+          "Code": "TAM",
+          "Description": "TAMBOR",
+          "Extra": {}
+        },
+        {
+          "Code": "TC",
+          "Description": "TONELADA CORTA",
+          "Extra": {}
+        },
+        {
+          "Code": "TCS",
+          "Description": "TONELADA CORTA SECA",
+          "Extra": {}
+        },
+        {
+          "Code": "TIR",
+          "Description": "TIRAS",
+          "Extra": {}
+        },
+        {
+          "Code": "TL",
+          "Description": "TONELADA LARGA",
+          "Extra": {}
+        },
+        {
+          "Code": "TLS",
+          "Description": "TONELADA LARGA SECA",
+          "Extra": {}
+        },
+        {
+          "Code": "TM",
+          "Description": "TONELADAS",
+          "Extra": {}
+        },
+        {
+          "Code": "TM3",
+          "Description": "TONELADA CUBICA",
+          "Extra": {}
+        },
+        {
+          "Code": "TMS",
+          "Description": "TONELADA METRICA SECA",
+          "Extra": {}
+        },
+        {
+          "Code": "TUB",
+          "Description": "TUBOS",
+          "Extra": {}
+        },
+        {
+          "Code": "U",
+          "Description": "UNIDAD",
+          "Extra": {}
+        },
+        {
+          "Code": "U 3",
+          "Description": "UNIDAD POR 10**3",
+          "Extra": {}
+        },
+        {
+          "Code": "U 6",
+          "Description": "UNIDAD PO 10**6",
+          "Extra": {}
+        },
+        {
+          "Code": "U2",
+          "Description": "CIENTO DE UNIDADES",
+          "Extra": {}
+        },
+        {
+          "Code": "U3",
+          "Description": "MILES DE UNIDADES",
+          "Extra": {}
+        },
+        {
+          "Code": "U6",
+          "Description": "MILLON DE UNIDADES",
+          "Extra": {}
+        },
+        {
+          "Code": "YD",
+          "Description": "YARDA",
+          "Extra": {}
+        },
+        {
+          "Code": "YD2",
+          "Description": "YARDA CUADRADA",
+          "Extra": {}
+        },
+        {
+          "Code": "UNI",
+          "Description": "UNIDADES (UNI)",
+          "Extra": {}
+        },
+        {
+          "Code": "AE",
+          "Description": "AEROSOL",
+          "Extra": {}
+        },
+        {
+          "Code": "AP",
+          "Description": "AMPOULE, PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "AT",
+          "Description": "ATOMIZER",
+          "Extra": {}
+        },
+        {
+          "Code": "ATD",
+          "Description": "ATADOS",
+          "Extra": {}
+        },
+        {
+          "Code": "BA",
+          "Description": "BARREL",
+          "Extra": {}
+        },
+        {
+          "Code": "BB",
+          "Description": "BOBBIN",
+          "Extra": {}
+        },
+        {
+          "Code": "BC",
+          "Description": "BOTTLECRATE, BOTTLERACK",
+          "Extra": {}
+        },
+        {
+          "Code": "BD",
+          "Description": "BOARD",
+          "Extra": {}
+        },
+        {
+          "Code": "BE",
+          "Description": "BUNDLE",
+          "Extra": {}
+        },
+        {
+          "Code": "BF",
+          "Description": "BALLOON, NON-PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "BG",
+          "Description": "BAG",
+          "Extra": {}
+        },
+        {
+          "Code": "BH",
+          "Description": "BUNCH",
+          "Extra": {}
+        },
+        {
+          "Code": "BI",
+          "Description": "BIN",
+          "Extra": {}
+        },
+        {
+          "Code": "BJ",
+          "Description": "BUCKET",
+          "Extra": {}
+        },
+        {
+          "Code": "BK",
+          "Description": "BASKET",
+          "Extra": {}
+        },
+        {
+          "Code": "BL",
+          "Description": "BALE, COMPRESSED",
+          "Extra": {}
+        },
+        {
+          "Code": "BLL",
+          "Description": "BULLET",
+          "Extra": {}
+        },
+        {
+          "Code": "BN",
+          "Description": "BALE, NON-COMPRESSED",
+          "Extra": {}
+        },
+        {
+          "Code": "BO",
+          "Description": "BOTTLE, NON-PROTECTED, CYLINDRICAL",
+          "Extra": {}
+        },
+        {
+          "Code": "BP",
+          "Description": "BALLOON, PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "BQ",
+          "Description": "BOTTLE, PROTECTED CYLINDRICAL",
+          "Extra": {}
+        },
+        {
+          "Code": "BR",
+          "Description": "BAR",
+          "Extra": {}
+        },
+        {
+          "Code": "BS",
+          "Description": "BOTTLE, NON-PROTECTED, BULBOUS",
+          "Extra": {}
+        },
+        {
+          "Code": "BT",
+          "Description": "BOLT",
+          "Extra": {}
+        },
+        {
+          "Code": "BU",
+          "Description": "BUTT",
+          "Extra": {}
+        },
+        {
+          "Code": "BUL",
+          "Description": "BULTOS",
+          "Extra": {}
+        },
+        {
+          "Code": "BV",
+          "Description": "BOTTLE, PROTECTED BULBOUS",
+          "Extra": {}
+        },
+        {
+          "Code": "BX",
+          "Description": "BOX",
+          "Extra": {}
+        },
+        {
+          "Code": "BY",
+          "Description": "BOARD, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "BZ",
+          "Description": "BARS, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "CA",
+          "Description": "CAN, RECTANGULAR",
+          "Extra": {}
+        },
+        {
+          "Code": "CB",
+          "Description": "BEER CRATE",
+          "Extra": {}
+        },
+        {
+          "Code": "CC",
+          "Description": "CHURN",
+          "Extra": {}
+        },
+        {
+          "Code": "CE",
+          "Description": "CREEL",
+          "Extra": {}
+        },
+        {
+          "Code": "CF",
+          "Description": "COFFER",
+          "Extra": {}
+        },
+        {
+          "Code": "CG",
+          "Description": "CAGE",
+          "Extra": {}
+        },
+        {
+          "Code": "CH",
+          "Description": "CHEST",
+          "Extra": {}
+        },
+        {
+          "Code": "CI",
+          "Description": "CANISTER",
+          "Extra": {}
+        },
+        {
+          "Code": "CJ",
+          "Description": "COFFIN",
+          "Extra": {}
+        },
+        {
+          "Code": "CK",
+          "Description": "CASK",
+          "Extra": {}
+        },
+        {
+          "Code": "CKD",
+          "Description": "COMPLETELY KNOCKDOWN",
+          "Extra": {}
+        },
+        {
+          "Code": "CL",
+          "Description": "COIL",
+          "Extra": {}
+        },
+        {
+          "Code": "CNT",
+          "Description": "CIENTOS",
+          "Extra": {}
+        },
+        {
+          "Code": "CO",
+          "Description": "CARBOY, NON-PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "CP",
+          "Description": "CARBOY, PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "CR",
+          "Description": "CRATE",
+          "Extra": {}
+        },
+        {
+          "Code": "CS",
+          "Description": "CASE",
+          "Extra": {}
+        },
+        {
+          "Code": "CT",
+          "Description": "CARTON",
+          "Extra": {}
+        },
+        {
+          "Code": "CTN",
+          "Description": "CONTENEDOR (CTN)",
+          "Extra": {}
+        },
+        {
+          "Code": "CU",
+          "Description": "CUP",
+          "Extra": {}
+        },
+        {
+          "Code": "CUB",
+          "Description": "CUBETA",
+          "Extra": {}
+        },
+        {
+          "Code": "CUN",
+          "Description": "CUYETES",
+          "Extra": {}
+        },
+        {
+          "Code": "CV",
+          "Description": "COVER",
+          "Extra": {}
+        },
+        {
+          "Code": "CX",
+          "Description": "CAN, CYLINDRICAL",
+          "Extra": {}
+        },
+        {
+          "Code": "CY",
+          "Description": "CYLINDER",
+          "Extra": {}
+        },
+        {
+          "Code": "CZ",
+          "Description": "CANVAS",
+          "Extra": {}
+        },
+        {
+          "Code": "DJ",
+          "Description": "DEMIJOHN, NON-PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "DOC",
+          "Description": "DOCENA (DOC)",
+          "Extra": {}
+        },
+        {
+          "Code": "DP",
+          "Description": "DEMIJOHN, PROTECTED",
+          "Extra": {}
+        },
+        {
+          "Code": "DPA",
+          "Description": "DOCENA DE PARES",
+          "Extra": {}
+        },
+        {
+          "Code": "DR",
+          "Description": "DRUM",
+          "Extra": {}
+        },
+        {
+          "Code": "EN",
+          "Description": "ENVELOPE",
+          "Extra": {}
+        },
+        {
+          "Code": "ENG",
+          "Description": "ENGRADADOS",
+          "Extra": {}
+        },
+        {
+          "Code": "ERJ",
+          "Description": "ENREJADOS",
+          "Extra": {}
+        },
+        {
+          "Code": "ESQ",
+          "Description": "ESQUELETOS",
+          "Extra": {}
+        },
+        {
+          "Code": "EST",
+          "Description": "ESTIBAS",
+          "Extra": {}
+        },
+        {
+          "Code": "FAR",
+          "Description": "FARDOS",
+          "Extra": {}
+        },
+        {
+          "Code": "FC",
+          "Description": "FRUIT CRATE",
+          "Extra": {}
+        },
+        {
+          "Code": "FD",
+          "Description": "FRAMED CRATE",
+          "Extra": {}
+        },
+        {
+          "Code": "FI",
+          "Description": "FIRKIN",
+          "Extra": {}
+        },
+        {
+          "Code": "FL",
+          "Description": "FLASK",
+          "Extra": {}
+        },
+        {
+          "Code": "FO",
+          "Description": "FOOTLOCKER",
+          "Extra": {}
+        },
+        {
+          "Code": "FP",
+          "Description": "FILMPACK",
+          "Extra": {}
+        },
+        {
+          "Code": "FR",
+          "Description": "FRAME",
+          "Extra": {}
+        },
+        {
+          "Code": "GB",
+          "Description": "GAS BOTTLE",
+          "Extra": {}
+        },
+        {
+          "Code": "GI",
+          "Description": "GIRDER",
+          "Extra": {}
+        },
+        {
+          "Code": "GRM",
+          "Description": "GRAMOS",
+          "Extra": {}
+        },
+        {
+          "Code": "GRN",
+          "Description": "GRANEL",
+          "Extra": {}
+        },
+        {
+          "Code": "GZ",
+          "Description": "GIRDERS, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "HG",
+          "Description": "HOGSHEAD",
+          "Extra": {}
+        },
+        {
+          "Code": "HR",
+          "Description": "HAMPER",
+          "Extra": {}
+        },
+        {
+          "Code": "HUA",
+          "Description": "HUACALES",
+          "Extra": {}
+        },
+        {
+          "Code": "IN",
+          "Description": "INGOT",
+          "Extra": {}
+        },
+        {
+          "Code": "IZ",
+          "Description": "INGOTS, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "JAB",
+          "Description": "JABAS",
+          "Extra": {}
+        },
+        {
+          "Code": "JC",
+          "Description": "JERRICAN, RECTANGULAR",
+          "Extra": {}
+        },
+        {
+          "Code": "JG",
+          "Description": "JUG",
+          "Extra": {}
+        },
+        {
+          "Code": "JR",
+          "Description": "JAR",
+          "Extra": {}
+        },
+        {
+          "Code": "JT",
+          "Description": "JUTEBAG",
+          "Extra": {}
+        },
+        {
+          "Code": "JY",
+          "Description": "JERRICAN, CYLINDRICAL",
+          "Extra": {}
+        },
+        {
+          "Code": "KGS",
+          "Description": "KILOGRAMOS",
+          "Extra": {}
+        },
+        {
+          "Code": "KLW",
+          "Description": "KILOWATTS",
+          "Extra": {}
+        },
+        {
+          "Code": "LBS",
+          "Description": "LIBRAS (LBS)",
+          "Extra": {}
+        },
+        {
+          "Code": "LG",
+          "Description": "LOG",
+          "Extra": {}
+        },
+        {
+          "Code": "LIT",
+          "Description": "LITROS",
+          "Extra": {}
+        },
+        {
+          "Code": "LOT",
+          "Description": "LOTES",
+          "Extra": {}
+        },
+        {
+          "Code": "LZ",
+          "Description": "LOGS, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "MB",
+          "Description": "MULTIPLY BAG",
+          "Extra": {}
+        },
+        {
+          "Code": "MC",
+          "Description": "MILK CRATE",
+          "Extra": {}
+        },
+        {
+          "Code": "MS",
+          "Description": "MULTIWALL SACK",
+          "Extra": {}
+        },
+        {
+          "Code": "MT",
+          "Description": "MAT",
+          "Extra": {}
+        },
+        {
+          "Code": "MTS",
+          "Description": "METROS LINEALES",
+          "Extra": {}
+        },
+        {
+          "Code": "MT2",
+          "Description": "METROS CUADRADOS",
+          "Extra": {}
+        },
+        {
+          "Code": "MT3",
+          "Description": "METROS CUBICOS",
+          "Extra": {}
+        },
+        {
+          "Code": "MX",
+          "Description": "MATCH BOX",
+          "Extra": {}
+        },
+        {
+          "Code": "NE",
+          "Description": "UNPACKED OR UNPACKAGED",
+          "Extra": {}
+        },
+        {
+          "Code": "NS",
+          "Description": "NEST",
+          "Extra": {}
+        },
+        {
+          "Code": "NT",
+          "Description": "NET",
+          "Extra": {}
+        },
+        {
+          "Code": "ONZ",
+          "Description": "ONZAS (ONZ)",
+          "Extra": {}
+        },
+        {
+          "Code": "PA",
+          "Description": "PACKET",
+          "Extra": {}
+        },
+        {
+          "Code": "PAR",
+          "Description": "PARES",
+          "Extra": {}
+        },
+        {
+          "Code": "PC",
+          "Description": "PARCEL",
+          "Extra": {}
+        },
+        {
+          "Code": "PCH",
+          "Description": "PLANCHAS (PCH)",
+          "Extra": {}
+        },
+        {
+          "Code": "PG",
+          "Description": "PLATE",
+          "Extra": {}
+        },
+        {
+          "Code": "PGS",
+          "Description": "PULGADAS (PGS)",
+          "Extra": {}
+        },
+        {
+          "Code": "PG2",
+          "Description": "PULGADAS CUADRADAS",
+          "Extra": {}
+        },
+        {
+          "Code": "PH",
+          "Description": "PITCHER",
+          "Extra": {}
+        },
+        {
+          "Code": "PI",
+          "Description": "PIPE",
+          "Extra": {}
+        },
+        {
+          "Code": "PIE",
+          "Description": "PIE",
+          "Extra": {}
+        },
+        {
+          "Code": "PK",
+          "Description": "PACKAGE",
+          "Extra": {}
+        },
+        {
+          "Code": "PN",
+          "Description": "PLANK",
+          "Extra": {}
+        },
+        {
+          "Code": "PO",
+          "Description": "POUCH",
+          "Extra": {}
+        },
+        {
+          "Code": "PQT",
+          "Description": "PAQUETES",
+          "Extra": {}
+        },
+        {
+          "Code": "PT",
+          "Description": "POT",
+          "Extra": {}
+        },
+        {
+          "Code": "PTE",
+          "Description": "POTES",
+          "Extra": {}
+        },
+        {
+          "Code": "PTF",
+          "Description": "PLATAFORMAS",
+          "Extra": {}
+        },
+        {
+          "Code": "PU",
+          "Description": "TRAY",
+          "Extra": {}
+        },
+        {
+          "Code": "PY",
+          "Description": "PLATES, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "PZ",
+          "Description": "PIPES, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "PZS",
+          "Description": "PIEZAS (PZS)",
+          "Extra": {}
+        },
+        {
+          "Code": "QLT",
+          "Description": "QUILATES",
+          "Extra": {}
+        },
+        {
+          "Code": "RD",
+          "Description": "ROD",
+          "Extra": {}
+        },
+        {
+          "Code": "RG",
+          "Description": "RING",
+          "Extra": {}
+        },
+        {
+          "Code": "RL",
+          "Description": "REEL",
+          "Extra": {}
+        },
+        {
+          "Code": "RLL",
+          "Description": "ROLLOS (RLL)",
+          "Extra": {}
+        },
+        {
+          "Code": "RO",
+          "Description": "ROLL",
+          "Extra": {}
+        },
+        {
+          "Code": "RT",
+          "Description": "REDNET",
+          "Extra": {}
+        },
+        {
+          "Code": "RZ",
+          "Description": "RODS, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "SA",
+          "Description": "SACK",
+          "Extra": {}
+        },
+        {
+          "Code": "SC",
+          "Description": "SHALLOW CRATE",
+          "Extra": {}
+        },
+        {
+          "Code": "SD",
+          "Description": "SPINDLE",
+          "Extra": {}
+        },
+        {
+          "Code": "SE",
+          "Description": "SEA-CHEST",
+          "Extra": {}
+        },
+        {
+          "Code": "SH",
+          "Description": "SACHET",
+          "Extra": {}
+        },
+        {
+          "Code": "SK",
+          "Description": "SKELETON CASE",
+          "Extra": {}
+        },
+        {
+          "Code": "SKI",
+          "Description": "SKIDS",
+          "Extra": {}
+        },
+        {
+          "Code": "SL",
+          "Description": "SLIPSHEET",
+          "Extra": {}
+        },
+        {
+          "Code": "SM",
+          "Description": "SHEETMETAL",
+          "Extra": {}
+        },
+        {
+          "Code": "ST",
+          "Description": "SHEET",
+          "Extra": {}
+        },
+        {
+          "Code": "SU",
+          "Description": "SUITCASE",
+          "Extra": {}
+        },
+        {
+          "Code": "SW",
+          "Description": "SHRINKWRAPPED",
+          "Extra": {}
+        },
+        {
+          "Code": "SZ",
+          "Description": "SHEETS, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "TB",
+          "Description": "TUB",
+          "Extra": {}
+        },
+        {
+          "Code": "TD",
+          "Description": "COLLAPSIBLE TUBE",
+          "Extra": {}
+        },
+        {
+          "Code": "TK",
+          "Description": "TANK, RECTANGULAR",
+          "Extra": {}
+        },
+        {
+          "Code": "TN",
+          "Description": "TIN",
+          "Extra": {}
+        },
+        {
+          "Code": "TNM",
+          "Description": "TONELADAS METRICAS",
+          "Extra": {}
+        },
+        {
+          "Code": "TO",
+          "Description": "TUN",
+          "Extra": {}
+        },
+        {
+          "Code": "TR",
+          "Description": "TRUNK",
+          "Extra": {}
+        },
+        {
+          "Code": "TS",
+          "Description": "TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "TU",
+          "Description": "TUBE",
+          "Extra": {}
+        },
+        {
+          "Code": "TY",
+          "Description": "TANK, CYLINDRICAL",
+          "Extra": {}
+        },
+        {
+          "Code": "TZ",
+          "Description": "TUBES, IN BUNDLE/BUNCH/TRUSS",
+          "Extra": {}
+        },
+        {
+          "Code": "VA",
+          "Description": "VAT",
+          "Extra": {}
+        },
+        {
+          "Code": "VEI",
+          "Description": "VEHICULO",
+          "Extra": {}
+        },
+        {
+          "Code": "VG",
+          "Description": "BULK, GAS (AT 1031 MBAR AND 15ØC)",
+          "Extra": {}
+        },
+        {
+          "Code": "VI",
+          "Description": "VIAL",
+          "Extra": {}
+        },
+        {
+          "Code": "VL",
+          "Description": "BULK, LIQUID",
+          "Extra": {}
+        },
+        {
+          "Code": "VO",
+          "Description": "BULK, SOLID, LARGE PARTICLES (\"NODULES\")",
+          "Extra": {}
+        },
+        {
+          "Code": "VP",
+          "Description": "VACUUM-PACKED",
+          "Extra": {}
+        },
+        {
+          "Code": "VQ",
+          "Description": "BULK, LIQUEFIED GAS (AT ABNORMAL TEMPERATURE/PRESSURE)",
+          "Extra": {}
+        },
+        {
+          "Code": "VR",
+          "Description": "BULK, SOLID, GRANULAR PARTICLES (\"GRAINS\")",
+          "Extra": {}
+        },
+        {
+          "Code": "VY",
+          "Description": "BULK, SOLID, FINE PARTICLES (\"POWDERS\")",
+          "Extra": {}
+        },
+        {
+          "Code": "WAT",
+          "Description": "WATT",
+          "Extra": {}
+        },
+        {
+          "Code": "WB",
+          "Description": "WICKERBOTTLE",
+          "Extra": {}
+        },
+        {
+          "Code": "YRD",
+          "Description": "YARDAS",
+          "Extra": {}
+        },
+        {
+          "Code": "Z1",
+          "Description": "PALETA",
+          "Extra": {}
+        },
+        {
+          "Code": "Z2",
+          "Description": "CONTENEDOR (Z2)",
+          "Extra": {}
+        },
+        {
+          "Code": "Z3",
+          "Description": "UNIDADES (Z3)",
+          "Extra": {}
+        }
+      ]
+    }
+  ]
+}

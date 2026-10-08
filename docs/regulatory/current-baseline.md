@@ -60,9 +60,14 @@ Confirmado por S01/S02: con un PSE, la firma se hace con el certificado del PSE 
 
 ## 6. GRE (S05, S06)
 
-- Plataforma **REST** con tokens OAuth2: se inscribe la aplicación en SOL (*Credenciales de API SUNAT*) → `client_id`/`client_secret`; token vía `POST https://api-seguridad.sunat.gob.pe/v1/clientessol/<client_id>/oauth2/token/` con `grant_type=password`, `scope=https://api-cpe.sunat.gob.pe`, `username=<RUC><usuarioSOL>`, `password=<claveSOL>`; el token dura ~1 hora. URIs del manual son "referenciales": confirmar en "Manual URL – GRE.xlsx" antes de implementar.
+- Plataforma **REST** con tokens OAuth2: se inscribe la aplicación en SOL (*Credenciales de API SUNAT*) → `client_id`/`client_secret`; token vía `POST https://api-seguridad.sunat.gob.pe/v1/clientessol/<client_id>/oauth2/token/` con `grant_type=password`, `scope=https://api-cpe.sunat.gob.pe`, `username=<RUC><usuarioSOL>`, `password=<claveSOL>`; el token dura ~1 hora. Las URI del manual son «referenciales».
+- **Envío** (S29, leído el 2026-10-08): `POST https://api-cpe.sunat.gob.pe/v1/contribuyente/gem/comprobantes/{numRucEmisor}-{codCpe}-{numSerie}-{numCpe}` con `Authorization: Bearer`, `codCpe` `09` (remitente) o `31` (transportista), serie `T###` (remitente) o `V###` (transportista) y número de 1 a 8 dígitos. Cuerpo JSON `{"archivo":{"nomArchivo":"RUC-09-T001-1.zip","arcGreZip":"<zip en base64>","hashZip":"<SHA-256 del zip>"}}`; el zip lleva un solo XML `RUC-09-T001-1.xml` firmado. Respuesta: `{"numTicket":"<uuid>","fecRecepcion":"…"}`.
+- **Consulta del ticket** (S29): `GET https://api-cpe.sunat.gob.pe/v1/contribuyente/gem/comprobantes/envios/{numTicket}` → `codRespuesta` `98` (en proceso), `99` (con error: `error.numError`/`desError`, y `arcCdr` si `indCdrGenerado` es `1`) o `0` (correcto: `arcCdr` en base64, `indCdrGenerado` `1`).
+- Errores del envío: forma `501` (codCpe), `502` (serie), `503`–`506` (campos vacíos o nombre del zip), `507` (hash), `155`–`161` (zip vacío o corrupto, sin comprobantes, con más de uno, nombre del XML incorrecto o distinto del zip); consulta `508`/`509`. Los errores 4xx/5xx de la plataforma llegan como `{cod, msg, exc}`; los de validación, con `422` y `errors`. Los códigos de validación del contenido son los de S27.
 - La GRE debe tener **CDR aceptada antes del inicio del traslado**. No se puede emitir por SEE-OSE.
-- Bounded context `Gre` independiente (Fase 7). Reglas de validación GRE 25.09.2026; XSD GRE 13/07/2022.
+- Bounded context `Gre` independiente (Fase 7). Reglas de validación GRE 25.09.2026 (S27); XSD GRE 13/07/2022 (S30, idéntico al UBL 2.1 de S17); XSL 2.0.1 del 01.10.2026 (S31, solo de lectura).
+- **Quién la emite**: el contribuyente con RUC activo, domicilio habido y régimen de tercera categoría (S05); un PSE vinculado puede enviar la GRE de sus emisores (regla 0154 de la hoja General de S27, vigencia hasta el 7.º día del mes siguiente de la revocación).
+- La GRE remitente es `DespatchAdvice` UBL 2.1 con `CustomizationID` `2.0` y tipo `09`; la del transportista, tipo `31`, serie `V###`. Ver `matrix.md` R-062 a R-068 para el detalle por campo.
 
 ## 7. OSE como canal tercero (S07)
 

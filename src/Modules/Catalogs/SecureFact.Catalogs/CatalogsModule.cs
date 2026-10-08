@@ -33,6 +33,6 @@ public static class CatalogsModule
             .Options;
         await using var db = new CatalogsDbContext(options);
         await db.Database.MigrateAsync(cancellationToken);
-        await CatalogSeeder.SeedAsync(db, TimeProvider.System, cancellationToken);
+        await CatalogSeeder.SeedAllAsync(db, TimeProvider.System, cancellationToken);
     }
 }

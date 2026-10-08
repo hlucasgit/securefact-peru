@@ -3,6 +3,7 @@
     <InternalsVisibleTo Include="SecureFact.Security.Tests" />
     <InternalsVisibleTo Include="SecureFact.Unit.Tests" />
     <EmbeddedResource Include="Seeds\sunat-catalogs-2026-08-26.json" LogicalName="SecureFact.Catalogs.Seeds.sunat-catalogs-2026-08-26.json" />
+    <EmbeddedResource Include="Seeds\sunat-catalogs-gre-2026-09-25.json" LogicalName="SecureFact.Catalogs.Seeds.sunat-catalogs-gre-2026-09-25.json" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

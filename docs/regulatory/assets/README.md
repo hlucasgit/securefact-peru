@@ -14,3 +14,14 @@ Copias **byte a byte** de documentos oficiales de SUNAT, descargadas el 2026-10-
 
 - `xsd/2.1/` — 19 archivos UBL 2.1 (14 de `common/` más `Invoice`, `CreditNote`, `DebitNote`, `DespatchAdvice`, `ApplicationResponse`). Se obtuvieron además de OASIS (`https://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/`) y son **idénticos byte a byte** a los del zip de SUNAT.
 - `xsd/2.0/` — 27 archivos UBL 2.0 con extensiones SUNAT `UBLPE-*` extraídos del zip sin modificar (`Invoice`, `CreditNote`, `DebitNote`, `Perception`, `Retention`, `SummaryDocuments`, `VoidedDocuments`, `ApplicationResponse`, `SunatAggregateComponents`, `xmldsig`, listas de códigos). Los usan el resumen diario, la comunicación de baja, retenciones y percepciones.
+
+## GRE (descargados el 2026-10-08)
+Cinco archivos de `https://cpe.sunat.gob.pe/node/116` en `gre/`, intactos (el navegador del panel de Claude Code los descargó con autorización del propietario). Registrados en `../sources.md` como S27 a S31.
+
+| Archivo | Fuente | Versión | Fila |
+|---------|--------|---------|------|
+| `gre/reglas-validacion-publicado-2026-09-25.xlsx` | `…/sites/default/files/2026-09/Reglas de validación publicado al 25.09.2026.xlsx` | 25.09.2026 | S27 |
+| `gre/manual-servicios-gre-2022-10-04.pdf` | `…/inline-files/Manual_Servicios_GRE (1)_0.pdf` | 04/10/2022 | S28 |
+| `gre/manual-url-gre-2022-10-25.xlsx` | `…/inline-files/Manual URL – GRE.xlsx` | 25/10/2022 | S29 |
+| `gre/xsd-gre-2022-07-13.zip` | `…/inline-files/Archivo XSD.zip` | 13/07/2022 | S30 |
+| `gre/xsl-gre-2.0.1-2026-10-01.zip` | `…/sites/default/files/2026-10/Archivos_XSL.10.zip` | 2.0.1, 01.10.2026 | S31 |
