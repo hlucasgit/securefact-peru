@@ -9,6 +9,8 @@ using SecureFact.Catalogs;
 using SecureFact.CpeEngine;
 using SecureFact.Certificates;
 using SecureFact.CpeEngine.Contracts;
+using SecureFact.Gre;
+using SecureFact.Gre.Contracts;
 using SecureFact.Customers;
 using SecureFact.Products;
 using SecureFact.Identity;
@@ -124,19 +126,23 @@ if (appConnection is not null)
     builder.Services.AddCustomersModule(appConnection);
     builder.Services.AddCertificatesModule(appConnection);
     builder.Services.AddCpePipeline(appConnection);
+    builder.Services.AddGreModule(appConnection);
 
     // SUNAT is never reached implicitly: the environment must be named. Without it, documents are prepared and signed but not sent.
     switch (builder.Configuration["Sunat:Environment"])
     {
         case "Beta":
+            // SUNAT documents no beta for the guides (R-065): they stay prepared in this environment.
             builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Beta);
             break;
         case "Production":
             builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Production);
+            builder.Services.AddGreSubmissionChannel(GreChannelOptions.Production);
             break;
         case "Sandbox":
             // The in-process simulator (ADR-039): for development and end-to-end tests, never production.
             builder.Services.AddSandboxSubmissionChannel(builder.Environment.IsProduction());
+            builder.Services.AddSandboxGreChannel(builder.Environment.IsProduction());
             break;
         case null or "":
             break;
@@ -166,6 +172,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await CustomersModule.MigrateAsync(migrationsConnection);
     await CertificatesModule.MigrateAsync(migrationsConnection);
     await SecureFact.CpeEngine.CpeEngineModule.MigrateAsync(migrationsConnection);
+    await SecureFact.Gre.GreModule.MigrateAsync(migrationsConnection);
     await ProductsModule.MigrateAsync(migrationsConnection);
     return;
 }
@@ -218,6 +225,7 @@ app.MapRuleEndpoints();
 app.MapMasterDataEndpoints();
 app.MapCertificateEndpoints();
 app.MapCpeEndpoints();
+app.MapGreEndpoints();
 app.MapOutboxEndpoints();
 
 app.Run();

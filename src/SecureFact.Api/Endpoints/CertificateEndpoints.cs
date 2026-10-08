@@ -5,6 +5,8 @@ namespace SecureFact.Api.Endpoints;
 
 internal static class CertificateEndpoints
 {
+    public sealed record ApiCredentialsBody(string ClientId, string ClientSecret);
+
     public static void MapCertificateEndpoints(this IEndpointRouteBuilder app)
     {
         var certificates = app.MapGroup("/api/v1/certificates").WithTags("Certificates");
@@ -32,5 +34,12 @@ internal static class CertificateEndpoints
 
         sol.MapDelete("/{companyId:guid}", async (Guid companyId, ISolCredentialAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.ClearAsync(companyId, ct)).ToNoContent(http)).RequireAuthorization(Permissions.CertificatesManage);
+
+        // The credentials of the API of SUNAT (client_id and client_secret) that the GRE needs, next to the SOL ones (ADR-056).
+        sol.MapPut("/{companyId:guid}/api", async (Guid companyId, ApiCredentialsBody body, ISolCredentialAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.SetApiCredentialsAsync(new SetApiCredentialsRequest(companyId, body.ClientId, body.ClientSecret), ct)).ToHttp(http)).RequireAuthorization(Permissions.CertificatesManage);
+
+        sol.MapDelete("/{companyId:guid}/api", async (Guid companyId, ISolCredentialAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.ClearApiCredentialsAsync(companyId, ct)).ToNoContent(http)).RequireAuthorization(Permissions.CertificatesManage);
     }
 }

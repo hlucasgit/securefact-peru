@@ -81,6 +81,8 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public FakeSunatChannel Sunat { get; } = new();
 
+    public FakeGreChannel Gre { get; } = new();
+
     /// <summary>The DNS that the verification of the domains asks: what a test publishes is what it finds.</summary>
     public FakeDomainNameSystem Dns { get; } = new();
 
@@ -116,6 +118,7 @@ public sealed class ApiFixture : IAsyncLifetime
             {
                 services.AddSingleton<IEmailSender>(Mail);
                 services.AddSingleton<SecureFact.CpeEngine.Contracts.ICpeSubmissionChannel>(Sunat);
+                services.AddSingleton<SecureFact.Gre.Contracts.IGreChannel>(Gre);
                 services.AddSingleton<SecureFact.Tenancy.Contracts.IDomainNameSystem>(Dns);
                 services.AddLogging(logging => logging.AddProvider(Logs));
             }));

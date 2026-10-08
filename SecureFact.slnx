@@ -32,6 +32,10 @@
     <Project Path="src/Modules/Customers/SecureFact.Customers.Contracts/SecureFact.Customers.Contracts.csproj" />
     <Project Path="src/Modules/Customers/SecureFact.Customers/SecureFact.Customers.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Gre/">
+    <Project Path="src/Modules/Gre/SecureFact.Gre.Contracts/SecureFact.Gre.Contracts.csproj" />
+    <Project Path="src/Modules/Gre/SecureFact.Gre/SecureFact.Gre.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/SecureFact.Identity.Contracts/SecureFact.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/SecureFact.Identity/SecureFact.Identity.csproj" />

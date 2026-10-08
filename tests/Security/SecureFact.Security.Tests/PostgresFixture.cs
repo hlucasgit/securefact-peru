@@ -58,6 +58,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         await CustomersModule.MigrateAsync(OwnerConnectionString);
         await SecureFact.Certificates.CertificatesModule.MigrateAsync(OwnerConnectionString);
         await SecureFact.CpeEngine.CpeEngineModule.MigrateAsync(OwnerConnectionString);
+        await SecureFact.Gre.GreModule.MigrateAsync(OwnerConnectionString);
         await ProductsModule.MigrateAsync(OwnerConnectionString);
 
         await ExecuteAsOwnerAsync($"""

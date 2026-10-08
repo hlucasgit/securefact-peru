@@ -24,6 +24,9 @@ internal sealed class SolCredentialService(
     IAuditTrail audit) : ISolCredentialAdministration, ISolCredentialProvider
 {
     public const string PasswordPurpose = "certificates.sol-password";
+    public const string ApiSecretPurpose = "certificates.api-client-secret";
+    private const int MaxClientIdLength = 100;
+    private const int MaxClientSecretLength = 200;
     private const int MaxUserLength = 30;
     private const int MaxPasswordLength = 100;
 
@@ -105,6 +108,62 @@ internal sealed class SolCredentialService(
         return Unit.Value;
     }
 
+    public async Task<Result<SolCredentialDto>> SetApiCredentialsAsync(SetApiCredentialsRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var clientId = request.ClientId?.Trim() ?? string.Empty;
+        if (clientId.Length is 0 or > MaxClientIdLength || clientId.Any(char.IsWhiteSpace) || string.IsNullOrEmpty(request.ClientSecret) || request.ClientSecret.Length > MaxClientSecretLength)
+        {
+            return Error.Validation(ErrorCodes.InvalidCertificate, "Credenciales de API no válidas", "Indique el client_id (sin espacios) y el client_secret generados en SOL.");
+        }
+
+        var entity = await db.SolCredentials.SingleOrDefaultAsync(c => c.CompanyId == request.CompanyId, cancellationToken);
+        if (entity is null)
+        {
+            return Error.Conflict(ErrorCodes.CertificateUnavailable, "Faltan las credenciales SOL", "Registre primero el usuario y la clave SOL de la empresa: la API de SUNAT pide ambas.");
+        }
+
+        var plain = Encoding.UTF8.GetBytes(request.ClientSecret);
+        byte[] protectedSecret;
+        try
+        {
+            protectedSecret = secrets.Protect(plain, ApiSecretPurpose);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plain);
+        }
+
+        var created = entity.ApiClientId is null;
+        entity.SetApi(clientId, protectedSecret, user.UserId, clock.GetUtcNow());
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.RecordAsync(new AuditEvent(
+            AuditActions.ApiCredentialsSet, "sol_credential", entity.Id.ToString("D"), entity.TenantId,
+            NewValues: new Dictionary<string, object?> { ["companyId"] = request.CompanyId, ["clientId"] = clientId, ["created"] = created }), cancellationToken);
+        return ToDto(entity);
+    }
+
+    public async Task<Result<Unit>> ClearApiCredentialsAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var entity = await db.SolCredentials.SingleOrDefaultAsync(c => c.CompanyId == companyId, cancellationToken);
+        if (entity is null)
+        {
+            return Missing;
+        }
+
+        if (entity.ApiClientId is not null)
+        {
+            var clientId = entity.ApiClientId;
+            entity.ClearApi(user.UserId, clock.GetUtcNow());
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.RecordAsync(new AuditEvent(
+                AuditActions.ApiCredentialsCleared, "sol_credential", entity.Id.ToString("D"), entity.TenantId,
+                OldValues: new Dictionary<string, object?> { ["companyId"] = companyId, ["clientId"] = clientId }), cancellationToken);
+        }
+
+        return Unit.Value;
+    }
+
     async Task<Result<SolSecret>> ISolCredentialProvider.GetAsync(Guid companyId, CancellationToken cancellationToken)
     {
         var entity = await db.SolCredentials.AsNoTracking().SingleOrDefaultAsync(c => c.CompanyId == companyId, cancellationToken);
@@ -125,7 +184,25 @@ internal sealed class SolCredentialService(
 
         try
         {
-            return new SolSecret(entity.SolUser, Encoding.UTF8.GetString(plain));
+            string? apiSecret = null;
+            if (entity.ApiClientId is not null && entity.ProtectedApiClientSecret is { } apiBlob)
+            {
+                var apiPlain = secrets.Unprotect(apiBlob, ApiSecretPurpose);
+                try
+                {
+                    apiSecret = Encoding.UTF8.GetString(apiPlain);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(apiPlain);
+                }
+            }
+
+            return new SolSecret(entity.SolUser, Encoding.UTF8.GetString(plain), apiSecret is null ? null : entity.ApiClientId, apiSecret);
+        }
+        catch (CryptographicException)
+        {
+            return Error.Conflict(ErrorCodes.CertificateUnavailable, "Credenciales SOL no disponibles", "No se pudieron recuperar las credenciales almacenadas.");
         }
         finally
         {
@@ -133,5 +210,6 @@ internal sealed class SolCredentialService(
         }
     }
 
-    private static SolCredentialDto ToDto(SolCredential c) => new(c.CompanyId, c.SolUser, c.ProtectedPassword is not null, c.UpdatedAt);
+    private static SolCredentialDto ToDto(SolCredential c) =>
+        new(c.CompanyId, c.SolUser, c.ProtectedPassword is not null, c.UpdatedAt, c.ApiClientId, c.ProtectedApiClientSecret is not null);
 }

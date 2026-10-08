@@ -50,6 +50,8 @@ internal sealed class CertificatesDbContext(DbContextOptions<CertificatesDbConte
             b.Property(c => c.CompanyId).HasColumnName("company_id");
             b.Property(c => c.SolUser).HasColumnName("sol_user").HasMaxLength(30).IsRequired();
             b.Property(c => c.ProtectedPassword).HasColumnName("protected_password");
+            b.Property(c => c.ApiClientId).HasColumnName("api_client_id").HasMaxLength(100);
+            b.Property(c => c.ProtectedApiClientSecret).HasColumnName("protected_api_client_secret");
             b.Property(c => c.UpdatedBy).HasColumnName("updated_by");
             b.Property(c => c.UpdatedAt).HasColumnName("updated_at");
             b.Property(c => c.Version).IsRowVersion();

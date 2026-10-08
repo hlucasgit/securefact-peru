@@ -47,6 +47,13 @@ public static class AuditActions
     public const string ElectronicDocumentRecovered = "cpe.electronic_document.recovered";
     public const string SolCredentialsSet = "certificates.sol_credentials.set";
     public const string SolCredentialsCleared = "certificates.sol_credentials.cleared";
+    public const string ApiCredentialsSet = "certificates.api_credentials.set";
+    public const string GuideCreated = "gre.guide.created";
+    public const string GuideSubmitted = "gre.guide.submitted";
+    public const string GuideProcessed = "gre.guide.processed";
+    public const string GreSeriesCreated = "gre.series.created";
+    public const string GreSeriesDeactivated = "gre.series.deactivated";
+    public const string ApiCredentialsCleared = "certificates.api_credentials.cleared";
 
     public const string SeriesCreated = "billing.series.created";
     public const string SeriesDeactivated = "billing.series.deactivated";

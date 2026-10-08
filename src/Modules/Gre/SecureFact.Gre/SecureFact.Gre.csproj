@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="SecureFact.Security.Tests" />
+    <InternalsVisibleTo Include="SecureFact.Unit.Tests" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
+    <ProjectReference Include="..\..\Audit\SecureFact.Audit.Contracts\SecureFact.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Catalogs\SecureFact.Catalogs.Contracts\SecureFact.Catalogs.Contracts.csproj" />
+    <ProjectReference Include="..\..\Certificates\SecureFact.Certificates.Contracts\SecureFact.Certificates.Contracts.csproj" />
+    <ProjectReference Include="..\..\CpeEngine\SecureFact.CpeEngine.Contracts\SecureFact.CpeEngine.Contracts.csproj" />
+    <ProjectReference Include="..\..\Organizations\SecureFact.Organizations.Contracts\SecureFact.Organizations.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\SecureFact.Rules.Contracts\SecureFact.Rules.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tenancy\SecureFact.Tenancy.Contracts\SecureFact.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\SecureFact.Gre.Contracts\SecureFact.Gre.Contracts.csproj" />
+  </ItemGroup>
+</Project>

@@ -12,6 +12,12 @@ public static class RuleCodes
     public const string IssueDateMaxAgeDays = "billing.issue_date_max_age_days";
     public const string NoteIssueDateMaxAgeDays = "billing.note_issue_date_max_age_days";
 
+    /// <summary>Days before the day of sending that the issue date of a guide of the sender may be (S27 rule 2108).</summary>
+    public const string GreMaxIssueLagDays = "gre.max_issue_lag_days";
+
+    /// <summary>Descriptions that the motive «otros» of a guide may not be, on their own (S27 sheet «Palabras Clave»).</summary>
+    public const string GreGenericMotiveDescriptions = "gre.generic_motive_descriptions";
+
     /// <summary>Amount in soles above which a receipt (or a note of one) must identify the buyer.</summary>
     public const string ReceiptIdentificationThreshold = "billing.receipt_identification_threshold";
 }

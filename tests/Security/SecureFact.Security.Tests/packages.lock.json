@@ -620,6 +620,8 @@
           "SecureFact.Certificates": "[1.0.0, )",
           "SecureFact.CpeEngine": "[1.0.0, )",
           "SecureFact.Customers": "[1.0.0, )",
+          "SecureFact.Gre": "[1.0.0, )",
+          "SecureFact.Gre.Contracts": "[1.0.0, )",
           "SecureFact.Identity": "[1.0.0, )",
           "SecureFact.Notifications": "[1.0.0, )",
           "SecureFact.Organizations": "[1.0.0, )",
@@ -736,6 +738,28 @@
         }
       },
       "securefact.customers.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "securefact.gre": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Http": "[10.0.12, )",
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Catalogs.Contracts": "[1.0.0, )",
+          "SecureFact.Certificates.Contracts": "[1.0.0, )",
+          "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Gre.Contracts": "[1.0.0, )",
+          "SecureFact.Organizations.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.Rules.Contracts": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.Tenancy.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.gre.contracts": {
         "type": "Project",
         "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )"
@@ -899,6 +923,8 @@
           "SecureFact.Certificates": "[1.0.0, )",
           "SecureFact.CpeEngine": "[1.0.0, )",
           "SecureFact.Customers": "[1.0.0, )",
+          "SecureFact.Gre": "[1.0.0, )",
+          "SecureFact.Gre.Contracts": "[1.0.0, )",
           "SecureFact.Identity": "[1.0.0, )",
           "SecureFact.Messaging.RabbitMq": "[1.0.0, )",
           "SecureFact.Notifications": "[1.0.0, )",

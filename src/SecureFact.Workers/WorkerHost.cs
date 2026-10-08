@@ -5,6 +5,8 @@ using SecureFact.Certificates;
 using SecureFact.CpeEngine;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.Customers;
+using SecureFact.Gre;
+using SecureFact.Gre.Contracts;
 using SecureFact.Identity;
 using SecureFact.Messaging.RabbitMq;
 using SecureFact.Notifications;
@@ -82,6 +84,7 @@ internal static class WorkerHost
         builder.Services.AddCertificatesModule(appConnection);
         builder.Services.AddCpeEngineModule();
         builder.Services.AddCpePipeline(appConnection);
+        builder.Services.AddGreModule(appConnection);
 
         // SUNAT is never reached implicitly: the environment must be named. Without it the worker only prepares summaries.
         switch (builder.Configuration["Sunat:Environment"])
@@ -91,10 +94,12 @@ internal static class WorkerHost
                 break;
             case "Production":
                 builder.Services.AddSunatSubmissionChannel(SunatChannelOptions.Production);
+                builder.Services.AddGreSubmissionChannel(GreChannelOptions.Production);
                 break;
             case "Sandbox":
                 // The in-process simulator (ADR-039): for development and end-to-end tests, never production.
                 builder.Services.AddSandboxSubmissionChannel(builder.Environment.IsProduction());
+                builder.Services.AddSandboxGreChannel(builder.Environment.IsProduction());
                 break;
             case null or "":
                 break;
@@ -113,6 +118,7 @@ internal static class WorkerHost
 
         builder.Services.AddHostedService<OutboxWorker>();
         builder.Services.AddHostedService<CpeWorker>();
+        builder.Services.AddHostedService<GreWorker>();
         builder.Services.AddHostedService<DomainWorker>();
         builder.Services.AddHostedService<EmailWorker>();
 

@@ -97,6 +97,22 @@
       "source": "S16 Resumen Diario1_1, rule 2514: a summary line whose total amount is above 700 nuevos soles must carry the buyer (AccountingCustomerParty). The sheet gives no date for the value.",
       "verification": "Verified",
       "configuration": { "amount": 700, "currency": "PEN" }
+    },
+    {
+      "code": "gre.max_issue_lag_days",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S27 Guía-Remitente2_0, rule 2108: the difference between the reception date of the XML and the issue date is above the limit of the listing 'Parámetros (004)', which the sheet gives as 1 day. The sheet gives no start date for the value.",
+      "verification": "Verified",
+      "configuration": { "days": 1 }
+    },
+    {
+      "code": "gre.generic_motive_descriptions",
+      "version": 1,
+      "effectiveFrom": "1900-01-01",
+      "source": "S27 sheet 'Palabras Clave' (observation 4190): a description of the motive 'otros' (13) that is only one of these words or phrases is observed. The sheet distinguishes an exact match from a match inside the text; the guide compares the whole description with each entry, which is the stricter reading of 'only' (the sheet's wording is ambiguous: P).",
+      "verification": "Pending",
+      "configuration": { "descriptions": ["Otro", "Otros", "Traslado", "Traslados", "Transp", "Transporte", "Transportes", "Varios", "Venta", "Ventas", "Vta", "Vta.", "Venta entrega a terceros", "Venta a terceros", "Venta con entrega a terceros", "Compra", "Compras", "Traslado entre establecimientos de la misma empresa", "Traslado entre establecimiento de la misma empresa", "Traslado entre establecimiento de la misma emp", "Traslado establecimientos de la misma emp", "Traslado establecimientos de misma emp", "Traslado entre establecimiento misma emp", "Consignación", "Consignacion", "Devolución", "Devolucion", "Recojo de bienes transformados", "Recojo bienes transformados", "Recojo bs transformados", "Recojo de bien transformado", "Recojo bien transformado", "Importación", "Importacion", "Exportación", "Exportacion", "Venta sujeta a confirmación del comprador", "Venta sujeta a confirmación", "Vta sujeta a confirmación", "Venta sujeta a confirmacion del comprador", "Venta sujeta a confirmacion", "Vta sujeta a confirmacion", "Traslado de bienes para transformación", "Traslado bienes para transformación", "Traslado bs para transformación", "Traslado de bien para transformación", "Traslado bien para transformación", "Traslado de bienes para transformacion", "Traslado bienes para transformacion", "Traslado de bien para transformacion", "Traslado bien para transformacion", "Traslado emisor itinerante de comprobantes de pago", "Traslado emisor itinerante de comprobantes", "Traslado emisor itinerante de cp", "Traslado emisor itinerante de cdp", "Traslado emisor itinerante comprobantes de pago", "Traslado emisor itinerante comprobantes", "Traslado emisor itinerante cp", "Traslado emisor itinerante cdp", "Emisor itinerante de comprobantes de pago", "Emisor itinerante de comprobantes", "Emisor itinerante de cp", "Emisor itinerante de cdp", "Emisor itinerante comprobantes de pago", "Emisor itinerante comprobantes", "Emisor itinerante cp", "Emisor itinerante cdp", "Emisor itinerante", "Traslado itinerante"] }
     }
   ]
 }

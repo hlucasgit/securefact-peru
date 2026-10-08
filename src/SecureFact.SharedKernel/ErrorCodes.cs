@@ -90,6 +90,18 @@ public static class ErrorCodes
     public const string ImportFileInvalid = "SF-IMP-001";
     public const string ImportConflict = "SF-IMP-002";
 
+    public const string InvalidGuide = "SF-GRE-001";
+    public const string GuideNotFound = "SF-GRE-002";
+    public const string GuideNotSupported = "SF-GRE-003";
+    public const string GuideStateInvalid = "SF-GRE-004";
+    public const string InvalidGreSeries = "SF-GRE-005";
+    public const string GreSeriesNotFound = "SF-GRE-006";
+    public const string GreSeriesAlreadyExists = "SF-GRE-007";
+    public const string GreChannelNotConfigured = "SF-GRE-008";
+    public const string GreBusy = "SF-GRE-009";
+    public const string GreSeriesExhausted = "SF-GRE-010";
+    public const string GreChannelUnavailable = "SF-GRE-011";
+
     public const string RuleNotFound = "SF-RUL-001";
     public const string RuleInvalid = "SF-RUL-002";
 

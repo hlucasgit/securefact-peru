@@ -58,8 +58,17 @@ public sealed record SetSolCredentialsRequest(Guid CompanyId, string SolUser, st
     public override string ToString() => $"SetSolCredentialsRequest {{ CompanyId = {CompanyId}, SolUser = {SolUser}, SolPassword = ***** }}";
 }
 
-/// <summary>What is known about the stored SOL credentials. The password is never part of it.</summary>
-public sealed record SolCredentialDto(Guid CompanyId, string SolUser, bool HasPassword, DateTimeOffset UpdatedAt);
+/// <summary>
+/// The credentials of the API of SUNAT that the GRE needs besides the SOL user (menu SOL «Credenciales de API SUNAT», S28): the application's <c>client_id</c> and <c>client_secret</c>.
+/// They are stored next to the SOL credentials of the company, which must exist first. The secret is never stored in clear, logged or returned.
+/// </summary>
+public sealed record SetApiCredentialsRequest(Guid CompanyId, string ClientId, string ClientSecret)
+{
+    public override string ToString() => $"SetApiCredentialsRequest {{ CompanyId = {CompanyId}, ClientId = {ClientId}, ClientSecret = ***** }}";
+}
+
+/// <summary>What is known about the stored SOL credentials. The password and the secret of the API are never part of it.</summary>
+public sealed record SolCredentialDto(Guid CompanyId, string SolUser, bool HasPassword, DateTimeOffset UpdatedAt, string? ApiClientId = null, bool HasApiSecret = false);
 
 public interface ISolCredentialAdministration
 {
@@ -70,12 +79,17 @@ public interface ISolCredentialAdministration
 
     /// <summary>Wipes the stored password. The user name is kept as a record that credentials existed.</summary>
     Task<Result<Unit>> ClearAsync(Guid companyId, CancellationToken cancellationToken);
+
+    /// <summary>Stores (or replaces) the credentials of the API of the company, encrypted. The SOL credentials must exist.</summary>
+    Task<Result<SolCredentialDto>> SetApiCredentialsAsync(SetApiCredentialsRequest request, CancellationToken cancellationToken);
+
+    Task<Result<Unit>> ClearApiCredentialsAsync(Guid companyId, CancellationToken cancellationToken);
 }
 
 /// <summary>The decrypted secret, for the submission pipeline only. <see cref="ToString"/> prints no secret.</summary>
-public sealed record SolSecret(string SolUser, string SolPassword)
+public sealed record SolSecret(string SolUser, string SolPassword, string? ApiClientId = null, string? ApiClientSecret = null)
 {
-    public override string ToString() => $"SolSecret {{ SolUser = {SolUser}, SolPassword = ***** }}";
+    public override string ToString() => $"SolSecret {{ SolUser = {SolUser}, SolPassword = *****, ApiClientId = {ApiClientId}, ApiClientSecret = ***** }}";
 }
 
 public interface ISolCredentialProvider

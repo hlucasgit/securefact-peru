@@ -115,9 +115,18 @@ namespace SecureFact.Certificates.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ApiClientId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("api_client_id");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
+
+                    b.Property<byte[]>("ProtectedApiClientSecret")
+                        .HasColumnType("bytea")
+                        .HasColumnName("protected_api_client_secret");
 
                     b.Property<byte[]>("ProtectedPassword")
                         .HasColumnType("bytea")
