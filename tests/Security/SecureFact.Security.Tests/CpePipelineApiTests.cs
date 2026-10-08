@@ -19,7 +19,7 @@ public sealed class CpePipelineApiTests(ApiFixture api)
     private const string SolPassword = "Sol-Clave-pipeline-secret-7";
     private static int _rucCounter = 9_000_000;
 
-    private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, SeriesDto InvoiceSeries, SeriesDto ReceiptSeries);
+    private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, SeriesDto InvoiceSeries, SeriesDto ReceiptSeries, string OwnerEmail = "");
 
     private static string NewRuc()
     {
@@ -64,7 +64,7 @@ public sealed class CpePipelineApiTests(ApiFixture api)
         async Task<SeriesDto> SeriesAsync(string type, string code) =>
             (await (await owner.PostAsJsonAsync("/api/v1/series", new { companyId = company.Id, documentTypeCode = type, code })).Content.ReadFromJsonAsync<SeriesDto>(ApiFixture.JsonOptions))!;
 
-        return new Setup(tenantId, owner, company, await SeriesAsync("01", "F001"), await SeriesAsync("03", "B001"));
+        return new Setup(tenantId, owner, company, await SeriesAsync("01", "F001"), await SeriesAsync("03", "B001"), user.Email);
     }
 
     private static async Task<DocumentDto> NewDocumentAsync(HttpClient client, SeriesDto series, bool receipt = false)
@@ -219,6 +219,27 @@ public sealed class CpePipelineApiTests(ApiFixture api)
 
         Assert.Equal(EDocumentState.AcceptedWithObservations, sent.State);
         Assert.Equal(new CdrObservation("4031", "Debe indicar el nombre comercial"), Assert.Single(sent.CdrObservations));
+    }
+
+    [Fact]
+    public async Task The_owners_are_told_when_sunat_rejects_a_document_with_the_answer_of_sunat_and_not_when_it_accepts_it()
+    {
+        var (setup, document, electronic) = await ReadyAsync("Cpe Reject Notice SAC");
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(setup.Company.Ruc, Reference(document), "2047", "Es obligatorio al menos un AdditionalMonetaryTotal")));
+
+        Assert.Equal(EDocumentState.Rejected, (await SendOkAsync(setup.Owner, electronic.Id)).State);
+
+        await api.DrainMailAsync();
+        var notice = Assert.Single(api.Mail.To(setup.OwnerEmail), m => m.Subject.Contains("rechazó", StringComparison.Ordinal));
+        Assert.Contains($"F001-{document.Number}", notice.Subject, StringComparison.Ordinal);
+        Assert.Contains("código 2047", notice.Text, StringComparison.Ordinal);
+        Assert.Contains("AdditionalMonetaryTotal", notice.Text, StringComparison.Ordinal);
+
+        var (accepted, acceptedDocument, acceptedElectronic) = await ReadyAsync("Cpe Accept Notice SAC");
+        api.Sunat.Enqueue(ChannelReply.Cdr(FakeSunatChannel.CdrZip(accepted.Company.Ruc, Reference(acceptedDocument))));
+        Assert.Equal(EDocumentState.Accepted, (await SendOkAsync(accepted.Owner, acceptedElectronic.Id)).State);
+        await api.DrainMailAsync();
+        Assert.DoesNotContain(api.Mail.To(accepted.OwnerEmail), m => m.Subject.Contains("comprobante", StringComparison.Ordinal));
     }
 
     [Fact]

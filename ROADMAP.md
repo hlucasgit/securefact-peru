@@ -10,7 +10,7 @@ Cada fase tiene **entrada** (qué debe estar listo) y **salida** (criterio de ac
 | 3 | Motor CPE | **En curso** — QR, UBL, firma XMLDSig, ZIP, parser de CDR y canal SOAP (con simulador) hechos; almacén de certificados, credenciales SOL, máquina de estados, tubería, worker, resumen diario, outbox, PDF y notas de facturas hechos y aceptados en el beta; bajas de facturas y boletas hechas; descuentos, cargos y crédito con cuotas hechos |
 | 4 | Integración | Pendiente |
 | 5 | MVP comercial | Pendiente |
-| 6 | White label / Resellers | En curso: revendedores (ADR-043) y marca blanca de la interfaz (ADR-044) hechos, y los dominios se verifican por DNS (ADR-051); el correo saliente existe (recuperación de contraseña, ADR-052; avisos de cuenta y dominio con cola de reintentos, ADR-054); faltan plantillas por revendedor y precios |
+| 6 | White label / Resellers | En curso: revendedores (ADR-043) y marca blanca de la interfaz (ADR-044) hechos, y los dominios se verifican por DNS (ADR-051); el correo saliente existe (recuperación de contraseña, ADR-052; avisos de cuenta, dominio y negocio con cola de reintentos, ADR-054 y ADR-055); faltan plantillas por revendedor y precios |
 | 7 | Tributario avanzado | Pendiente |
 | 8 | SecureFact PSE | Pendiente (decisión comercial) |
 | 9 | Tax Platform | Pendiente |

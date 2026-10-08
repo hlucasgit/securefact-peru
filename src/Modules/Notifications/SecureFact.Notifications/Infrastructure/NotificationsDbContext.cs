@@ -33,6 +33,8 @@ internal sealed class NotificationsDbContext(DbContextOptions<NotificationsDbCon
             builder.Property(e => e.SentAt).HasColumnName("sent_at");
             builder.Property(e => e.DeadAt).HasColumnName("dead_at");
             builder.Property(e => e.LastError).HasColumnName("last_error").HasMaxLength(500);
+            builder.Property(e => e.DedupeKey).HasColumnName("dedupe_key").HasMaxLength(300);
+            builder.HasIndex(e => e.DedupeKey).IsUnique().HasFilter("dedupe_key IS NOT NULL").HasDatabaseName("ux_email_queue_dedupe");
 
             // The dispatcher scans only what is pending: due, not sent and not dead.
             builder.HasIndex(e => e.NextAttemptAt).HasFilter("sent_at IS NULL AND dead_at IS NULL").HasDatabaseName("ix_email_queue_pending");

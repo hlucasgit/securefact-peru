@@ -15,10 +15,19 @@ public sealed record EmailDispatchReport(int Sent, int Failed, int Dead)
     public static EmailDispatchReport Empty { get; } = new(0, 0, 0);
 }
 
+/// <summary>An e-mail that failed all its attempts and waits for an operator (platform staff). The text of the message is still kept so that it can be sent again.</summary>
+public sealed record DeadEmail(Guid Id, string ToAddress, string Subject, int Attempts, string? LastError, DateTimeOffset CreatedAt, DateTimeOffset DeadAt);
+
 /// <summary>Sends the queued e-mails (ADR-054). The background worker calls it; a test can call it to make the queue run.</summary>
 public interface IEmailDispatcher
 {
     Task<EmailDispatchReport> RunOnceAsync(CancellationToken cancellationToken);
+
+    /// <summary>The e-mails that died, oldest first. Platform scope.</summary>
+    Task<IReadOnlyList<DeadEmail>> ListDeadAsync(int max, CancellationToken cancellationToken);
+
+    /// <summary>Puts a dead e-mail back in the queue with its attempts reset. False when it is not dead.</summary>
+    Task<bool> RequeueAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>Removes the e-mails that were sent, or that died, more than <paramref name="retention"/> ago. Returns how many.</summary>
     Task<int> PurgeAsync(TimeSpan retention, CancellationToken cancellationToken);
@@ -79,6 +88,29 @@ internal sealed partial class EmailDispatcher(NotificationsDbContext db, DataSco
         }
 
         return report;
+    }
+
+    public async Task<IReadOnlyList<DeadEmail>> ListDeadAsync(int max, CancellationToken cancellationToken)
+    {
+        using var elevated = scope.Elevate("notifications: list the dead e-mails");
+        return await db.Database.SqlQuery<DeadEmail>($"""
+            SELECT id AS "Id", to_address AS "ToAddress", subject AS "Subject", attempts AS "Attempts", last_error AS "LastError", created_at AS "CreatedAt", dead_at AS "DeadAt"
+            FROM notifications.email_queue
+            WHERE dead_at IS NOT NULL AND sent_at IS NULL
+            ORDER BY created_at
+            LIMIT {Math.Clamp(max, 1, 200)}
+            """).ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> RequeueAsync(Guid id, CancellationToken cancellationToken)
+    {
+        using var elevated = scope.Elevate("notifications: send a dead e-mail again");
+        var changed = await db.Database.ExecuteSqlAsync($"""
+            UPDATE notifications.email_queue
+            SET dead_at = NULL, attempts = 0, next_attempt_at = {clock.GetUtcNow()}, locked_until = NULL
+            WHERE id = {id} AND dead_at IS NOT NULL AND sent_at IS NULL
+            """, cancellationToken);
+        return changed == 1;
     }
 
     public async Task<int> PurgeAsync(TimeSpan retention, CancellationToken cancellationToken)

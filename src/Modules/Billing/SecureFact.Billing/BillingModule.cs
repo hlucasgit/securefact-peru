@@ -20,6 +20,7 @@ public static class BillingModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISeriesAdministration, SeriesAdministration>();
         services.TryAddScoped<IVoidStatusProvider, NoVoidStatus>();
+        services.TryAddScoped<SecureFact.Notifications.Contracts.IBusinessNotices, SecureFact.Notifications.Contracts.NullBusinessNotices>();
         services.TryAddScoped<IIneffectiveDocumentsProvider, NoIneffectiveDocuments>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<SecureFact.SharedKernel.Messaging.IOutboxSource>(sp => new SecureFact.Platform.Messaging.PostgresOutboxSource(sp.GetRequiredService<BillingDbContext>(), sp.GetRequiredService<TimeProvider>(), BillingDbContext.Schema, "billing"));

@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\Rules\SecureFact.Rules.Contracts\SecureFact.Rules.Contracts.csproj" />
     <ProjectReference Include="..\..\TaxEngine\SecureFact.TaxEngine.Contracts\SecureFact.TaxEngine.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\SecureFact.Tenancy.Contracts\SecureFact.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Notifications\SecureFact.Notifications.Contracts\SecureFact.Notifications.Contracts.csproj" />
     <ProjectReference Include="..\SecureFact.CpeEngine.Contracts\SecureFact.CpeEngine.Contracts.csproj" />
   </ItemGroup>
 </Project>

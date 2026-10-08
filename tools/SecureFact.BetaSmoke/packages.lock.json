@@ -165,6 +165,7 @@
           "SecureFact.Billing.Contracts": "[1.0.0, )",
           "SecureFact.Certificates.Contracts": "[1.0.0, )",
           "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Notifications.Contracts": "[1.0.0, )",
           "SecureFact.Organizations.Contracts": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.Rules.Contracts": "[1.0.0, )",
@@ -179,6 +180,12 @@
         "dependencies": {
           "SecureFact.SharedKernel": "[1.0.0, )",
           "SecureFact.TaxEngine.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.notifications.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },
       "securefact.organizations.contracts": {

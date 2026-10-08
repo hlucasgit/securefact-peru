@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useAudit, useDeadMessages, useRequeue, useTenants, useVerifyAudit } from '../api/queries'
+import { useAudit, useDeadEmails, useDeadMessages, useRequeue, useRequeueEmail, useTenants, useVerifyAudit } from '../api/queries'
 import type { AuditRecord } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, Loading, PageHeader, SelectField, TextField, useToast } from '../components/ui'
@@ -171,6 +171,57 @@ export function DeadMessages() {
           </div>
         ) : (
           <Empty>No hay mensajes fallidos.</Empty>
+        )}
+      </div>
+    </>
+  )
+}
+
+/** The e-mails that the platform could not send after all their attempts (ADR-054). Only platform staff see them: the queue is the platform's. */
+export function DeadEmails() {
+  const { data, isPending, error } = useDeadEmails()
+  const requeue = useRequeueEmail()
+  const toast = useToast()
+  return (
+    <>
+      <PageHeader title="Correos fallidos" subtitle="Avisos que agotaron sus reintentos de envío (servidor de correo caído o dirección rechazada)" />
+      <div className="card">
+        <ErrorAlert error={error ?? requeue.error} />
+        {isPending ? (
+          <Loading />
+        ) : data && data.length > 0 ? (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Destinatario</th>
+                  <th>Asunto</th>
+                  <th className="num">Intentos</th>
+                  <th>Último error</th>
+                  <th>Murió</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((email) => (
+                  <tr key={email.id}>
+                    <td>{email.toAddress}</td>
+                    <td>{email.subject}</td>
+                    <td className="num">{email.attempts}</td>
+                    <td>{email.lastError ?? '—'}</td>
+                    <td className="tight">{dateTime(email.deadAt)}</td>
+                    <td className="right">
+                      <button className="btn small" type="button" disabled={requeue.isPending} aria-label={`Reenviar a ${email.toAddress}: ${email.subject}`} onClick={() => requeue.mutate(email, { onSuccess: () => toast.ok('Correo devuelto a la cola.') })}>
+                        Reenviar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty>No hay correos fallidos.</Empty>
         )}
       </div>
     </>

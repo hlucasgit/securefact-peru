@@ -4,7 +4,7 @@ import { PLATFORM_ROLES, RESELLER_ROLES } from './lib/format'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
 import { Rules, Security, Users } from './pages/Account'
-import { Audit, DeadMessages } from './pages/Audit'
+import { Audit, DeadEmails, DeadMessages } from './pages/Audit'
 import { CompanyDetail } from './pages/CompanyDetail'
 import { Companies } from './pages/Companies'
 import { Dashboard } from './pages/Dashboard'
@@ -49,6 +49,7 @@ export function App() {
         <Route path="plataforma/inquilinos/:id" element={<TenantDetail />} />
         <Route path="plataforma/planes" element={<Plans />} />
         <Route path="plataforma/revendedores" element={<Resellers />} />
+        <Route path="plataforma/correos" element={<DeadEmails />} />
         <Route path="revendedor/cuentas" element={<ResellerAccounts />} />
         <Route path="revendedor/marca" element={<ResellerBrand />} />
         <Route path="revendedor/cuentas/:id" element={<ResellerAccountDetail />} />

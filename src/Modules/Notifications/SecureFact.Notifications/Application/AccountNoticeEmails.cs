@@ -21,7 +21,7 @@ internal sealed partial class AccountNoticeEmails(NoticeContext context, IEmailO
                         "Ingrese con este mismo correo y la contraseña que le dio quien creó la cuenta. Si no la tiene o la olvidó, elija una nueva con «¿Olvidó su contraseña?».",
                     ],
                     "Ingresar", $"{portal}/ingresar"),
-                cancellationToken);
+                cancellationToken: cancellationToken);
         }
         catch (Exception failure) when (failure is not OperationCanceledException)
         {

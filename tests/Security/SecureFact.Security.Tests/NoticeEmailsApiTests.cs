@@ -172,7 +172,7 @@ public sealed class NoticeEmailsApiTests(ApiFixture api)
     private async Task<Guid> EnqueueAsync(string subject)
     {
         await using var scope = api.Services.CreateAsyncScope();
-        Assert.True(await scope.ServiceProvider.GetRequiredService<IEmailOutbox>().EnqueueAsync(new EmailMessage($"{Guid.NewGuid():N}@cola.test", subject, "texto del aviso", "<p>texto del aviso</p>"), CancellationToken.None));
+        Assert.True(await scope.ServiceProvider.GetRequiredService<IEmailOutbox>().EnqueueAsync(new EmailMessage($"{Guid.NewGuid():N}@cola.test", subject, "texto del aviso", "<p>texto del aviso</p>")));
         return await api.Postgres.ScalarAsOwnerAsync<Guid>($"SELECT id FROM notifications.email_queue WHERE subject = '{subject}'");
     }
 
@@ -263,5 +263,49 @@ public sealed class NoticeEmailsApiTests(ApiFixture api)
 
         await using var asTenant = new NpgsqlCommand("SELECT count(*) FROM notifications.email_queue", connection);
         Assert.Equal(0L, await asTenant.ExecuteScalarAsync());
+    }
+
+    private sealed record DeadRow(Guid Id, string ToAddress, string Subject, int Attempts, string? LastError);
+
+    [Fact]
+    public async Task Platform_staff_see_the_dead_emails_and_send_one_again_and_nobody_else_can()
+    {
+        using var admin = await api.AdminClientAsync();
+        await api.DrainMailAsync();
+        var subject = $"Para reenviar {Guid.NewGuid():N}";
+        var id = await EnqueueAsync(subject);
+        await api.Postgres.ExecuteAsOwnerAsync($"UPDATE notifications.email_queue SET attempts = 9 WHERE id = '{id}'");
+        api.Mail.Fail = true;
+        try
+        {
+            await api.DispatchMailOnceAsync();
+        }
+        finally
+        {
+            api.Mail.Fail = false;
+        }
+
+        var dead = (await admin.GetFromJsonAsync<List<DeadRow>>("/api/v1/platform/emails/dead", ApiFixture.JsonOptions))!;
+        var row = Assert.Single(dead, e => e.Id == id);
+        Assert.Equal((subject, 10), (row.Subject, row.Attempts));
+        Assert.Contains("simulated", row.LastError, StringComparison.Ordinal);
+
+        // The queue is the platform's: a tenant owner neither lists nor requeues.
+        var tenantId = await api.CreateTenantAsync($"Sin acceso {Guid.NewGuid():N}"[..20]);
+        var user = await ApiFixture.CreateUserAsync(admin, Roles.TenantOwner, tenantId);
+        using var owner = api.ClientFor(await api.LoginOkAsync(user.Email, user.Password));
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync("/api/v1/platform/emails/dead")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PostAsync($"/api/v1/platform/emails/{id}/requeue", null)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"/api/v1/platform/emails/{id}/requeue", null)).StatusCode);
+        await api.DrainMailAsync();
+        Assert.True(await api.Postgres.ScalarAsOwnerAsync<bool>($"SELECT sent_at IS NOT NULL FROM notifications.email_queue WHERE id = '{id}'"));
+        Assert.DoesNotContain((await admin.GetFromJsonAsync<List<DeadRow>>("/api/v1/platform/emails/dead", ApiFixture.JsonOptions))!, e => e.Id == id);
+
+        // It is not dead any more, so it cannot be requeued again, and the one time it was is in the audit trail.
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsync($"/api/v1/platform/emails/{id}/requeue", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsync($"/api/v1/platform/emails/{Guid.NewGuid()}/requeue", null)).StatusCode);
+        var audit = await admin.GetStringAsync($"/api/v1/audit?action=notifications.email.requeued&entityId={id}");
+        Assert.Contains("notifications.email.requeued", audit, StringComparison.Ordinal);
     }
 }

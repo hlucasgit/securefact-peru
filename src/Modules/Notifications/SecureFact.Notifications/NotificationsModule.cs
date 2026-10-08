@@ -90,6 +90,8 @@ public static class NotificationsModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IEmailOutbox, EmailOutbox>();
         services.AddScoped<IEmailDispatcher, EmailDispatcher>();
+        services.AddScoped<ICertificateExpiryNotices, CertificateExpiryNotices>();
+        services.Replace(ServiceDescriptor.Scoped<IBusinessNotices, BusinessNoticeEmails>());
         services.Replace(ServiceDescriptor.Scoped<ITenantNotices, TenantNoticeEmails>());
         services.Replace(ServiceDescriptor.Scoped<IAccountNotices, AccountNoticeEmails>());
         return services;

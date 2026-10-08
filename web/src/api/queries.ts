@@ -5,6 +5,7 @@ import type {
   ArchivedFile,
   AuditRecord,
   AuditVerification,
+  DeadEmail,
   DeadMessage,
   BrandInput,
   BrandScope,
@@ -67,6 +68,7 @@ export const keys = {
   myPlan: ['plan'] as const,
   audit: (filters: string) => ['audit', filters] as const,
   dead: ['outbox', 'dead'] as const,
+  deadEmails: ['emails', 'dead'] as const,
   tenant: ['tenant'] as const,
   rules: ['rules'] as const,
 }
@@ -268,4 +270,6 @@ export const useAudit = (filters: AuditFilters, skip: number) =>
   useQuery({ queryKey: keys.audit(`${auditQuery(filters, skip)}`), queryFn: () => get<AuditRecord[]>(`/api/v1/audit?${auditQuery(filters, skip)}`) })
 export const useVerifyAudit = () => useAction((tenantId: string) => post<AuditVerification>(`/api/v1/audit/verify${tenantId ? `?tenantId=${tenantId}` : ''}`), [])
 export const useDeadMessages = () => useQuery({ queryKey: keys.dead, queryFn: () => get<DeadMessage[]>('/api/v1/outbox/dead') })
+export const useDeadEmails = () => useQuery({ queryKey: keys.deadEmails, queryFn: () => get<DeadEmail[]>('/api/v1/platform/emails/dead') })
+export const useRequeueEmail = () => useAction((email: DeadEmail) => post(`/api/v1/platform/emails/${email.id}/requeue`), [keys.deadEmails])
 export const useRequeue = () => useAction((message: DeadMessage) => post(`/api/v1/outbox/${message.source}/${message.id}/requeue`), [keys.dead])

@@ -25,7 +25,7 @@ internal sealed partial class TenantNoticeEmails(IAccountDirectory directory, No
             var (brand, portal, _) = await context.ForAsync(notice.TenantId, notice.ResellerId, cancellationToken);
             foreach (var owner in owners)
             {
-                await queue.EnqueueAsync(Status(owner, brand, portal, notice), cancellationToken);
+                await queue.EnqueueAsync(Status(owner, brand, portal, notice), cancellationToken: cancellationToken);
             }
         }
         catch (Exception failure) when (failure is not OperationCanceledException)
@@ -53,7 +53,7 @@ internal sealed partial class TenantNoticeEmails(IAccountDirectory directory, No
             var (brand, portal, _) = await context.ForAsync(null, notice.ResellerId, cancellationToken);
             foreach (var admin in admins)
             {
-                await queue.EnqueueAsync(Domain(admin, brand, portal, notice), cancellationToken);
+                await queue.EnqueueAsync(Domain(admin, brand, portal, notice), cancellationToken: cancellationToken);
             }
         }
         catch (Exception failure) when (failure is not OperationCanceledException)

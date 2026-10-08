@@ -40,9 +40,9 @@ Cada aviso es de mejor esfuerzo: si no se puede componer o encolar, el cambio (l
 
 ## Límites (P)
 - **El SMTP real sigue sin probarse** (ADR-052).
-- Los correos **muertos** se quedan en la tabla (30 días) y se ven en el registro del worker; **no hay pantalla ni endpoint** para listarlos ni reencolarlos (el *outbox* de eventos sí lo tiene).
+- Los correos **muertos** se quedan en la tabla (30 días); la plataforma los ve y los reenvía desde la pantalla *Correos fallidos* (ADR-055).
 - Una caída del proceso entre el cambio y el encolado **pierde el aviso**: se encola después de guardar el cambio, no en la misma transacción (módulos distintos). Para estos avisos se aceptó; la auditoría del cambio queda siempre.
 - **Solo propietarios**: cuando la plataforma suspende la cuenta de un revendedor, el revendedor no recibe copia; tampoco los usuarios que no son propietarios.
-- Sin avisos de: vencimiento del certificado digital, límite de plan cercano, rechazo de un comprobante, cambio de plan, usuario desactivado ni de inicio de sesión desde un lugar nuevo.
+- Vencimiento del certificado, plan cerca del tope y rechazo de un comprobante son del ADR-055. Sin avisos de cambio de plan, usuario desactivado ni inicio de sesión desde un lugar nuevo.
 - Sin preferencias de la persona (no se puede dejar de recibirlos), ni plantillas editables por el revendedor, ni otro idioma que el español, ni logotipo en el cuerpo.
 - La purga y la cola son de la plataforma entera: no hay una cuota de avisos por cuenta; un revendedor que cree miles de usuarios genera miles de correos de bienvenida.

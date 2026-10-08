@@ -14,6 +14,7 @@ public static class AuditActions
     public const string ResellerBrandingUpdated = "tenancy.reseller.branding_updated";
     public const string ResellerLogoChanged = "tenancy.reseller.logo_changed";
     public const string ResellerDomainChanged = "tenancy.reseller.domain_changed";
+    public const string EmailRequeued = "notifications.email.requeued";
     public const string ResellerDomainVerified = "tenancy.reseller.domain_verified";
     public const string ResellerDomainUnreachable = "tenancy.reseller.domain_unreachable";
     public const string TenantReactivated = "tenancy.tenant.reactivated";

@@ -34,6 +34,7 @@ public static class CpeEngineModule
             .UseNpgsql(appConnectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", CpeDbContext.Schema))
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddScoped<SecureFact.Notifications.Contracts.IBusinessNotices, SecureFact.Notifications.Contracts.NullBusinessNotices>();
         services.AddScoped<IElectronicDocumentService, ElectronicDocumentService>();
         services.AddScoped<ISummaryService, SummaryService>();
         services.AddScoped<IVoidService, VoidService>();

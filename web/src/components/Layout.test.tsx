@@ -29,7 +29,7 @@ function links(roles: string[]): string[] {
 
 describe('the navigation follows the role', () => {
   it('shows platform staff the platform and no tenant operation', () => {
-    expect(links(['PlatformSuperAdmin'])).toEqual(['Inquilinos', 'Planes', 'Revendedores', 'Auditoría', 'Seguridad', 'Reglas'])
+    expect(links(['PlatformSuperAdmin'])).toEqual(['Inquilinos', 'Planes', 'Revendedores', 'Correos fallidos', 'Auditoría', 'Seguridad', 'Reglas'])
   })
 
   it('shows a reseller its accounts and nothing else of the platform or of a tenant', () => {

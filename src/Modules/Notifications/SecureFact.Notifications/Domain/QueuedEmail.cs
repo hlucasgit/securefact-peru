@@ -38,16 +38,6 @@ internal sealed class QueuedEmail
 
     public string? LastError { get; private set; }
 
-    public static QueuedEmail Create(Contracts.EmailMessage message, DateTimeOffset now) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        CreatedAt = now,
-        ToAddress = message.To,
-        Subject = message.Subject,
-        TextBody = message.Text,
-        HtmlBody = message.Html,
-        FromName = message.FromName,
-        ReplyTo = message.ReplyTo,
-        NextAttemptAt = now,
-    };
+    /// <summary>Names the fact the message tells, with the address (<c>key|address</c>); unique when set, so the same fact is never queued twice for one address.</summary>
+    public string? DedupeKey { get; private set; }
 }

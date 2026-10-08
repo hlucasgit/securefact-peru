@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SecureFact.Audit.Contracts;
 using SecureFact.Billing.Contracts;
+using SecureFact.Notifications.Contracts;
 using SecureFact.Certificates.Contracts;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.CpeEngine.Domain;
@@ -34,7 +35,8 @@ internal sealed class ElectronicDocumentService(
     IEDocumentStateMachine machine,
     IServiceProvider services,
     TimeProvider clock,
-    IAuditTrail audit) : IElectronicDocumentService
+    IAuditTrail audit,
+    IBusinessNotices notices) : IElectronicDocumentService
 {
     private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromHours(1);
@@ -840,6 +842,16 @@ internal sealed class ElectronicDocumentService(
                 ["cdrProcessId"] = entity.CdrProcessId,
                 ["errorCode"] = entity.LastErrorCode,
             }), CancellationToken.None);
+
+        // A rejection, or a document that could not be sent for good, is what the owners want to hear about by themselves (ADR-055).
+        if (state is EDocumentState.Rejected or EDocumentState.Failed)
+        {
+            await notices.DocumentRejectedAsync(
+                new DocumentRejectedNotice(
+                    entity.TenantId, entity.Id, $"{entity.Series}-{entity.Number}", state == EDocumentState.Rejected, entity.CdrResponseCode,
+                    state == EDocumentState.Rejected ? entity.CdrDescription : null),
+                CancellationToken.None);
+        }
     }
 
     private async Task<Error?> TrySaveAsync(CancellationToken cancellationToken)

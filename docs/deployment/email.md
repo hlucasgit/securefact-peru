@@ -17,7 +17,8 @@ La API **no arranca** si el proveedor es desconocido, si falta el servidor o el 
 
 ## La cola de avisos (worker de correo)
 - Los avisos se guardan en `notifications.email_queue` y los manda `SecureFact.Workers` (`EmailWorker`, cada `Email:WorkerIntervalSeconds`, 5 por defecto). **El worker necesita la misma configuración de correo que la API** (`Email__*`, `Web__PublicUrl`): `docker-compose.yml` ya la pasa a los dos.
-- Si el envío falla, reintenta con espera creciente (30 s a 1 h) y a los 10 intentos el correo queda **muerto** (advertencia «was not delivered … dead: True» en el registro del worker, con su id; no hay pantalla para reencolarlo). Lo enviado o muerto se purga a los `Email:RetentionDays` (30).
+- Si el envío falla, reintenta con espera creciente (30 s a 1 h) y a los 10 intentos el correo queda **muerto** (advertencia «was not delivered … dead: True» en el registro del worker, con su id; la plataforma lo ve y lo reenvía en *Correos fallidos*). Lo enviado o muerto se purga a los `Email:RetentionDays` (30).
+- Los avisos del negocio (certificado por vencer, plan cerca del tope, comprobante rechazado; ADR-055) usan la misma cola; el paso del certificado corre cada 24 horas en el mismo worker.
 - Al enviarse se borra el texto del correo de la cola. Sin `Email:Provider` (`None`) los avisos **no se encolan**.
 - Para revisar la cola: `SELECT to_address, subject, attempts, sent_at, dead_at, last_error FROM notifications.email_queue ORDER BY created_at DESC;` con la conexión del dueño del esquema (el rol de la aplicación no la ve sin el ámbito de la plataforma).
 

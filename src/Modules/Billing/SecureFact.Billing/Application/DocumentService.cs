@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using SecureFact.Audit.Contracts;
 using SecureFact.Billing.Contracts;
+using SecureFact.Notifications.Contracts;
 using SecureFact.Billing.Domain;
 using SecureFact.Customers.Contracts;
 using SecureFact.Billing.Infrastructure;
@@ -30,8 +31,12 @@ internal sealed partial class DocumentService(
     ITaxCalculator calculator,
     TimeProvider clock,
     IAuditTrail audit,
-    IPlanLimits plans) : IDocumentService
+    IPlanLimits plans,
+    IBusinessNotices notices) : IDocumentService
 {
+    /// <summary>The plan usage that the current issuance crossed (80 % or 100 %); it is told once the document is committed, so a rolled back issuance tells nothing.</summary>
+    private PlanUsageNotice? _pendingUsage;
+
     private const int MaxLines = 1000;
     private const int MaxPage = 100;
 
@@ -310,6 +315,12 @@ internal sealed partial class DocumentService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
+        if (_pendingUsage is { } usage)
+        {
+            _pendingUsage = null;
+            await notices.PlanUsageAsync(usage, cancellationToken);
+        }
+
         await audit.RecordAsync(new AuditEvent(
             AuditActions.DocumentCreated, "document", documentId.ToString("D"), tenantId,
             NewValues: new Dictionary<string, object?>
@@ -331,6 +342,7 @@ internal sealed partial class DocumentService(
     /// </summary>
     private async Task<Error?> CheckMonthlyAllowanceAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        _pendingUsage = null;
         var plan = await plans.OfTenantAsync(new SecureFact.SharedKernel.Domain.TenantId(tenantId), cancellationToken);
         if (plan?.MaxDocumentsPerMonth is not { } limit)
         {
@@ -342,7 +354,16 @@ internal sealed partial class DocumentService(
         var local = TimeZoneInfo.ConvertTime(now, Lima);
         var monthStart = new DateTimeOffset(local.Year, local.Month, 1, 0, 0, 0, Lima.GetUtcOffset(new DateTime(local.Year, local.Month, 1))).ToUniversalTime();
         var issued = await db.Documents.CountAsync(d => d.TenantId == tenantId && d.CreatedAt >= monthStart, cancellationToken);
-        return issued >= limit ? IPlanLimits.LimitReached(PlanResource.DocumentsPerMonth, plan.Name, limit) : null;
+        if (issued >= limit)
+        {
+            return IPlanLimits.LimitReached(PlanResource.DocumentsPerMonth, plan.Name, limit);
+        }
+
+        // This issuance makes it issued + 1. The notice is for the moment a share is crossed: 100 % when it takes the last place, 80 % the first time it reaches four fifths.
+        var used = issued + 1;
+        var percent = used == limit ? 100 : used * 100 >= limit * 80 && issued * 100 < limit * 80 ? 80 : 0;
+        _pendingUsage = percent == 0 ? null : new PlanUsageNotice(tenantId, plan.Name, used, limit, percent, local.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture));
+        return null;
     }
 
     public async Task<int> CountIssuedAsync(Guid tenantId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>

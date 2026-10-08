@@ -450,6 +450,16 @@ export interface AuditVerification {
   reason: string | null
 }
 
+export interface DeadEmail {
+  id: string
+  toAddress: string
+  subject: string
+  attempts: number
+  lastError: string | null
+  createdAt: string
+  deadAt: string
+}
+
 export interface DeadMessage {
   id: string
   source: string

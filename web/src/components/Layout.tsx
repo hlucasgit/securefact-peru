@@ -11,7 +11,7 @@ interface Item {
 }
 
 const PLATFORM_GROUPS: { title: string; items: Item[] }[] = [
-  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/plataforma/planes', label: 'Planes' }, { to: '/plataforma/revendedores', label: 'Revendedores' }, { to: '/auditoria', label: 'Auditoría' }] },
+  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/plataforma/planes', label: 'Planes' }, { to: '/plataforma/revendedores', label: 'Revendedores' }, { to: '/plataforma/correos', label: 'Correos fallidos' }, { to: '/auditoria', label: 'Auditoría' }] },
   { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
 ]
 
