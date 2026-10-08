@@ -172,7 +172,7 @@ export function NewGuide() {
               <SelectField label={`Tipo del documento ${index + 1}`} value={item.typeCode} onChange={(event) => set('related', form.related.map((other) => (other.key === item.key ? { ...other, typeCode: event.target.value } : other)))}>
                 {relatedTypes.map((type) => <option key={type.code} value={type.code}>{type.code} · {type.description}</option>)}
               </SelectField>
-              <TextField label="Número" hint="Por ejemplo F001-123" value={item.number} onChange={(event) => set('related', form.related.map((other) => (other.key === item.key ? { ...other, number: event.target.value } : other)))} />
+              <TextField label={`Número del documento relacionado ${index + 1}`} hint="Por ejemplo F001-123" value={item.number} onChange={(event) => set('related', form.related.map((other) => (other.key === item.key ? { ...other, number: event.target.value } : other)))} />
               <TextField label="RUC del emisor" pattern="\d{11}" maxLength={11} value={item.issuerRuc} onChange={(event) => set('related', form.related.map((other) => (other.key === item.key ? { ...other, issuerRuc: event.target.value } : other)))} />
               <div><button className="btn small danger" type="button" onClick={() => set('related', form.related.filter((other) => other.key !== item.key))}>Quitar documento {index + 1}</button></div>
             </div>

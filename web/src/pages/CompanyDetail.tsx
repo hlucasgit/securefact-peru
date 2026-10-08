@@ -26,7 +26,7 @@ import { useSession } from '../auth/session'
 import { ADMIN_ROLES, DOCUMENT_TYPES, date, dateTime } from '../lib/format'
 import { CompanyForm } from './Companies'
 
-type Tab = 'datos' | 'establecimientos' | 'series' | 'certificado' | 'sol'
+type Tab = 'datos' | 'establecimientos' | 'series' | 'guias' | 'certificado' | 'sol'
 
 export function CompanyDetail() {
   const { id = '' } = useParams()
@@ -48,6 +48,7 @@ export function CompanyDetail() {
           { id: 'datos', label: 'Datos' },
           { id: 'establecimientos', label: 'Establecimientos' },
           { id: 'series', label: 'Series' },
+          { id: 'guias', label: 'Guías de remisión' },
           { id: 'certificado', label: 'Certificado digital' },
           { id: 'sol', label: 'Credenciales SOL' },
         ]}
@@ -55,6 +56,7 @@ export function CompanyDetail() {
       {tab === 'datos' && <DataTab company={company} />}
       {tab === 'establecimientos' && <EstablishmentsTab companyId={id} />}
       {tab === 'series' && <SeriesTab companyId={id} />}
+      {tab === 'guias' && <GreSeriesSection companyId={id} />}
       {tab === 'certificado' && <CertificateTab companyId={id} ruc={company.ruc} />}
       {tab === 'sol' && <SolTab companyId={id} />}
     </>
@@ -183,7 +185,6 @@ function SeriesTab({ companyId }: { companyId: string }) {
         </div>
         <div><button className="btn primary" type="submit" disabled={create.isPending}>Crear serie</button></div>
       </form>
-      <GreSeriesSection companyId={companyId} />
     </>
   )
 }
@@ -230,7 +231,7 @@ function GreSeriesSection({ companyId }: { companyId: string }) {
         <div className="form-grid">
           <TextField label="Serie" hint="4 caracteres: T… (por ejemplo T001)" required maxLength={4} minLength={4} pattern="[Tt][A-Za-z0-9]{3}" value={code} onChange={(event) => setCode(event.target.value)} />
         </div>
-        <div><button className="btn primary" type="submit" disabled={create.isPending}>Crear serie de guía</button></div>
+        <div><button className="btn primary" type="submit" disabled={create.isPending}>Registrar serie de guía</button></div>
       </form>
     </>
   )
@@ -378,7 +379,7 @@ function ApiCredentialsSection({ companyId }: { companyId: string }) {
           <TextField label="client_id" required autoComplete="off" value={clientId} onChange={(event) => setClientId(event.target.value)} />
           <TextField label="client_secret" type="password" required autoComplete="off" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} />
         </div>
-        <div><button className="btn primary" type="submit" disabled={save.isPending}>Guardar</button></div>
+        <div><button className="btn primary" type="submit" disabled={save.isPending}>Guardar credenciales de API</button></div>
       </form>
     </>
   )

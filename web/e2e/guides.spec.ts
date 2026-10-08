@@ -26,7 +26,7 @@ async function fillSale(page: Page, ruc: string, note = ''): Promise<void> {
   await page.getByLabel('Descripción del bien 1').fill('Caja de repuestos')
 
   await page.getByRole('button', { name: 'Agregar documento relacionado' }).click()
-  await page.getByLabel('Número', { exact: true }).fill('F001-123')
+  await page.getByLabel('Número del documento relacionado 1').fill('F001-123')
   await page.getByLabel('RUC del emisor').fill(ruc)
 }
 
