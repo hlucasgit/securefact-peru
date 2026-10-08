@@ -95,6 +95,25 @@ export interface Customer {
   createdAt: string
 }
 
+export type ImportRowStatus = 'Ready' | 'Created' | 'Existing' | 'Invalid'
+
+export interface ImportRow {
+  line: number
+  status: ImportRowStatus
+  key: string | null
+  message: string | null
+}
+
+export interface ImportResult {
+  committed: boolean
+  total: number
+  ready: number
+  created: number
+  existing: number
+  invalid: number
+  rows: ImportRow[]
+}
+
 export type CustomerDetails = Pick<Customer, 'documentTypeCode' | 'documentNumber' | 'name' | 'address' | 'email' | 'phone'>
 
 export interface Product {

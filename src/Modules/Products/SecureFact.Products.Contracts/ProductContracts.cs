@@ -1,3 +1,4 @@
+using SecureFact.SharedKernel.Import;
 using SecureFact.SharedKernel.Results;
 
 namespace SecureFact.Products.Contracts;
@@ -49,4 +50,10 @@ public interface IProductAdministration
     Task<Result<ProductDto>> UpdateAsync(Guid productId, ProductDetails details, CancellationToken cancellationToken);
 
     Task<Result<Unit>> DeactivateAsync(Guid productId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads products from a CSV (ADR-053). Without <c>Commit</c> it only reports what would happen. With it, the valid rows are created in one transaction; a product whose internal
+    /// code already exists is skipped (never overwritten) and a row with a problem is skipped and explained.
+    /// </summary>
+    Task<Result<ImportResult>> ImportAsync(ImportRequest request, CancellationToken cancellationToken);
 }

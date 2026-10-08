@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useCatalog, useCustomers, useDeactivateCustomer, useDeactivateProduct, useProducts, useSaveCustomer, useSaveProduct } from '../api/queries'
 import type { Customer, CustomerDetails, Product, ProductDetails } from '../api/types'
+import { ImportModal } from '../components/ImportModal'
 import { Badge, ConfirmButton, Empty, ErrorAlert, Loading, Modal, PageHeader, SelectField, TextField, useToast } from '../components/ui'
 import { money } from '../lib/format'
 
@@ -15,11 +16,13 @@ export function Customers() {
   const { data, isPending, error } = useCustomers(search)
   const deactivate = useDeactivateCustomer()
   const [editing, setEditing] = useState<Customer | 'new' | null>(null)
+  const [importing, setImporting] = useState(false)
   const types = useCatalog('06')
 
   return (
     <>
       <PageHeader title="Clientes" subtitle="Adquirentes frecuentes">
+        <button className="btn" type="button" onClick={() => setImporting(true)}>Importar CSV</button>
         <button className="btn primary" type="button" onClick={() => setEditing('new')}>Nuevo cliente</button>
       </PageHeader>
       <div className="card">
@@ -48,6 +51,7 @@ export function Customers() {
         ) : <Empty>No hay clientes.</Empty>}
       </div>
       {editing && <CustomerModal customer={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {importing && <ImportModal kind="customers" onClose={() => setImporting(false)} />}
     </>
   )
 }
@@ -92,10 +96,12 @@ export function Products() {
   const { data, isPending, error } = useProducts(search)
   const deactivate = useDeactivateProduct()
   const [editing, setEditing] = useState<Product | 'new' | null>(null)
+  const [importing, setImporting] = useState(false)
 
   return (
     <>
       <PageHeader title="Productos" subtitle="Catálogo de bienes y servicios">
+        <button className="btn" type="button" onClick={() => setImporting(true)}>Importar CSV</button>
         <button className="btn primary" type="button" onClick={() => setEditing('new')}>Nuevo producto</button>
       </PageHeader>
       <div className="card">
@@ -126,6 +132,7 @@ export function Products() {
         ) : <Empty>No hay productos.</Empty>}
       </div>
       {editing && <ProductModal product={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {importing && <ImportModal kind="products" onClose={() => setImporting(false)} />}
     </>
   )
 }

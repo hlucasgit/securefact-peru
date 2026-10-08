@@ -1,3 +1,4 @@
+using SecureFact.SharedKernel.Import;
 using SecureFact.SharedKernel.Results;
 
 namespace SecureFact.Customers.Contracts;
@@ -30,4 +31,10 @@ public interface ICustomerAdministration
     Task<Result<CustomerDto>> UpdateAsync(Guid customerId, CustomerDetails details, CancellationToken cancellationToken);
 
     Task<Result<Unit>> DeactivateAsync(Guid customerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads customers from a CSV (ADR-053). Without <c>Commit</c> it only reports what would happen. With it, the valid rows are created in one transaction; a customer whose document
+    /// already exists is skipped (never overwritten) and a row with a problem is skipped and explained.
+    /// </summary>
+    Task<Result<ImportResult>> ImportAsync(ImportRequest request, CancellationToken cancellationToken);
 }

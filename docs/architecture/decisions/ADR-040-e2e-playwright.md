@@ -9,7 +9,7 @@ Las 16 pruebas unitarias de la interfaz no prueban lo que más importa: que la p
 ## Decisión
 - **Playwright** (`@playwright/test`, Chromium) en `web/e2e/`, contra la **API real** con PostgreSQL y el almacén S3, los **workers** y el **simulador de SUNAT** (ADR-039). La interfaz se sirve **compilada** (`vite preview`): el mismo paquete que se despliega.
 - **Cada archivo trabaja en su propia cuenta**: el administrador de plataforma (`SF_E2E_ADMIN_EMAIL`, `SF_E2E_ADMIN_PASSWORD`) crea por la API una cuenta nueva con su propietario para cada prueba, y una empresa lista (certificado, SOL, series) cuando hace falta. Las pruebas preparan su mundo por la API y **ejercitan la interfaz para lo que verifican**; así corren en paralelo (4 trabajadores) sin tocarse, y dos corridas seguidas no chocan.
-- **Qué cubren (70 recorridos)**:
+- **Qué cubren (72 recorridos)**:
   - *Autenticación*: ruta protegida con regreso, clave equivocada, cerrar sesión, recargar, segundo factor completo (con TOTP calculado en la prueba; el código del paso de la inscripción no se acepta dos veces, y la prueba usa el siguiente).
   - *Emisión*: factura con ISC e ICBPER de punta a punta (totales, XML firmado con 2000 y 7152, CDR, PDF), archivo conservado con su hash, boleta con DNI, crédito con cuotas que no suman, empresa sin series.
   - *Seguimiento*: nota de crédito que parte del documento aceptado con su ISC y sus bolsas, nota de débito, observación, falla y rechazo del simulador, baja hasta «Anulado» (1 minuto: SUNAT contesta con un ticket que los workers consultan cada minuto) y resumen diario.
@@ -18,6 +18,7 @@ Las 16 pruebas unitarias de la interfaz no prueban lo que más importa: que la p
   - *Plataforma* (ADR-041): crear inquilino con su propietario, suspender y reactivar con la sesión del propietario en otra ventana, cierre, búsqueda, usuarios, soporte de solo lectura, auditoría y su integridad.
   - *Planes* (ADR-042): crear un plan, asignarlo, agotar un tope de empresas y ampliarlo con la vista del propietario y la auditoría; accesibilidad del catálogo y acceso negado al propietario.
   - *Revendedores* (ADR-043): crear un revendedor y su administrador, abrir una cuenta con plan propio y propietario, aislamiento entre revendedores, mover una cuenta y apagar al revendedor.
+  - *Importación desde CSV* (ADR-053): revisar sin escribir, importar, repetir el archivo y un archivo de Excel en español.
   - *Recuperación de la contraseña* (ADR-052): el correo que la API escribe como archivo (`Email__Provider=Sandbox`), el enlace con el token en el fragmento, la contraseña nueva y el enlace que sirve una vez.
   - *Dominio del revendedor* (ADR-051): los registros DNS que se muestran, la verificación y el ingreso en el dominio que pasa de la marca de la plataforma a la del revendedor.
   - *Cookie del refresh token* (ADR-050): `HttpOnly` y `Strict`, sin token en el almacenamiento de la página, y dos pestañas que renuevan a la vez.

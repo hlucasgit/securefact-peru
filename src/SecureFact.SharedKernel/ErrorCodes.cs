@@ -87,6 +87,9 @@ public static class ErrorCodes
     public const string ProductNotFound = "SF-PRD-002";
     public const string ProductAlreadyExists = "SF-PRD-003";
 
+    public const string ImportFileInvalid = "SF-IMP-001";
+    public const string ImportConflict = "SF-IMP-002";
+
     public const string RuleNotFound = "SF-RUL-001";
     public const string RuleInvalid = "SF-RUL-002";
 

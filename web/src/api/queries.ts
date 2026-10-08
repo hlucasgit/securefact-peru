@@ -22,6 +22,7 @@ import type {
   CompanyDetails,
   Customer,
   CustomerDetails,
+  ImportResult,
   Document,
   DocumentPreview,
   ElectronicDocument,
@@ -155,6 +156,9 @@ export const useSetSol = (companyId: string) =>
 export const useRemoveSol = (companyId: string) => useAction(() => del(`/api/v1/sol-credentials/${companyId}`), [keys.sol(companyId)])
 export const useSaveCustomer = () =>
   useAction((input: { id?: string; details: CustomerDetails }) => (input.id ? put<Customer>(`/api/v1/customers/${input.id}`, input.details) : post<Customer>('/api/v1/customers', input.details)), [['customers']])
+/** Reads customers or products from a CSV: without `commit` it only reports; with it, it creates (ADR-053). */
+export const useImportCsv = (kind: 'customers' | 'products') =>
+  useAction((input: { csv: string; commit: boolean }) => post<ImportResult>(`/api/v1/${kind}/import`, input), [[kind]])
 export const useDeactivateCustomer = () => useAction((id: string) => post(`/api/v1/customers/${id}/deactivate`), [['customers']])
 export const useSaveProduct = () =>
   useAction((input: { id?: string; details: ProductDetails }) => (input.id ? put<Product>(`/api/v1/products/${input.id}`, input.details) : post<Product>('/api/v1/products', input.details)), [['products']])

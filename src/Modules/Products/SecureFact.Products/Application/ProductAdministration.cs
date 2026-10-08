@@ -20,6 +20,8 @@ internal sealed partial class ProductAdministration(
 {
     private const int MaxPage = 200;
 
+    private readonly Dictionary<string, bool> _affectations = [];
+
     [GeneratedRegex("^[A-Za-z0-9._/-]{1,50}$")]
     private static partial Regex CodePattern();
 
@@ -150,8 +152,7 @@ internal sealed partial class ProductAdministration(
             return Bad("El valor unitario debe ser no negativo y tener hasta 10 decimales.");
         }
 
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-        if (!await catalogs.IsValidCodeAsync("07", d.IgvAffectationCode?.Trim() ?? string.Empty, today, cancellationToken))
+        if (!await IsKnownAffectationAsync(d.IgvAffectationCode?.Trim() ?? string.Empty, cancellationToken))
         {
             return Bad("El tipo de afectación del IGV no existe en el catálogo 07.");
         }
@@ -162,6 +163,18 @@ internal sealed partial class ProductAdministration(
         }
 
         return d.Category is { Length: > 100 } ? Bad("La categoría admite máximo 100 caracteres.") : null;
+    }
+
+    /// <summary>Catalogue 07 lookups, remembered for the life of the request: an import of thousands of rows asks about the same few codes.</summary>
+    private async Task<bool> IsKnownAffectationAsync(string code, CancellationToken cancellationToken)
+    {
+        if (!_affectations.TryGetValue(code, out var known))
+        {
+            known = await catalogs.IsValidCodeAsync("07", code, DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime), cancellationToken);
+            _affectations[code] = known;
+        }
+
+        return known;
     }
 
     private static Dictionary<string, object?> Values(Product p) => new()

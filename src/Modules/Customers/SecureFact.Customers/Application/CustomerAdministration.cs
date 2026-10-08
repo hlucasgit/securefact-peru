@@ -12,7 +12,7 @@ using SecureFact.SharedKernel.Results;
 
 namespace SecureFact.Customers.Application;
 
-internal sealed class CustomerAdministration(
+internal sealed partial class CustomerAdministration(
     CustomersDbContext db,
     IDataScope scope,
     ICatalogReader catalogs,
@@ -20,6 +20,8 @@ internal sealed class CustomerAdministration(
     IAuditTrail audit) : ICustomerAdministration
 {
     private const int MaxPage = 200;
+
+    private readonly Dictionary<string, bool> _documentTypes = [];
 
     private static readonly Error Missing = Error.NotFound(ErrorCodes.CustomerNotFound, "Cliente no encontrado", "El cliente no existe o no es visible para este contexto.");
 
@@ -126,8 +128,7 @@ internal sealed class CustomerAdministration(
             return Bad(problem);
         }
 
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-        if (!await catalogs.IsValidCodeAsync("06", details.DocumentTypeCode.Trim(), today, cancellationToken))
+        if (!await IsKnownDocumentTypeAsync(details.DocumentTypeCode.Trim(), cancellationToken))
         {
             return Bad($"El tipo de documento '{details.DocumentTypeCode}' no está vigente en el catálogo 06.");
         }
@@ -144,6 +145,18 @@ internal sealed class CustomerAdministration(
         }
 
         return null;
+    }
+
+    /// <summary>Catalogue 06 lookups, remembered for the life of the request: an import of thousands of rows asks about the same few codes.</summary>
+    private async Task<bool> IsKnownDocumentTypeAsync(string code, CancellationToken cancellationToken)
+    {
+        if (!_documentTypes.TryGetValue(code, out var known))
+        {
+            known = await catalogs.IsValidCodeAsync("06", code, DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime), cancellationToken);
+            _documentTypes[code] = known;
+        }
+
+        return known;
     }
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);

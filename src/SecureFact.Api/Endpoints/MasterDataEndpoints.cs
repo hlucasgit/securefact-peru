@@ -1,11 +1,15 @@
+using Microsoft.AspNetCore.Mvc;
 using SecureFact.Customers.Contracts;
 using SecureFact.Identity.Contracts;
 using SecureFact.Products.Contracts;
+using SecureFact.SharedKernel.Import;
 
 namespace SecureFact.Api.Endpoints;
 
 internal static class MasterDataEndpoints
 {
+    private const long ImportBodyLimit = ImportLimits.MaxCharacters * 4L + 4096;
+
     public static void MapMasterDataEndpoints(this IEndpointRouteBuilder app)
     {
         var customers = app.MapGroup("/api/v1/customers").WithTags("Customers");
@@ -18,6 +22,10 @@ internal static class MasterDataEndpoints
 
         customers.MapPost(string.Empty, async (CustomerDetails body, ICustomerAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.CreateAsync(body, ct)).ToHttp(http, dto => Results.Created($"/api/v1/customers/{dto.Id}", dto))).RequireAuthorization(Permissions.CustomersManage);
+
+        // The file travels as text in the body: a little more than the limit of characters of the service (JSON escapes and a 4-byte character take room).
+        customers.MapPost("/import", async (ImportRequest body, ICustomerAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.ImportAsync(body, ct)).ToHttp(http)).RequireAuthorization(Permissions.CustomersManage).WithMetadata(new RequestSizeLimitAttribute(ImportBodyLimit));
 
         customers.MapPut("/{id:guid}", async (Guid id, CustomerDetails body, ICustomerAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.UpdateAsync(id, body, ct)).ToHttp(http)).RequireAuthorization(Permissions.CustomersManage);
@@ -35,6 +43,9 @@ internal static class MasterDataEndpoints
 
         products.MapPost(string.Empty, async (ProductDetails body, IProductAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.CreateAsync(body, ct)).ToHttp(http, dto => Results.Created($"/api/v1/products/{dto.Id}", dto))).RequireAuthorization(Permissions.ProductsManage);
+
+        products.MapPost("/import", async (ImportRequest body, IProductAdministration admin, HttpContext http, CancellationToken ct) =>
+            (await admin.ImportAsync(body, ct)).ToHttp(http)).RequireAuthorization(Permissions.ProductsManage).WithMetadata(new RequestSizeLimitAttribute(ImportBodyLimit));
 
         products.MapPut("/{id:guid}", async (Guid id, ProductDetails body, IProductAdministration admin, HttpContext http, CancellationToken ct) =>
             (await admin.UpdateAsync(id, body, ct)).ToHttp(http)).RequireAuthorization(Permissions.ProductsManage);
