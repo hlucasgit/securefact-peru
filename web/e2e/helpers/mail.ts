@@ -62,11 +62,11 @@ export function mailTo(address: string): Mail[] {
     }))
 }
 
-/** Waits for the message to arrive and returns the link to choose a new password, as it appears in it. */
+const RESET_LINK = /https?:\/\/[^\s"<]+\/restablecer#token=[^\s"<]+/
+
+/** Waits for the e-mail with the link to choose a new password (the other notices to the same address, such as the welcome, are not it) and returns the link as it appears in it. */
 export async function resetLinkFor(address: string, already = 0): Promise<{ link: string; mail: Mail }> {
   let found: Mail | undefined
-  await expect.poll(() => (found = mailTo(address)[already]) !== undefined, { timeout: 15_000 }).toBe(true)
-  const link = /https?:\/\/[^\s"<]+\/restablecer#token=[^\s"<]+/.exec(found!.body)?.[0]
-  if (!link) throw new Error('The e-mail has no link to choose a new password.')
-  return { link, mail: found! }
+  await expect.poll(() => (found = mailTo(address).filter((mail) => RESET_LINK.test(mail.body))[already]) !== undefined, { timeout: 15_000 }).toBe(true)
+  return { link: RESET_LINK.exec(found!.body)![0], mail: found! }
 }
