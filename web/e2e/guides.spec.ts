@@ -41,7 +41,7 @@ test.describe('guías de remisión', () => {
     await app.getByRole('button', { name: 'Preparar guía' }).click()
 
     await expect(app.getByRole('heading', { name: 'Guía de remisión T001-1' })).toBeVisible()
-    await expect(app.getByText('Preparada')).toBeVisible()
+    await expect(app.getByText('Preparada', { exact: true })).toBeVisible()
 
     await app.getByRole('button', { name: 'Enviar a SUNAT' }).click()
     await expect(app.locator('.alert.ok')).toContainText('ha sido aceptada', { timeout: 30_000 })
@@ -102,6 +102,6 @@ test.describe('guías de remisión', () => {
     await app.getByRole('button', { name: 'Enviar a SUNAT' }).click()
 
     await expect(app.getByRole('alert')).toContainText('client_id')
-    await expect(app.getByText('Preparada')).toBeVisible()
+    await expect(app.getByText('Preparada', { exact: true })).toBeVisible()
   })
 })
