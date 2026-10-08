@@ -130,4 +130,30 @@ public sealed class EmailChannelTests : IDisposable
         Assert.DoesNotContain("token", message.Text, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("ayuda@x.pe", message.ReplyTo);
     }
+
+    [Fact]
+    public void A_notice_says_the_same_in_text_and_html_escapes_everything_and_signs_with_the_brand_and_its_support()
+    {
+        var message = NoticeEmail.Compose("u@x.pe", new EmailBrand("Casa <b>Sol</b>", "ayuda@x.pe"), "Aviso <1>", ["Primero & segundo", "Cuenta «A<B>»"], "Ingresar", "https://p.x.pe/ingresar?a=1&b=2");
+
+        Assert.DoesNotContain("<b>", message.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<B>", message.Html, StringComparison.Ordinal);
+        Assert.Contains("Primero &amp; segundo", message.Html, StringComparison.Ordinal);
+        Assert.Contains("https://p.x.pe/ingresar?a=1&amp;b=2", message.Html, StringComparison.Ordinal);
+        Assert.Contains("Primero & segundo", message.Text, StringComparison.Ordinal);
+        Assert.Contains("https://p.x.pe/ingresar?a=1&b=2", message.Text, StringComparison.Ordinal);
+        Assert.Contains("Si necesita ayuda, escriba a ayuda@x.pe.", message.Text, StringComparison.Ordinal);
+        Assert.EndsWith("Con tecnología SecureFact", message.Text, StringComparison.Ordinal);
+        Assert.Equal(("Casa <b>Sol</b>", "ayuda@x.pe", "Aviso <1>"), (message.FromName, message.ReplyTo, message.Subject));
+    }
+
+    [Fact]
+    public void A_notice_without_link_or_support_has_neither()
+    {
+        var message = NoticeEmail.Compose("u@x.pe", EmailBrand.Platform, "Aviso", ["Solo texto"]);
+
+        Assert.DoesNotContain("href", message.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("ayuda", message.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(message.ReplyTo);
+    }
 }

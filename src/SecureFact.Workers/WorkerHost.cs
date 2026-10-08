@@ -5,7 +5,9 @@ using SecureFact.Certificates;
 using SecureFact.CpeEngine;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.Customers;
+using SecureFact.Identity;
 using SecureFact.Messaging.RabbitMq;
+using SecureFact.Notifications;
 using SecureFact.Organizations;
 using SecureFact.Platform;
 using SecureFact.Platform.Messaging;
@@ -66,6 +68,11 @@ internal static class WorkerHost
         builder.Services.AddAuditModule(appConnection);
         builder.Services.AddTenancyModule(appConnection);
         builder.Services.AddDomainProvisioning(builder.Configuration.GetSection(DomainsOptions.SectionName).Get<DomainsOptions>() ?? new DomainsOptions(), builder.Environment.IsProduction());
+        // The notices (ADR-054): the queue of e-mails is sent from here, and the notices of the domains are queued from here. The workers sign nobody in, so they only need the directory of who to write to.
+        builder.Services.AddNotificationsModule(builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions(), builder.Environment.IsProduction());
+        builder.Services.AddPortalLinks(builder.Configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions(), builder.Environment.IsProduction());
+        builder.Services.AddAccountDirectory(appConnection);
+        builder.Services.AddEmailNotices(appConnection);
         builder.Services.AddOrganizationsModule(appConnection);
         builder.Services.AddTaxEngineModule();
         builder.Services.AddCatalogsModule(appConnection);
@@ -107,6 +114,7 @@ internal static class WorkerHost
         builder.Services.AddHostedService<OutboxWorker>();
         builder.Services.AddHostedService<CpeWorker>();
         builder.Services.AddHostedService<DomainWorker>();
+        builder.Services.AddHostedService<EmailWorker>();
 
         return builder;
     }

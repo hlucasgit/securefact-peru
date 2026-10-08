@@ -1,5 +1,13 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SecureFact.Identity.Contracts;
+using SecureFact.Notifications.Application;
 using SecureFact.Notifications.Contracts;
+using SecureFact.Notifications.Infrastructure;
+using SecureFact.Platform.Persistence;
+using SecureFact.Platform.Tenancy;
+using SecureFact.Tenancy.Contracts;
 
 namespace SecureFact.Notifications;
 
@@ -48,6 +56,53 @@ public static class NotificationsModule
         }
 
         return services;
+    }
+
+    /// <summary>
+    /// The address of the web interface and the brand that signs the e-mails (ADR-052, ADR-054). Needs <see cref="IBranding"/> (the Tenancy module). Production requires an absolute
+    /// <c>https</c> address: it is the base of every link that goes out.
+    /// </summary>
+    public static IServiceCollection AddPortalLinks(this IServiceCollection services, WebOptions web, bool isProduction)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(web);
+        if (isProduction && !(Uri.TryCreate(web.PublicUrl, UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException("Web:PublicUrl is required in production and must be an https address: it is the base of the links that go out in e-mails.");
+        }
+
+        services.AddSingleton(web);
+        services.AddScoped<NoticeContext>();
+        return services;
+    }
+
+    /// <summary>
+    /// The queue of e-mails with its dispatcher, and the notices that use it: the state of an account, the domain of a reseller and the creation of an account (ADR-054). Needs
+    /// <c>AddPlatformDataScope</c>, <see cref="AddNotificationsModule"/>, <see cref="AddPortalLinks"/>, the Tenancy module and an <see cref="IAccountDirectory"/> (the Identity module
+    /// or its <c>AddAccountDirectory</c>). It replaces the silent defaults of the modules wherever it is registered.
+    /// </summary>
+    public static IServiceCollection AddEmailNotices(this IServiceCollection services, string appConnectionString)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddDbContext<NotificationsDbContext>((sp, options) => options
+            .UseNpgsql(appConnectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", NotificationsDbContext.Schema))
+            .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IEmailOutbox, EmailOutbox>();
+        services.AddScoped<IEmailDispatcher, EmailDispatcher>();
+        services.Replace(ServiceDescriptor.Scoped<ITenantNotices, TenantNoticeEmails>());
+        services.Replace(ServiceDescriptor.Scoped<IAccountNotices, AccountNoticeEmails>());
+        return services;
+    }
+
+    /// <summary>Applies pending migrations. Must run with the schema-owner connection, never the runtime role.</summary>
+    public static async Task MigrateAsync(string ownerConnectionString, CancellationToken cancellationToken = default)
+    {
+        var options = new DbContextOptionsBuilder<NotificationsDbContext>()
+            .UseNpgsql(ownerConnectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", NotificationsDbContext.Schema))
+            .Options;
+        await using var db = new NotificationsDbContext(options);
+        await db.Database.MigrateAsync(cancellationToken);
     }
 
     private static void Require(string? value, string name)

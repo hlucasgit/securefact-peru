@@ -94,6 +94,23 @@ public interface IPasswordResetNotifier
     Task NotifyChangedAsync(PasswordChangedNotice notice, CancellationToken cancellationToken);
 }
 
+/// <summary>An account was created for a person (ADR-054). There is no password in it: whoever created the account gave it.</summary>
+public sealed record AccountCreatedNotice(string Email, string DisplayName, Guid? TenantId, Guid? ResellerId, IReadOnlyList<string> Roles);
+
+/// <summary>Tells the person that an account exists for them. A failed notice never undoes the creation.</summary>
+public interface IAccountNotices
+{
+    Task AccountCreatedAsync(AccountCreatedNotice notice, CancellationToken cancellationToken);
+}
+
+/// <summary>Who to write to: the e-mail addresses of the active people who hold a role in an account or in a reseller. Read-only, for the notices (ADR-054).</summary>
+public interface IAccountDirectory
+{
+    Task<IReadOnlyList<string>> TenantOwnerEmailsAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> ResellerAdminEmailsAsync(Guid resellerId, CancellationToken cancellationToken);
+}
+
 /// <summary>One-time creation of the first platform administrator (run from the operator command line, never from HTTP).</summary>
 public interface IPlatformBootstrapper
 {

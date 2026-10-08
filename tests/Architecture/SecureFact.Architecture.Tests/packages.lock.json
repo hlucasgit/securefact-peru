@@ -652,8 +652,11 @@
           "MailKit": "[4.18.1, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
+          "SecureFact.Identity.Contracts": "[1.0.0, )",
           "SecureFact.Notifications.Contracts": "[1.0.0, )",
-          "SecureFact.SharedKernel": "[1.0.0, )"
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.Tenancy.Contracts": "[1.0.0, )"
         }
       },
       "securefact.notifications.contracts": {
@@ -772,7 +775,9 @@
           "SecureFact.Certificates": "[1.0.0, )",
           "SecureFact.CpeEngine": "[1.0.0, )",
           "SecureFact.Customers": "[1.0.0, )",
+          "SecureFact.Identity": "[1.0.0, )",
           "SecureFact.Messaging.RabbitMq": "[1.0.0, )",
+          "SecureFact.Notifications": "[1.0.0, )",
           "SecureFact.Organizations": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.Rules": "[1.0.0, )",

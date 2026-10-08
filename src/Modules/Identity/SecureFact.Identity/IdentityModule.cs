@@ -32,6 +32,21 @@ public static class IdentityModule
         services.AddScoped<IUserAdministration, UserAdministration>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IPlatformBootstrapper, PlatformBootstrapper>();
+        services.AddScoped<IAccountDirectory, AccountDirectory>();
+        services.TryAddScoped<IAccountNotices, NullAccountNotices>();
+        return services;
+    }
+
+    /// <summary>
+    /// Only the directory of who to write to (ADR-054), for a host that does not sign anyone in, such as the workers. Requires <c>AddPlatformDataScope</c>. The API registers it with
+    /// <see cref="AddIdentityModule"/>.
+    /// </summary>
+    public static IServiceCollection AddAccountDirectory(this IServiceCollection services, string appConnectionString)
+    {
+        services.AddDbContext<IdentityDbContext>((sp, options) => options
+            .UseNpgsql(appConnectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", IdentityDbContext.Schema))
+            .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
+        services.AddScoped<IAccountDirectory, AccountDirectory>();
         return services;
     }
 

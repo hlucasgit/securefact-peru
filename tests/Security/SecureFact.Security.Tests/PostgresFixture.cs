@@ -49,6 +49,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 
         await TenancyModule.MigrateAsync(OwnerConnectionString);
         await IdentityModule.MigrateAsync(OwnerConnectionString);
+        await SecureFact.Notifications.NotificationsModule.MigrateAsync(OwnerConnectionString);
         await AuditModule.MigrateAsync(OwnerConnectionString);
         await OrganizationsModule.MigrateAsync(OwnerConnectionString);
         await BillingModule.MigrateAsync(OwnerConnectionString);

@@ -11,7 +11,7 @@ using SecureFact.Tenancy.Infrastructure;
 
 namespace SecureFact.Tenancy.Application;
 
-internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, IMemoryCache cache) : ITenantAdministration
+internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, IMemoryCache cache, ITenantNotices notices) : ITenantAdministration
 {
     private const int MinNameLength = 3;
     private const int MaxNameLength = 120;
@@ -141,6 +141,7 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
                 OldValues: new Dictionary<string, object?> { ["status"] = previous, ["suspendedBy"] = previousSource },
                 NewValues: new Dictionary<string, object?> { ["status"] = target, ["reason"] = why, ["suspendedBy"] = tenant.SuspendedBy }),
             cancellationToken);
+        await notices.StatusChangedAsync(new TenantStatusNotice(tenant.Id, tenant.Name, tenant.ResellerId, target), cancellationToken);
         return ToDto(tenant);
     }
 

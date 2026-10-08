@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using SecureFact.Identity.Contracts;
+using SecureFact.Notifications.Application;
 using SecureFact.Notifications.Contracts;
 
 namespace SecureFact.Security.Tests;
@@ -105,6 +106,10 @@ public sealed class ApiFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Domains__EdgeSecret", FakeDomainNameSystem.EdgeSecret);
         Environment.SetEnvironmentVariable("Domains__MinimumCheckSeconds", "2");
         Environment.SetEnvironmentVariable("Web__PublicUrl", PublicUrl);
+        // A channel is configured so that the notices are queued (ADR-054); the sender itself is the one of the tests, which keeps what would leave.
+        Environment.SetEnvironmentVariable("Email__Provider", "Sandbox");
+        Environment.SetEnvironmentVariable("Email__From", "no-responder@securefact.test");
+        Environment.SetEnvironmentVariable("Email__Sandbox__Directory", Path.Combine(Path.GetTempPath(), "sf-test-mail-unused"));
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -132,6 +137,24 @@ public sealed class ApiFixture : IAsyncLifetime
     }
 
     public HttpClient NewClient() => _factory!.CreateClient();
+
+    /// <summary>Runs the dispatcher of the queued e-mails until the queue has nothing due (the worker does this in a real deployment).</summary>
+    public async Task DrainMailAsync()
+    {
+        EmailDispatchReport report;
+        do
+        {
+            await using var scope = _factory!.Services.CreateAsyncScope();
+            report = await scope.ServiceProvider.GetRequiredService<IEmailDispatcher>().RunOnceAsync(CancellationToken.None);
+        }
+        while (report.Sent > 0);
+    }
+
+    public async Task<EmailDispatchReport> DispatchMailOnceAsync()
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IEmailDispatcher>().RunOnceAsync(CancellationToken.None);
+    }
 
     /// <summary>A client that keeps no cookies of its own: a test that sends and reads the cookies by hand sees exactly what the server says.</summary>
     public HttpClient NewCookielessClient() => _factory!.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });

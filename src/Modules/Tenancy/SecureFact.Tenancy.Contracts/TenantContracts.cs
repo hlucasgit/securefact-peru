@@ -208,6 +208,20 @@ public interface IBranding
     Task<Result<BrandingSettings>> RemoveLogoAsync(Guid resellerId, CancellationToken cancellationToken);
 }
 
+/// <summary>The state of an account changed (ADR-054). The reason of the change stays in the audit trail: it is not part of the notice.</summary>
+public sealed record TenantStatusNotice(Guid TenantId, string TenantName, Guid? ResellerId, TenantStatus Status);
+
+/// <summary>The domain of a reseller was assigned, verified, lost or cleared (ADR-054).</summary>
+public sealed record DomainNotice(Guid ResellerId, string? Host, DomainStatus Status);
+
+/// <summary>Tells the people concerned that something changed. A failed notice never undoes the change.</summary>
+public interface ITenantNotices
+{
+    Task StatusChangedAsync(TenantStatusNotice notice, CancellationToken cancellationToken);
+
+    Task DomainChangedAsync(DomainNotice notice, CancellationToken cancellationToken);
+}
+
 public enum DomainStatus
 {
     /// <summary>The reseller has no domain.</summary>

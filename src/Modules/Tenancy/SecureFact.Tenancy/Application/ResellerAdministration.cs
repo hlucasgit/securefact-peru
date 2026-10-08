@@ -12,7 +12,7 @@ using SecureFact.Tenancy.Infrastructure;
 
 namespace SecureFact.Tenancy.Application;
 
-internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope scope, ICurrentUser actor, TimeProvider clock, IAuditTrail audit, IMemoryCache cache) : IResellerAdministration
+internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope scope, ICurrentUser actor, TimeProvider clock, IAuditTrail audit, IMemoryCache cache, ITenantNotices notices) : IResellerAdministration
 {
     private const int MaxPageSize = 100;
     private const int MinNameLength = 3;
@@ -282,6 +282,7 @@ internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope sco
                 OldValues: new Dictionary<string, object?> { ["status"] = previous },
                 NewValues: new Dictionary<string, object?> { ["status"] = target, ["reason"] = why, ["suspendedBy"] = tenant.SuspendedBy, ["byReseller"] = resellerId }),
             cancellationToken);
+        await notices.StatusChangedAsync(new TenantStatusNotice(tenant.Id, tenant.Name, tenant.ResellerId, target), cancellationToken);
         return TenantAdministration.ToDto(tenant);
     }
 

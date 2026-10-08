@@ -19,7 +19,8 @@ internal sealed class UserAdministration(
     TimeProvider clock,
     IAuditTrail audit,
     IPlanLimits plans,
-    IResellerAdministration resellers) : IUserAdministration
+    IResellerAdministration resellers,
+    IAccountNotices notices) : IUserAdministration
 {
     private const int MaxPageSize = 200;
 
@@ -95,6 +96,7 @@ internal sealed class UserAdministration(
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
         await RecordAsync(AuditActions.UserCreated, user, new Dictionary<string, object?> { ["email"] = user.Email, ["roles"] = roles }, cancellationToken);
+        await notices.AccountCreatedAsync(new AccountCreatedNotice(user.Email, user.DisplayName, user.TenantId, user.ResellerId, roles), cancellationToken);
         return ToDto(user);
     }
 
@@ -164,6 +166,7 @@ internal sealed class UserAdministration(
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
         await RecordAsync(AuditActions.UserCreated, user, new Dictionary<string, object?> { ["email"] = user.Email, ["roles"] = new[] { Roles.TenantOwner } }, cancellationToken);
+        await notices.AccountCreatedAsync(new AccountCreatedNotice(user.Email, user.DisplayName, user.TenantId, user.ResellerId, [Roles.TenantOwner]), cancellationToken);
         return ToDto(user);
     }
 

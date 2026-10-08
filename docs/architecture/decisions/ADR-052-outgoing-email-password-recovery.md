@@ -41,8 +41,8 @@ Módulo nuevo **Notifications** (`IEmailSender`, `EmailMessage`, `EmailDeliveryE
 
 ## Límites (P)
 - **El SMTP real no se probó** (no hay servidor en el entorno de desarrollo): lo probado es la construcción del mensaje (`.eml` abierto con MimeKit), la falla ante un servidor que no contesta y la configuración. Antes del primer uso real, mande un correo de prueba a un buzón propio y revise SPF/DKIM/DMARC del dominio remitente y que no caiga en correo no deseado.
-- **Sin cola de reintento**: si el servidor SMTP está caído en ese momento, el enlace no llega y la persona debe pedirlo de nuevo (la advertencia queda en los registros). Una cola (el *outbox* que ya usa el CPE) es lo siguiente si el volumen o la fiabilidad lo piden.
-- **Solo este correo**: avisos de suspensión y reactivación, bienvenida del dueño de una cuenta nueva y «tu dominio quedó verificado» **no se envían aún**; la plantilla es la de la recuperación. Tampoco hay logotipo en el cuerpo del correo (la imagen exigiría incrustarla o servirla sin sesión).
+- **El correo de recuperación se manda en el acto y no se reintenta**: si el servidor SMTP está caído en ese momento, el enlace no llega y la persona debe pedirlo de nuevo (la advertencia queda en los registros). Es a propósito: un token de un solo uso no se guarda en una cola (ADR-054, que sí reintenta los demás avisos).
+- **Solo estos dos correos** (el enlace y el aviso de cambio); los avisos de suspensión, bienvenida y dominio son del ADR-054. No hay logotipo en el cuerpo del correo (la imagen exigiría incrustarla o servirla sin sesión).
 - **Solo en español**, con la marca como texto: sin plantillas editables por el revendedor.
 - Un revendedor con dominio verificado pero **sin nombre de marca** manda a sus usuarios al portal de la plataforma (su marca vacía no cuenta como marca).
 - Límite de pedidos: el del endpoint de ingreso (por dirección IP). No hay límite por cuenta: alguien puede llenar de correos legítimos el buzón de una persona (hasta ese límite por minuto).

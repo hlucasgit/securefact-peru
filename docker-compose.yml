@@ -192,6 +192,18 @@ services:
       # SUNAT is never reached implicitly: leave empty to only prepare summaries, or set Beta / Production explicitly.
       Sunat__Environment: ${SF_SUNAT_ENVIRONMENT:-}
       Cpe__WorkerIntervalSeconds: ${SF_CPE_WORKER_INTERVAL:-15}
+      # The queued e-mails (ADR-054) leave from here, with the same channel as the API. The Sandbox files go to the same folder.
+      Email__Provider: ${SF_EMAIL_PROVIDER:-None}
+      Email__From: ${SF_EMAIL_FROM:-}
+      Email__Smtp__Host: ${SF_SMTP_HOST:-}
+      Email__Smtp__Port: ${SF_SMTP_PORT:-587}
+      Email__Smtp__Security: ${SF_SMTP_SECURITY:-StartTls}
+      Email__Smtp__User: ${SF_SMTP_USER:-}
+      Email__Smtp__Password: ${SF_SMTP_PASSWORD:-}
+      Email__Sandbox__Directory: /var/lib/securefact/mail
+      Web__PublicUrl: ${SF_PUBLIC_URL:-http://localhost:5173}
+    volumes:
+      - ${SF_MAIL_DIR:-./.data/mail}:/var/lib/securefact/mail
 
   # Optional local observability stack: docker compose --profile observability up -d
   # Grafana http://localhost:3000 (Loki, Tempo, Prometheus); set SF_OTLP_ENDPOINT=http://otel:4317 for the API.

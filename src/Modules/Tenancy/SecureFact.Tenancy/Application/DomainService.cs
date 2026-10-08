@@ -41,7 +41,7 @@ internal static partial class HostNames
 /// to the platform's edge); the platform checks them, and from then on the brand is shown there and the edge may issue a certificate for it. A domain whose checks fail again after being
 /// verified goes back to being unreachable by itself and recovers by itself.
 /// </summary>
-internal sealed class DomainService(TenancyDbContext db, DataScope scope, ICurrentUser actor, IDomainNameSystem dns, DomainsOptions options, TimeProvider clock, IAuditTrail audit) : IDomains
+internal sealed class DomainService(TenancyDbContext db, DataScope scope, ICurrentUser actor, IDomainNameSystem dns, DomainsOptions options, TimeProvider clock, IAuditTrail audit, ITenantNotices notices) : IDomains
 {
     /// <summary>The prefix of the TXT record that proves ownership: <c>_securefact-challenge.&lt;host&gt;</c> holds <c>securefact-verification=&lt;token&gt;</c>.</summary>
     public const string ChallengeLabel = "_securefact-challenge";
@@ -106,6 +106,7 @@ internal sealed class DomainService(TenancyDbContext db, DataScope scope, ICurre
         reseller.SetHost(clean, clean is null ? null : NewToken());
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.ResellerDomainChanged, "reseller", reseller.Id.ToString("D"), null, OldValues: before, NewValues: Values(reseller)), cancellationToken);
+        await notices.DomainChangedAsync(new DomainNotice(reseller.Id, reseller.Host, reseller.HostStatus), cancellationToken);
         return ToDto(reseller);
     }
 
@@ -215,6 +216,7 @@ internal sealed class DomainService(TenancyDbContext db, DataScope scope, ICurre
                     OldValues: new Dictionary<string, object?> { ["status"] = before },
                     NewValues: new Dictionary<string, object?> { ["host"] = reseller.Host, ["status"] = reseller.HostStatus, ["error"] = reseller.HostError }),
                 cancellationToken);
+            await notices.DomainChangedAsync(new DomainNotice(reseller.Id, reseller.Host, reseller.HostStatus), cancellationToken);
         }
     }
 

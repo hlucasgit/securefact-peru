@@ -104,13 +104,7 @@ else
     builder.Services.AddInMemoryObjectStorage();
 }
 builder.Services.AddNotificationsModule(builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions(), builder.Environment.IsProduction());
-var webOptions = builder.Configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions();
-if (builder.Environment.IsProduction() && !(Uri.TryCreate(webOptions.PublicUrl, UriKind.Absolute, out var publicUrl) && publicUrl.Scheme == Uri.UriSchemeHttps))
-{
-    throw new InvalidOperationException("Web:PublicUrl is required in production and must be an https address: it is the base of the links that go out in e-mails.");
-}
-
-builder.Services.AddSingleton(webOptions);
+builder.Services.AddPortalLinks(builder.Configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions(), builder.Environment.IsProduction());
 builder.Services.AddScoped<IPasswordResetNotifier, EmailPasswordResetNotifier>();
 builder.Services.AddSecureFactRateLimiting(builder.Configuration);
 builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
@@ -121,6 +115,7 @@ if (appConnection is not null)
     builder.Services.AddTenancyModule(appConnection);
     builder.Services.AddDomainProvisioning(builder.Configuration.GetSection(DomainsOptions.SectionName).Get<DomainsOptions>() ?? new DomainsOptions(), builder.Environment.IsProduction());
     builder.Services.AddPlanUsage();
+    builder.Services.AddEmailNotices(appConnection);
     builder.Services.AddOrganizationsModule(appConnection);
     builder.Services.AddTaxEngineModule();
     builder.Services.AddCpeEngineModule();
@@ -162,6 +157,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
 {
     await TenancyModule.MigrateAsync(migrationsConnection ?? throw new InvalidOperationException("ConnectionStrings:Migrations is required."));
     await IdentityModule.MigrateAsync(migrationsConnection);
+    await NotificationsModule.MigrateAsync(migrationsConnection);
     await AuditModule.MigrateAsync(migrationsConnection);
     await OrganizationsModule.MigrateAsync(migrationsConnection);
     await BillingModule.MigrateAsync(migrationsConnection);
