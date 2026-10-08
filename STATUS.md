@@ -124,6 +124,9 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 - **Avisos del negocio y correos fallidos** (ADR-055): a los propietarios, el plan al 80 % y al 100 % de los comprobantes del mes, el certificado digital a 30/15/7 días y al vencer, y el comprobante rechazado por SUNAT o que no pudo enviarse; cada hecho una vez por dirección (clave de deduplicación en la cola). La plataforma ve y reenvía los correos muertos en *Correos fallidos*.
 - Pendiente: la emisión real de certificados por el *edge* (probar con la autoridad de pruebas), probar el SMTP real, avisos a otros usuarios y al revendedor, y plantillas por revendedor, precios, comisiones y facturación de la plataforma a sus cuentas, «entrar como», exportar o dar de baja definitiva una cuenta.
 
+## Guía de remisión remitente
+- **GRE remitente `09`** (ADR-056): módulo `Gre` con series `T…`, validación con las reglas del libro de SUNAT, `DespatchAdvice` UBL 2.1 firmado y numerado en la base, envío por la API REST de SUNAT (token OAuth2, ticket, CDR) con reintentos y worker, simulador `Sandbox`, credenciales de API junto a las SOL y las pantallas de lista, emisión y detalle. Motivos 01 a 07, 13, 14 y 17, transporte público y privado. **No probado contra SUNAT real** (no hay beta documentado; `hashZip`, el CDR y `cac:Signature` son supuestos, P). Sin PDF, sin importación/exportación/itinerante/mercancía extranjera ni guía del transportista.
+
 ## ISC e ICBPER
 - **ISC** (al valor y de monto fijo) **e ICBPER** en el UBL de facturas, boletas, notas y resumen diario, y en el PDF (ADR-037): subtotales de línea y globales según las hojas de reglas; el ISC entra en la base del IGV de la línea. Aceptados por el beta de SUNAT (factura, boleta, notas y resumen).
 - El monto por bolsa del ICBPER es `Verified` con el calendario de la Ley 30884 (S26): el beta **no** valida ese monto.

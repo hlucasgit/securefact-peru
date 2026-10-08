@@ -80,6 +80,8 @@ export interface SolCredential {
   companyId: string
   solUser: string
   hasPassword: boolean
+  apiClientId: string | null
+  hasApiSecret: boolean
   updatedAt: string
 }
 
@@ -467,4 +469,90 @@ export interface DeadMessage {
   attempts: number
   lastError: string | null
   createdAt: string
+}
+
+export type GreState = 'Prepared' | 'Pending' | 'Accepted' | 'AcceptedWithObservations' | 'Rejected' | 'Failed'
+
+export interface GreSeries {
+  id: string
+  companyId: string
+  code: string
+  lastNumber: number
+  isActive: boolean
+  createdAt: string
+}
+
+export interface GreObservation {
+  code: string
+  message: string
+}
+
+export interface Guide {
+  id: string
+  companyId: string
+  series: string
+  number: number
+  name: string
+  issueDate: string
+  motiveCode: string
+  modalityCode: string
+  state: GreState
+  recipientDocument: string
+  recipientName: string
+  ticket: string | null
+  attempts: number
+  createdAt: string
+  sentAt: string | null
+  processedAt: string | null
+  cdrResponseCode: number | null
+  cdrDescription: string | null
+  observations: GreObservation[]
+  errorCode: string | null
+  errorMessage: string | null
+}
+
+export interface GreParty {
+  documentTypeCode: string
+  documentNumber: string
+  name: string
+}
+
+export interface GreAddress {
+  ubigeoCode: string
+  address: string
+  establishmentRuc?: string | null
+  establishmentCode?: string | null
+}
+
+export interface GreGoodInput {
+  description: string
+  unitCode: string
+  quantity: number
+  code?: string | null
+}
+
+/** What the form sends; the API checks it against the rules of the validation workbook of SUNAT. */
+export interface CreateGuideBody {
+  companyId: string
+  seriesId: string
+  issueDate?: string | null
+  motiveCode: string
+  motiveDescription?: string | null
+  modalityCode: string
+  transferStartDate?: string | null
+  handoverDate?: string | null
+  grossWeight: number
+  weightUnit: string
+  packageCount?: number | null
+  note?: string | null
+  recipient: GreParty
+  supplier?: GreParty | null
+  buyer?: GreParty | null
+  origin: GreAddress
+  destination: GreAddress
+  carrier?: { ruc: string; name: string; mtcRegistration?: string | null } | null
+  vehicle?: { plate: string; circulationCard?: string | null } | null
+  driver?: { documentTypeCode: string; documentNumber: string; firstNames: string; lastNames: string; licenseNumber: string } | null
+  goods: GreGoodInput[]
+  relatedDocuments?: { typeCode: string; number: string; issuerRuc?: string | null }[] | null
 }

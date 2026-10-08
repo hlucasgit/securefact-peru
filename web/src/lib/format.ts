@@ -1,4 +1,4 @@
-import type { EDocumentState } from '../api/types'
+import type { EDocumentState, GreState } from '../api/types'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { PEN: 'S/', USD: 'US$', EUR: '€' }
 
@@ -86,3 +86,21 @@ export const PLAN_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']
 /** A reseller user belongs to no tenant and has its own screens: its accounts. */
 export const RESELLER_ROLES = ['ResellerAdmin']
 export const QUEUE_ROLES = ['TenantOwner', 'TenantAdmin', 'BillingAdmin']
+
+export const GRE_LABELS: Record<GreState, string> = {
+  Prepared: 'Preparada',
+  Pending: 'Esperando a SUNAT',
+  Accepted: 'Aceptada',
+  AcceptedWithObservations: 'Aceptada con observaciones',
+  Rejected: 'Rechazada',
+  Failed: 'Falló',
+}
+
+export const GRE_TONES: Record<GreState, Tone> = {
+  Prepared: 'neutral',
+  Pending: 'info',
+  Accepted: 'ok',
+  AcceptedWithObservations: 'warn',
+  Rejected: 'bad',
+  Failed: 'bad',
+}

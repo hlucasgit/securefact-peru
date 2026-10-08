@@ -28,6 +28,10 @@ import type {
   DocumentPreview,
   ElectronicDocument,
   ElectronicDocumentEvent,
+  CreateGuideBody,
+  GreSeries,
+  GreState,
+  Guide,
   Establishment,
   Product,
   ProductDetails,
@@ -46,6 +50,9 @@ export const keys = {
   certificates: (companyId: string) => ['certificates', companyId] as const,
   expiring: ['certificates', 'expiring'] as const,
   sol: (companyId: string) => ['sol', companyId] as const,
+  greSeries: (companyId: string) => ['gre', 'series', companyId] as const,
+  guides: (companyId: string | null, state: string, skip: number, take: number) => ['gre', 'guides', companyId, state, skip, take] as const,
+  guide: (id: string) => ['gre', 'guide', id] as const,
   customers: (search: string) => ['customers', search] as const,
   products: (search: string) => ['products', search] as const,
   documents: (companyId: string | null, skip: number, take: number) => ['documents', companyId, skip, take] as const,
@@ -273,3 +280,22 @@ export const useDeadMessages = () => useQuery({ queryKey: keys.dead, queryFn: ()
 export const useDeadEmails = () => useQuery({ queryKey: keys.deadEmails, queryFn: () => get<DeadEmail[]>('/api/v1/platform/emails/dead') })
 export const useRequeueEmail = () => useAction((email: DeadEmail) => post(`/api/v1/platform/emails/${email.id}/requeue`), [keys.deadEmails])
 export const useRequeue = () => useAction((message: DeadMessage) => post(`/api/v1/outbox/${message.source}/${message.id}/requeue`), [keys.dead])
+
+export const useGreSeries = (companyId: string | null) =>
+  useQuery({ queryKey: keys.greSeries(companyId ?? ''), queryFn: () => get<GreSeries[]>(`/api/v1/gre/series?companyId=${companyId}`), enabled: !!companyId })
+export const useCreateGreSeries = (companyId: string) => useAction((code: string) => post<GreSeries>('/api/v1/gre/series', { companyId, code }), [keys.greSeries(companyId)])
+export const useDeactivateGreSeries = (companyId: string) => useAction((id: string) => post(`/api/v1/gre/series/${id}/deactivate`), [keys.greSeries(companyId)])
+export const useSetApiCredentials = (companyId: string) =>
+  useAction((input: { clientId: string; clientSecret: string }) => put<SolCredential>(`/api/v1/sol-credentials/${companyId}/api`, input), [keys.sol(companyId)])
+export const useRemoveApiCredentials = (companyId: string) => useAction(() => del(`/api/v1/sol-credentials/${companyId}/api`), [keys.sol(companyId)])
+export const useGuides = (companyId: string | null, state: GreState | '', skip: number, take: number) =>
+  useQuery({
+    queryKey: keys.guides(companyId, state, skip, take),
+    queryFn: () => get<Guide[]>(`/api/v1/gre/guides?${page(skip, take)}${companyId ? `&companyId=${companyId}` : ''}${state ? `&state=${state}` : ''}`),
+    refetchInterval: 15_000,
+  })
+export const useGuide = (id: string) =>
+  useQuery({ queryKey: keys.guide(id), queryFn: () => get<Guide>(`/api/v1/gre/guides/${id}`), refetchInterval: (query) => (query.state.data?.state === 'Pending' ? 5_000 : false) })
+export const useCreateGuide = () => useAction((body: CreateGuideBody) => post<Guide>('/api/v1/gre/guides', body), [['gre', 'guides']])
+export const useSubmitGuide = (id: string) => useAction(() => post<Guide>(`/api/v1/gre/guides/${id}/submit`), [keys.guide(id), ['gre', 'guides']])
+export const useRefreshGuide = (id: string) => useAction(() => post<Guide>(`/api/v1/gre/guides/${id}/refresh`), [keys.guide(id), ['gre', 'guides']])

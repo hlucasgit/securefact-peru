@@ -45,6 +45,7 @@ export class ApiClient {
   get = <T>(path: string) => this.call<T>('GET', path)
   post = <T>(path: string, body?: unknown, headers?: Record<string, string>) => this.call<T>('POST', path, body, headers)
   put = <T>(path: string, body: unknown) => this.call<T>('PUT', path, body)
+  del = <T>(path: string) => this.call<T>('DELETE', path)
 }
 
 export async function login(credentials: Credentials, totpCode?: string): Promise<ApiClient> {

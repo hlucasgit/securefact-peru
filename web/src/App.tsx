@@ -10,11 +10,14 @@ import { Companies } from './pages/Companies'
 import { Dashboard } from './pages/Dashboard'
 import { DocumentDetail } from './pages/DocumentDetail'
 import { Documents } from './pages/Documents'
+import { GuideDetail } from './pages/GuideDetail'
+import { Guides } from './pages/Guides'
 import { Login } from './pages/Login'
 import { RecoverPassword } from './pages/RecoverPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
+import { NewGuide } from './pages/NewGuide'
 import { NewNote } from './pages/NewNote'
 import { ResellerBrand } from './pages/Brand'
 import { MyPlan, Plans } from './pages/Plans'
@@ -61,6 +64,9 @@ export function App() {
         <Route path="documentos/:id" element={<DocumentDetail />} />
         <Route path="documentos/:id/nota" element={<NewNote />} />
         <Route path="resumenes" element={<Summaries />} />
+        <Route path="guias" element={<Guides />} />
+        <Route path="guias/nueva" element={<NewGuide />} />
+        <Route path="guias/:id" element={<GuideDetail />} />
         <Route path="clientes" element={<Customers />} />
         <Route path="productos" element={<Products />} />
         <Route path="empresas" element={<Companies />} />

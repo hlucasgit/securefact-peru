@@ -4,12 +4,17 @@ import {
   useCertificates,
   useCompany,
   useCreateEstablishment,
+  useCreateGreSeries,
   useCreateSeries,
   useDeactivateCertificate,
+  useDeactivateGreSeries,
   useDeactivateSeries,
   useEstablishments,
+  useGreSeries,
+  useRemoveApiCredentials,
   useRemoveSol,
   useSeries,
+  useSetApiCredentials,
   useSetSol,
   useSolCredential,
   useUpdateCompany,
@@ -178,6 +183,55 @@ function SeriesTab({ companyId }: { companyId: string }) {
         </div>
         <div><button className="btn primary" type="submit" disabled={create.isPending}>Crear serie</button></div>
       </form>
+      <GreSeriesSection companyId={companyId} />
+    </>
+  )
+}
+
+function GreSeriesSection({ companyId }: { companyId: string }) {
+  const { data, isPending, error } = useGreSeries(companyId)
+  const create = useCreateGreSeries(companyId)
+  const deactivate = useDeactivateGreSeries(companyId)
+  const toast = useToast()
+  const [code, setCode] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    create.mutate(code.toUpperCase(), { onSuccess: () => { toast.ok('Serie de guía creada.'); setCode('') } })
+  }
+
+  return (
+    <>
+      <div className="card">
+        <h2>Series de guía de remisión</h2>
+        <p className="muted">Guía de remisión remitente (tipo 09): la serie empieza con «T» y lleva tres letras o dígitos más.</p>
+        <ErrorAlert error={error ?? deactivate.error} />
+        {isPending ? <Loading /> : data && data.length > 0 ? (
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>Serie</th><th className="num">Último número</th><th>Estado</th><th /></tr></thead>
+              <tbody>
+                {data.map((item) => (
+                  <tr key={item.id}>
+                    <td className="mono">{item.code}</td>
+                    <td className="num">{item.lastNumber}</td>
+                    <td><Badge tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? 'Activa' : 'Inactiva'}</Badge></td>
+                    <td className="right">{item.isActive && <ConfirmButton label="Desactivar" message={`¿Desactivar la serie ${item.code}? Ya no podrá emitir guías con ella.`} onConfirm={() => deactivate.mutate(item.id)} />}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <Empty>Sin series de guía. Cree una para poder emitir guías de remisión.</Empty>}
+      </div>
+      <form className="card stack" onSubmit={submit}>
+        <h2>Nueva serie de guía</h2>
+        <ErrorAlert error={create.error} />
+        <div className="form-grid">
+          <TextField label="Serie" hint="4 caracteres: T… (por ejemplo T001)" required maxLength={4} minLength={4} pattern="[Tt][A-Za-z0-9]{3}" value={code} onChange={(event) => setCode(event.target.value)} />
+        </div>
+        <div><button className="btn primary" type="submit" disabled={create.isPending}>Crear serie de guía</button></div>
+      </form>
     </>
   )
 }
@@ -283,6 +337,46 @@ function SolTab({ companyId }: { companyId: string }) {
         <div className="form-grid">
           <TextField label="Usuario SOL" required autoComplete="off" value={user} onChange={(event) => setUser(event.target.value)} />
           <TextField label="Clave SOL" type="password" required autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </div>
+        <div><button className="btn primary" type="submit" disabled={save.isPending}>Guardar</button></div>
+      </form>
+      <ApiCredentialsSection companyId={companyId} />
+    </>
+  )
+}
+
+function ApiCredentialsSection({ companyId }: { companyId: string }) {
+  const { data } = useSolCredential(companyId)
+  const save = useSetApiCredentials(companyId)
+  const remove = useRemoveApiCredentials(companyId)
+  const toast = useToast()
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    save.mutate({ clientId, clientSecret }, { onSuccess: () => { toast.ok('Credenciales de API guardadas.'); setClientId(''); setClientSecret('') } })
+  }
+
+  return (
+    <>
+      <div className="card">
+        <h2>Credenciales de API de SUNAT</h2>
+        <p className="muted">Las guías de remisión se envían por la API de SUNAT, que pide un client_id y un client_secret además de las credenciales SOL. Se generan en el menú SOL (Empresa, Credenciales de API SUNAT). Se guardan cifradas y no se vuelven a mostrar.</p>
+        <ErrorAlert error={remove.error} />
+        {data?.apiClientId ? (
+          <div className="row spread">
+            <KeyValues items={[['client_id', data.apiClientId], ['client_secret', data.hasApiSecret ? 'Guardado (no se muestra)' : 'No guardado']]} />
+            <ConfirmButton label="Quitar" message="¿Quitar las credenciales de API? No se podrán enviar guías a SUNAT." onConfirm={() => remove.mutate(undefined)} />
+          </div>
+        ) : <Empty>No hay credenciales de API. Hacen falta para enviar guías de remisión.</Empty>}
+      </div>
+      <form className="card stack" onSubmit={submit}>
+        <h2>{data?.apiClientId ? 'Reemplazar credenciales de API' : 'Guardar credenciales de API'}</h2>
+        <ErrorAlert error={save.error} />
+        <div className="form-grid">
+          <TextField label="client_id" required autoComplete="off" value={clientId} onChange={(event) => setClientId(event.target.value)} />
+          <TextField label="client_secret" type="password" required autoComplete="off" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} />
         </div>
         <div><button className="btn primary" type="submit" disabled={save.isPending}>Guardar</button></div>
       </form>
