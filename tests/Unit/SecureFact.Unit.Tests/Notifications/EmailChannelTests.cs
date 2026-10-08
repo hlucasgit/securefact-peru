@@ -118,4 +118,16 @@ public sealed class EmailChannelTests : IDisposable
         Assert.Equal("SecureFact Perú", message.FromName);
         Assert.Contains("5 minutos", message.Text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void The_warning_of_a_changed_password_escapes_the_brand_and_carries_no_way_in()
+    {
+        var message = PasswordChangedEmail.Compose("u@x.pe", new EmailBrand("Casa <i>Sol</i>", "ayuda@x.pe"), "https://p.x.pe/recuperar", "07/10/2026 19:05");
+
+        Assert.DoesNotContain("<i>", message.Html, StringComparison.Ordinal);
+        Assert.Contains("07/10/2026 19:05", message.Text, StringComparison.Ordinal);
+        Assert.Contains("https://p.x.pe/recuperar", message.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("token", message.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("ayuda@x.pe", message.ReplyTo);
+    }
 }

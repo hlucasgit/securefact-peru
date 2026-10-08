@@ -86,6 +86,7 @@ internal sealed class PasswordResetService(
 
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.PasswordResetCompleted, "user", user.Id.ToString("D"), user.TenantId, ActorUserId: user.Id), cancellationToken);
+        await notifier.NotifyChangedAsync(new PasswordChangedNotice(user.Email, now, user.TenantId, user.ResellerId), cancellationToken);
         return Unit.Value;
     }
 }

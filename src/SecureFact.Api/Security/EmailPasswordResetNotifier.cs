@@ -29,6 +29,8 @@ internal sealed partial class EmailPasswordResetNotifier(
     TimeProvider clock,
     ILogger<EmailPasswordResetNotifier> logger) : IPasswordResetNotifier
 {
+    private static readonly TimeZoneInfo Lima = TimeZoneInfo.FindSystemTimeZoneById("America/Lima");
+
     public async Task SendAsync(PasswordResetDelivery delivery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delivery);
@@ -47,14 +49,34 @@ internal sealed partial class EmailPasswordResetNotifier(
         }
     }
 
-    private async Task<BrandingDto?> BrandOfAsync(PasswordResetDelivery delivery, CancellationToken cancellationToken)
+    public async Task NotifyChangedAsync(PasswordChangedNotice notice, CancellationToken cancellationToken)
     {
-        if (delivery.ResellerId is { } resellerId)
+        ArgumentNullException.ThrowIfNull(notice);
+        var brand = await BrandOfAsync(notice.TenantId, notice.ResellerId, cancellationToken);
+        var baseUrl = await PortalOfAsync(brand?.ResellerId, cancellationToken);
+        var when = TimeZoneInfo.ConvertTime(notice.ChangedAt, Lima).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
+        var message = PasswordChangedEmail.Compose(notice.Email, brand is null ? EmailBrand.Platform : new EmailBrand(brand.BrandName, brand.SupportEmail), $"{baseUrl}/recuperar", when);
+        try
         {
-            return await branding.ForResellerAsync(resellerId, cancellationToken);
+            await email.SendAsync(message, cancellationToken);
+        }
+        catch (EmailDeliveryException failure)
+        {
+            LogNotDelivered(failure.Message);
+        }
+    }
+
+    private Task<BrandingDto?> BrandOfAsync(PasswordResetDelivery delivery, CancellationToken cancellationToken) =>
+        BrandOfAsync(delivery.TenantId, delivery.ResellerId, cancellationToken);
+
+    private async Task<BrandingDto?> BrandOfAsync(Guid? tenantId, Guid? resellerId, CancellationToken cancellationToken)
+    {
+        if (resellerId is { } reseller)
+        {
+            return await branding.ForResellerAsync(reseller, cancellationToken);
         }
 
-        return delivery.TenantId is { } tenantId ? await branding.ForTenantAsync(new TenantId(tenantId), cancellationToken) : null;
+        return tenantId is { } tenant ? await branding.ForTenantAsync(new TenantId(tenant), cancellationToken) : null;
     }
 
     private async Task<string> PortalOfAsync(Guid? resellerId, CancellationToken cancellationToken)

@@ -82,10 +82,16 @@ public interface IPasswordResetService
 /// </summary>
 public sealed record PasswordResetDelivery(string Email, string Token, DateTimeOffset ExpiresAt, Guid? TenantId, Guid? ResellerId);
 
+/// <summary>Tells the account holder that the password of the account changed, so a change they did not make is noticed (ADR-052).</summary>
+public sealed record PasswordChangedNotice(string Email, DateTimeOffset ChangedAt, Guid? TenantId, Guid? ResellerId);
+
 /// <summary>Delivers the one-time reset token to the account holder. The token must never be logged or returned by the API.</summary>
 public interface IPasswordResetNotifier
 {
     Task SendAsync(PasswordResetDelivery delivery, CancellationToken cancellationToken);
+
+    /// <summary>Warns the holder that the password changed. A failed delivery never undoes the change.</summary>
+    Task NotifyChangedAsync(PasswordChangedNotice notice, CancellationToken cancellationToken);
 }
 
 /// <summary>One-time creation of the first platform administrator (run from the operator command line, never from HTTP).</summary>

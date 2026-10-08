@@ -126,6 +126,42 @@ public sealed class PasswordResetEmailApiTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Choosing_a_new_password_warns_the_holder_and_a_failed_warning_does_not_undo_the_change()
+    {
+        using var admin = await api.AdminClientAsync();
+        var tenantId = await api.CreateTenantAsync($"Aviso {Guid.NewGuid():N}"[..20]);
+        var owner = await ApiFixture.CreateUserAsync(admin, Roles.TenantOwner, tenantId);
+        using var anonymous = api.NewClient();
+
+        await RequestResetAsync(owner.Email);
+        var first = "A first new passphrase for 2026";
+        Assert.Equal(HttpStatusCode.NoContent, (await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new { token = api.Notifier.TokenFor(owner.Email), newPassword = first })).StatusCode);
+
+        var notice = api.Mail.To(owner.Email).Last();
+        Assert.Contains("cambió", notice.Subject, StringComparison.Ordinal);
+        Assert.Contains($"{ApiFixture.PublicUrl}/recuperar", notice.Text, StringComparison.Ordinal);
+        Assert.Contains("se cerraron todas sus sesiones", notice.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("#token=", notice.Text, StringComparison.Ordinal); // a warning is not a way in
+
+        // The mail server goes down just before the second change: the password changes all the same.
+        await RequestResetAsync(owner.Email);
+        var token = api.Notifier.TokenFor(owner.Email);
+        var second = "A second new passphrase for 2026";
+        api.Mail.Fail = true;
+        try
+        {
+            Assert.Equal(HttpStatusCode.NoContent, (await anonymous.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new { token, newPassword = second })).StatusCode);
+        }
+        finally
+        {
+            api.Mail.Fail = false;
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await api.LoginAsync(owner.Email, second)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await api.LoginAsync(owner.Email, first)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_failed_delivery_answers_the_same_and_leaves_no_token_in_the_logs()
     {
         using var admin = await api.AdminClientAsync();
