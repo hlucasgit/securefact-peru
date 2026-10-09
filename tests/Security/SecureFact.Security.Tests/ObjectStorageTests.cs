@@ -19,7 +19,7 @@ public sealed class S3Fixture : IAsyncLifetime
     public const string AccessKey = "securefact-test-access";
     public const string SecretKey = "securefact-test-secret-key";
 
-    private readonly IContainer _container = new ContainerBuilder("chrislusf/seaweedfs:4.48")
+    private readonly IContainer _container = new ContainerBuilder(TestImages.Name("chrislusf/seaweedfs:4.48"))
         .WithCommand("server", "-dir=/data", "-s3", "-s3.port=8333", "-ip.bind=0.0.0.0")
         .WithEnvironment("AWS_ACCESS_KEY_ID", AccessKey)
         .WithEnvironment("AWS_SECRET_ACCESS_KEY", SecretKey)

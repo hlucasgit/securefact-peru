@@ -17,10 +17,12 @@ jobs:
   build-test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # The shared runners exhaust the anonymous pull limit of Docker Hub: the images come through a public mirror, and the runner is thrown away, so no Ryuk container is needed.
+      SF_IMAGE_REGISTRY: mirror.gcr.io/
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       - uses: actions/checkout@v4
-      - name: Docker Hub through a mirror (the shared runners exhaust its anonymous pull limit)
-        run: bash .github/scripts/docker-mirror.sh
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -90,10 +92,11 @@ jobs:
   e2e:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Same mirror as in build-test (anonymous pull limit of Docker Hub).
+      SF_IMAGE_REGISTRY: mirror.gcr.io/
     steps:
       - uses: actions/checkout@v4
-      - name: Docker Hub through a mirror (the shared runners exhaust its anonymous pull limit)
-        run: bash .github/scripts/docker-mirror.sh
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json

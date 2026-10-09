@@ -14,7 +14,7 @@ public sealed class RabbitFixture : IAsyncLifetime
     public const string User = "securefact-test";
     public const string Password = "rabbit-test-password";
 
-    private readonly RabbitMqContainer _container = new RabbitMqBuilder("rabbitmq:4").WithUsername(User).WithPassword(Password).Build();
+    private readonly RabbitMqContainer _container = new RabbitMqBuilder(TestImages.Name("library/rabbitmq:4")).WithUsername(User).WithPassword(Password).Build();
 
     public string Host => _container.Hostname;
 

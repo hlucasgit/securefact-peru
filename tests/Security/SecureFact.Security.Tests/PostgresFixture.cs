@@ -27,7 +27,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 {
     private const string AppPassword = "app-test-password";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17").Build();
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(TestImages.Name("library/postgres:17")).Build();
 
     public string OwnerConnectionString => _container.GetConnectionString();
 
