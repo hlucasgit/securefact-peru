@@ -17,6 +17,6 @@
 
 ## Límites (P)
 - La gracia y los plazos son cifras comerciales de la política, no normativa; la inicial es 10 días de plazo y 15 de gracia.
-- No hay aviso previo de vencimiento ni de «se va a suspender»; el cliente se entera del cargo en su pantalla de plan y de la suspensión por el correo de estado (ADR-054).
+- El aviso previo de vencimiento y de «se va a suspender» lo da ADR-068 (correo a los propietarios, con la anticipación de la política); la suspensión misma se avisa por el correo de estado (ADR-054).
 - Suspender no borra datos ni impide que se sigan archivando y consultando los comprobantes ya emitidos (ADR-041); el cierre definitivo sigue siendo de la plataforma.
 - Suspender corta también la emisión de comprobantes, y una cuenta de producción debe emitirlos a tiempo ante SUNAT. Por eso la suspensión es parte de la política y no del código: una versión con `suspend_after_days` vacío deja de suspender.

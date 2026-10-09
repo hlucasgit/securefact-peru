@@ -651,6 +651,7 @@ export interface BillingPolicy {
   effectiveFrom: string
   dueDays: number
   suspendAfterDays: number | null
+  reminderDays: number
   note: string | null
 }
 
@@ -658,6 +659,7 @@ export interface BillingPolicyInput {
   effectiveFrom: string
   dueDays: number
   suspendAfterDays: number | null
+  reminderDays: number
   note: string | null
 }
 

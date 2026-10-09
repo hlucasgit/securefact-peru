@@ -31,6 +31,8 @@ public static class SubscriptionsModule
         services.AddScoped<IBillingProfiles, BillingProfiles>();
         services.AddScoped<IInvoicingSettings, InvoicingSettingsService>();
         services.AddScoped<IChargeDocuments, ChargeDocumentFiles>();
+        services.TryAddScoped<SecureFact.Notifications.Contracts.IBillingNotices, SecureFact.Notifications.Contracts.NullBillingNotices>();
+        services.AddScoped<BillingReminders>();
         services.AddScoped<CollectionPass>();
         services.AddSingleton<ICollectionProcessor, CollectionProcessor>();
         return services;

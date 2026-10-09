@@ -12,7 +12,7 @@ internal static class SubscriptionEndpoints
 {
     public sealed record PriceBody(DateOnly EffectiveFrom, decimal MonthlyFee, int? IncludedDocuments, decimal? OverageUnitPrice, string? Note);
 
-    public sealed record PolicyBody(DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, string? Note);
+    public sealed record PolicyBody(DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, string? Note, int? ReminderDays = null);
 
     public sealed record PaymentBody(decimal Amount, PaymentMethod Method, DateOnly PaidOn, string? Reference, string? Note);
 
@@ -43,7 +43,7 @@ internal static class SubscriptionEndpoints
             (await pricing.ListPoliciesAsync(ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsRead);
 
         api.MapPost("/platform/billing-policies", async (PolicyBody body, IPricing pricing, HttpContext http, CancellationToken ct) =>
-            (await pricing.PublishPolicyAsync(new BillingPolicyInput(body.EffectiveFrom, body.DueDays, body.SuspendAfterDays, body.Note), ct))
+            (await pricing.PublishPolicyAsync(new BillingPolicyInput(body.EffectiveFrom, body.DueDays, body.SuspendAfterDays, body.Note, body.ReminderDays), ct))
             .ToHttp(http, dto => Results.Created("/api/v1/platform/billing-policies", dto))).RequireAuthorization(Permissions.SubscriptionsManage);
 
         api.MapGet("/platform/tenants/{id:guid}/terms", async (Guid id, ICurrentUser user, IPricing pricing, HttpContext http, CancellationToken ct) =>

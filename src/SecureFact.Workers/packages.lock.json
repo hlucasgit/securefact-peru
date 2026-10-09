@@ -591,6 +591,7 @@
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Billing.Contracts": "[1.0.0, )",
           "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Notifications.Contracts": "[1.0.0, )",
           "SecureFact.Organizations.Contracts": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.Rules.Contracts": "[1.0.0, )",

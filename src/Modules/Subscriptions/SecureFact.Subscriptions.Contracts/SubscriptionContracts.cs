@@ -34,9 +34,10 @@ public sealed record PlanPriceDto(
 
 /// <param name="DueDays">Days from the issue of a charge to its due date.</param>
 /// <param name="SuspendAfterDays">Days after the due date at which an unpaid charge suspends the account; empty never suspends.</param>
-public sealed record BillingPolicyInput(DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, string? Note);
+/// <param name="ReminderDays">Days of notice by e-mail before a due date and before a suspension; 0 sends none; empty takes the default of 3.</param>
+public sealed record BillingPolicyInput(DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, string? Note, int? ReminderDays = null);
 
-public sealed record BillingPolicyDto(Guid Id, int Version, DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, string? Note, DateTimeOffset CreatedAt);
+public sealed record BillingPolicyDto(Guid Id, int Version, DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, int ReminderDays, string? Note, DateTimeOffset CreatedAt);
 
 /// <summary>
 /// What a tenant pays and since when. <paramref name="Price"/> is the version that was in force the day the tenant took its plan (or the first one, when the plan had none yet): later versions do not
@@ -132,7 +133,7 @@ public interface ICollections
     Task<Result<ChargeDto>> VoidChargeAsync(Guid id, string reason, CancellationToken cancellationToken);
 }
 
-public sealed record CollectionPassResult(int ChargesCreated, int TenantsSuspended, int TenantsReactivated, int InvoicesIssued = 0);
+public sealed record CollectionPassResult(int ChargesCreated, int TenantsSuspended, int TenantsReactivated, int InvoicesIssued = 0, int NoticesQueued = 0);
 
 /// <summary>The background pass: charges for the months that closed and the suspensions and reactivations for non-payment. Platform scope.</summary>
 public interface ICollectionProcessor

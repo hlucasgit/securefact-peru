@@ -846,6 +846,7 @@ function PolicyTab() {
                 <th>Rige desde</th>
                 <th className="right">Plazo de pago</th>
                 <th className="right">Gracia antes de suspender</th>
+                <th className="right">Aviso anticipado</th>
                 <th>Nota</th>
               </tr>
             </thead>
@@ -856,6 +857,7 @@ function PolicyTab() {
                   <td>{date(policy.effectiveFrom)}</td>
                   <td className="right">{policy.dueDays} días</td>
                   <td className="right">{policy.suspendAfterDays === null ? 'No suspende' : `${policy.suspendAfterDays} días`}</td>
+                  <td className="right">{policy.reminderDays === 0 ? 'Sin aviso' : `${policy.reminderDays} días`}</td>
                   <td>{policy.note ?? ''}</td>
                 </tr>
               ))}
@@ -874,7 +876,7 @@ function PolicyTab() {
 function PolicyModal({ onClose }: { onClose: () => void }) {
   const publish = usePublishPolicy()
   const toast = useToast()
-  const [form, setForm] = useState({ effectiveFrom: '', dueDays: '10', suspendAfterDays: '15', note: '' })
+  const [form, setForm] = useState({ effectiveFrom: '', dueDays: '10', suspendAfterDays: '15', reminderDays: '3', note: '' })
   return (
     <Modal title="Nueva política de cobranza" onClose={onClose}>
       <form
@@ -888,6 +890,7 @@ function PolicyModal({ onClose }: { onClose: () => void }) {
         <TextField label="Rige desde" required type="date" min={todayInLima()} hint="un día futuro" value={form.effectiveFrom} onChange={(event) => setForm({ ...form, effectiveFrom: event.target.value })} />
         <TextField label="Plazo de pago (días)" required type="number" min="0" max="90" inputMode="numeric" value={form.dueDays} onChange={(event) => setForm({ ...form, dueDays: event.target.value })} />
         <TextField label="Gracia antes de suspender (días)" type="number" min="0" max="365" inputMode="numeric" hint="vacío: no suspende por mora" value={form.suspendAfterDays} onChange={(event) => setForm({ ...form, suspendAfterDays: event.target.value })} />
+        <TextField label="Aviso anticipado por correo (días)" required type="number" min="0" max="30" inputMode="numeric" hint="antes del vencimiento y de la suspensión; 0: sin aviso anticipado" value={form.reminderDays} onChange={(event) => setForm({ ...form, reminderDays: event.target.value })} />
         <TextField label="Nota" maxLength={300} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
         <div className="actions">
           <button className="btn" type="button" onClick={onClose}>

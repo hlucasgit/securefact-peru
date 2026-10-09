@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SecureFact.Billing.Contracts;
+using SecureFact.Notifications.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.Rules.Contracts;
 using SecureFact.SharedKernel.Domain;
@@ -36,6 +37,8 @@ internal sealed partial class CollectionPass(
     Commissions commissions,
     Enforcement enforcement,
     ChargeInvoicing invoicing,
+    BillingReminders reminders,
+    IBillingNotices notices,
     ILogger<CollectionPass> logger)
 {
     private const int PageSize = 100;
@@ -57,6 +60,7 @@ internal sealed partial class CollectionPass(
         var lastClosed = LimaCalendar.MonthStart(today).AddMonths(-1);
 
         var created = 0;
+        var notified = 0;
         var live = new List<TenantDto>();
         for (var skip = 0; ; skip += PageSize)
         {
@@ -72,7 +76,9 @@ internal sealed partial class CollectionPass(
                 live.Add(tenant);
                 try
                 {
-                    created += await ChargeAsync(tenant, planById, policies, lastClosed, today, now, cancellationToken);
+                    var (made, told) = await ChargeAsync(tenant, planById, policies, lastClosed, today, now, cancellationToken);
+                    created += made;
+                    notified += told;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -92,23 +98,46 @@ internal sealed partial class CollectionPass(
         }
 
         var invoiced = await invoicing.IssuePendingAsync(today, null, MaxInvoicesPerPass, cancellationToken);
-        var (suspended, reactivated) = await EnforceAsync(live, today, cancellationToken);
-        return new CollectionPassResult(created, suspended, reactivated, invoiced);
+        var late = await enforcement.TenantsPastGraceAsync(today, cancellationToken);
+        var (suspended, reactivated) = await EnforceAsync(live, late, today, cancellationToken);
+        notified += await RemindAsync(live, late, policies, today, cancellationToken);
+        return new CollectionPassResult(created, suspended, reactivated, invoiced, notified);
     }
 
-    private async Task<int> ChargeAsync(
+    /// <summary>The notices for the charges that are still unpaid. Only the accounts that are active are told, and not the ones about to be suspended in this very pass: their change of status tells them.</summary>
+    private async Task<int> RemindAsync(List<TenantDto> live, IReadOnlySet<Guid> late, List<BillingPolicy> policies, DateOnly today, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var policy = policies.LastOrDefault(p => p.EffectiveFrom <= today) ?? (policies.Count > 0 ? policies[0] : null);
+            var notifiable = live.Where(t => t.Status == TenantStatus.Active && !late.Contains(t.Id.Value)).Select(t => t.Id.Value).ToHashSet();
+            return await reminders.RunAsync(notifiable, policy?.ReminderDays ?? Pricing.DefaultReminderDays, today, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // A notice that cannot be queued must not undo the charges and the suspensions of the pass.
+            LogRemindFailed(logger, exception);
+            return 0;
+        }
+    }
+
+    private async Task<(int Made, int Notified)> ChargeAsync(
         TenantDto tenant, Dictionary<Guid, PlanDto> planById, List<BillingPolicy> policies, DateOnly lastClosed, DateOnly today, DateTimeOffset now, CancellationToken cancellationToken)
     {
         if (!planById.TryGetValue(tenant.PlanId, out var plan))
         {
-            return 0;
+            return (0, 0);
         }
 
         var versions = await db.Prices.AsNoTracking().Where(p => p.PlanId == plan.Id).OrderBy(p => p.EffectiveFrom).ToListAsync(cancellationToken);
         var terms = TermsResolver.Resolve(versions, LimaCalendar.Today(tenant.PlanAssignedAt ?? tenant.CreatedAt));
         if (terms is null || terms.FirstChargePeriod > lastClosed || (terms.Price.MonthlyFee == 0m && terms.Price.OverageUnitPrice is null))
         {
-            return 0;
+            return (0, 0);
         }
 
         var charged = (await db.Charges.AsNoTracking().Where(c => c.TenantId == tenant.Id.Value).Select(c => c.Period).ToListAsync(cancellationToken)).ToHashSet();
@@ -118,10 +147,11 @@ internal sealed partial class CollectionPass(
         if (!igv.IsSuccess)
         {
             LogNoRate(logger, igv.Error.Code);
-            return 0;
+            return (0, 0);
         }
 
         var made = 0;
+        var told = 0;
         for (var period = terms.FirstChargePeriod; period <= lastClosed && made < MaxChargesPerTenantPerPass; period = period.AddMonths(1))
         {
             if (charged.Contains(period))
@@ -134,10 +164,14 @@ internal sealed partial class CollectionPass(
             if (await SaveAsync(charge, cancellationToken))
             {
                 made++;
+                if (period == lastClosed && charge.TotalAmount > 0m && await notices.SendAsync(BillingReminders.Notice(BillingNoticeKind.ChargeIssued, charge, 0m), cancellationToken))
+                {
+                    told++;
+                }
             }
         }
 
-        return made;
+        return (made, told);
     }
 
     internal static Charge Build(
@@ -172,9 +206,8 @@ internal sealed partial class CollectionPass(
         return true;
     }
 
-    private async Task<(int Suspended, int Reactivated)> EnforceAsync(IReadOnlyList<TenantDto> live, DateOnly today, CancellationToken cancellationToken)
+    private async Task<(int Suspended, int Reactivated)> EnforceAsync(IReadOnlyList<TenantDto> live, IReadOnlySet<Guid> late, DateOnly today, CancellationToken cancellationToken)
     {
-        var late = await enforcement.TenantsPastGraceAsync(today, cancellationToken);
         var suspended = 0;
         var reactivated = 0;
         foreach (var tenant in live)
@@ -217,6 +250,9 @@ internal sealed partial class CollectionPass(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Collection pass: charging tenant {TenantId} failed unexpectedly.")]
     private static partial void LogChargeFailed(ILogger logger, Exception exception, Guid tenantId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Collection pass: the collection notices could not be queued.")]
+    private static partial void LogRemindFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Collection pass: enforcing the payment status of tenant {TenantId} failed unexpectedly.")]
     private static partial void LogEnforceFailed(ILogger logger, Exception exception, Guid tenantId);

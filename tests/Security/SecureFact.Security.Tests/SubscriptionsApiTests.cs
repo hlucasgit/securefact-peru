@@ -20,7 +20,7 @@ public sealed class SubscriptionsApiTests(ApiFixture api)
 
     private sealed record PriceRow(Guid Id, Guid PlanId, int Version, DateOnly EffectiveFrom, decimal MonthlyFee, int? IncludedDocuments, decimal? OverageUnitPrice, string? Note);
 
-    private sealed record PolicyRow(Guid Id, int Version, DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, string? Note);
+    private sealed record PolicyRow(Guid Id, int Version, DateOnly EffectiveFrom, int DueDays, int? SuspendAfterDays, int ReminderDays, string? Note);
 
     private sealed record TermsRow(Guid TenantId, Guid PlanId, string PlanCode, bool AllowsOverage, PriceRow? Price, DateOnly? FirstChargePeriod);
 
@@ -243,7 +243,7 @@ public sealed class SubscriptionsApiTests(ApiFixture api)
     {
         using var admin = await api.AdminClientAsync();
         var policies = (await admin.GetFromJsonAsync<List<PolicyRow>>("/api/v1/platform/billing-policies", ApiFixture.JsonOptions))!;
-        Assert.Equal((1, 10, 15), (policies[0].Version, policies[0].DueDays, policies[0].SuspendAfterDays));
+        Assert.Equal((1, 10, 15, 3), (policies[0].Version, policies[0].DueDays, policies[0].SuspendAfterDays, policies[0].ReminderDays));
 
         var today = TodayInLima();
         foreach (var body in new object[]
@@ -252,6 +252,8 @@ public sealed class SubscriptionsApiTests(ApiFixture api)
             new { effectiveFrom = today.AddDays(30), dueDays = -1, suspendAfterDays = 5 },
             new { effectiveFrom = today.AddDays(30), dueDays = 91, suspendAfterDays = 5 },
             new { effectiveFrom = today.AddDays(30), dueDays = 5, suspendAfterDays = 366 },
+            new { effectiveFrom = today.AddDays(30), dueDays = 5, suspendAfterDays = 5, reminderDays = -1 },
+            new { effectiveFrom = today.AddDays(30), dueDays = 5, suspendAfterDays = 5, reminderDays = 31 },
             new { effectiveFrom = today.AddDays(30), dueDays = 5, suspendAfterDays = 5, note = new string('x', 301) },
         })
         {
@@ -262,8 +264,9 @@ public sealed class SubscriptionsApiTests(ApiFixture api)
 
         // A version far in the future, so it changes nothing for the charges of the other tests; a later one has to come after it.
         var date = today.AddYears(30);
-        var created = await admin.PostAsJsonAsync("/api/v1/platform/billing-policies", new { effectiveFrom = date, dueDays = 7, suspendAfterDays = (int?)null, note = "Sin suspensión" });
+        var created = await admin.PostAsJsonAsync("/api/v1/platform/billing-policies", new { effectiveFrom = date, dueDays = 7, suspendAfterDays = (int?)null, reminderDays = 0, note = "Sin suspensión" });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(0, (await created.Content.ReadFromJsonAsync<PolicyRow>(ApiFixture.JsonOptions))!.ReminderDays);
         Assert.Equal("SF-SUB-002", await CodeAsync(await admin.PostAsJsonAsync("/api/v1/platform/billing-policies", new { effectiveFrom = date, dueDays = 7, suspendAfterDays = 1 })));
         Assert.Equal("SF-SUB-002", await CodeAsync(await admin.PostAsJsonAsync("/api/v1/platform/billing-policies", new { effectiveFrom = today.AddDays(40), dueDays = 7, suspendAfterDays = 1 })));
     }

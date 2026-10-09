@@ -64,6 +64,7 @@ internal sealed class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbCon
             b.Property(p => p.EffectiveFrom).HasColumnName("effective_from");
             b.Property(p => p.DueDays).HasColumnName("due_days");
             b.Property(p => p.SuspendAfterDays).HasColumnName("suspend_after_days");
+            b.Property(p => p.ReminderDays).HasColumnName("reminder_days");
             b.Property(p => p.Note).HasColumnName("note").HasMaxLength(300);
             b.Property(p => p.CreatedAt).HasColumnName("created_at");
             b.HasIndex(p => p.Version).IsUnique();

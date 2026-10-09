@@ -74,11 +74,12 @@ export interface PolicyForm {
   effectiveFrom: string
   dueDays: string
   suspendAfterDays: string
+  reminderDays: string
   note: string
 }
 
 export function buildPolicy(form: PolicyForm): BillingPolicyInput {
-  return { effectiveFrom: form.effectiveFrom, dueDays: Number(form.dueDays), suspendAfterDays: optionalNumber(form.suspendAfterDays), note: optionalText(form.note) }
+  return { effectiveFrom: form.effectiveFrom, dueDays: Number(form.dueDays), suspendAfterDays: optionalNumber(form.suspendAfterDays), reminderDays: Number(form.reminderDays), note: optionalText(form.note) }
 }
 
 export interface TierForm {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecureFact.Audit.Contracts;
+using SecureFact.Notifications.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Domain;
@@ -10,7 +11,7 @@ using SecureFact.Subscriptions.Infrastructure;
 
 namespace SecureFact.Subscriptions.Application;
 
-internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, Enforcement enforcement, Commissions commissions, ChargeInvoicing invoicing) : ICollections
+internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, Enforcement enforcement, Commissions commissions, ChargeInvoicing invoicing, IBillingNotices notices) : ICollections
 {
     private const int MaxPageSize = 100;
     private const int MinReasonLength = 3;
@@ -129,6 +130,11 @@ internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, T
                 NewValues: new Dictionary<string, object?> { ["charge"] = charge.Id, ["period"] = LimaCalendar.PeriodName(charge.Period), ["amount"] = payment.Amount, ["method"] = payment.Method, ["reference"] = payment.Reference }),
             cancellationToken);
         await enforcement.ReactivateIfClearedAsync(new TenantId(charge.TenantId), today, cancellationToken);
+        await notices.SendAsync(
+            new BillingNotice(
+                BillingNoticeKind.PaymentReceived, charge.TenantId, charge.Id, LimaCalendar.PeriodName(charge.Period), charge.TotalAmount, balance - payment.Amount, charge.Currency, charge.DueOn, charge.SuspendOn,
+                payment.Id, payment.Amount),
+            cancellationToken);
         return ToDto(payment);
     }
 

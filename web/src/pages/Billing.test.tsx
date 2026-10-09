@@ -248,7 +248,7 @@ describe('Pricing', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = String(input)
       if (init?.method === 'POST') return Promise.resolve(json(201, {}))
-      if (url.endsWith('/billing-policies')) return Promise.resolve(json(200, [{ id: 'bp', version: 1, effectiveFrom: '2026-01-01', dueDays: 10, suspendAfterDays: 15, note: null }]))
+      if (url.endsWith('/billing-policies')) return Promise.resolve(json(200, [{ id: 'bp', version: 1, effectiveFrom: '2026-01-01', dueDays: 10, suspendAfterDays: 15, reminderDays: 3, note: null }]))
       if (url.endsWith('/commission-schedules')) return Promise.resolve(json(200, [{ id: 'cs', version: 1, effectiveFrom: '2026-01-01', tiers: [{ minAccounts: 0, rate: 0.2 }, { minAccounts: 10, rate: 0.25 }], note: null }]))
       return Promise.resolve(json(200, PLANS))
     })
@@ -266,6 +266,7 @@ describe('Pricing', () => {
       effectiveFrom: '2027-03-01',
       dueDays: 10,
       suspendAfterDays: null,
+      reminderDays: 3,
       note: null,
     })
 

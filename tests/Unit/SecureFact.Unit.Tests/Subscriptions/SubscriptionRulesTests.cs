@@ -20,7 +20,7 @@ public class SubscriptionRulesTests
 
     private static readonly PlanDto Plan = new(PlanId, "pro", "Profesional", null, null, null, true, null, true);
 
-    private static BillingPolicy Policy(int dueDays = 10, int? suspendAfter = 15) => BillingPolicy.Create(1, new DateOnly(2026, 1, 1), dueDays, suspendAfter, null, Now);
+    private static BillingPolicy Policy(int dueDays = 10, int? suspendAfter = 15) => BillingPolicy.Create(1, new DateOnly(2026, 1, 1), dueDays, suspendAfter, 3, null, Now);
 
     [Fact]
     public void A_plan_without_a_price_has_no_terms()

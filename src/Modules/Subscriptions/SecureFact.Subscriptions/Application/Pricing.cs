@@ -19,6 +19,8 @@ internal sealed class Pricing(
     private const int MaxIncluded = 100_000_000;
     private const int MaxDueDays = 90;
     private const int MaxSuspendAfterDays = 365;
+    private const int MaxReminderDays = 30;
+    internal const int DefaultReminderDays = 3;
     private const int MaxNoteLength = 300;
 
     private static readonly Error PlanMissing = Error.NotFound(ErrorCodes.PlanNotFound, "Plan no encontrado", "El plan no existe.");
@@ -115,6 +117,11 @@ internal sealed class Pricing(
             return Error.Validation(ErrorCodes.InvalidBillingPolicy, "Plazo de suspensión inválido", $"Los días de gracia antes de suspender son de 0 a {MaxSuspendAfterDays}, o vacío para no suspender.");
         }
 
+        if (input.ReminderDays is < 0 or > MaxReminderDays)
+        {
+            return Error.Validation(ErrorCodes.InvalidBillingPolicy, "Anticipación de avisos inválida", $"Los días de anticipación de los avisos son de 0 a {MaxReminderDays}; 0 no envía avisos anticipados.");
+        }
+
         if (NoteTooLong(input.Note))
         {
             return Error.Validation(ErrorCodes.InvalidBillingPolicy, "Nota demasiado larga", $"La nota tiene hasta {MaxNoteLength} caracteres.");
@@ -126,7 +133,7 @@ internal sealed class Pricing(
             return Error.Validation(ErrorCodes.InvalidBillingPolicy, "Fecha de vigencia inválida", $"La nueva política debe regir después de la anterior, que rige desde {last.EffectiveFrom:yyyy-MM-dd}.");
         }
 
-        var policy = BillingPolicy.Create((last?.Version ?? 0) + 1, input.EffectiveFrom, input.DueDays, input.SuspendAfterDays, Clean(input.Note), clock.GetUtcNow());
+        var policy = BillingPolicy.Create((last?.Version ?? 0) + 1, input.EffectiveFrom, input.DueDays, input.SuspendAfterDays, input.ReminderDays ?? DefaultReminderDays, Clean(input.Note), clock.GetUtcNow());
         db.Policies.Add(policy);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(
@@ -138,6 +145,7 @@ internal sealed class Pricing(
                     ["effectiveFrom"] = policy.EffectiveFrom.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                     ["dueDays"] = policy.DueDays,
                     ["suspendAfterDays"] = policy.SuspendAfterDays,
+                    ["reminderDays"] = policy.ReminderDays,
                 }),
             cancellationToken);
         return ToDto(policy);
@@ -166,7 +174,7 @@ internal sealed class Pricing(
 
     internal static PlanPriceDto ToDto(PlanPrice p) => new(p.Id, p.PlanId, p.Version, p.EffectiveFrom, p.MonthlyFee, p.IncludedDocuments, p.OverageUnitPrice, p.Note, p.CreatedAt);
 
-    internal static BillingPolicyDto ToDto(BillingPolicy p) => new(p.Id, p.Version, p.EffectiveFrom, p.DueDays, p.SuspendAfterDays, p.Note, p.CreatedAt);
+    internal static BillingPolicyDto ToDto(BillingPolicy p) => new(p.Id, p.Version, p.EffectiveFrom, p.DueDays, p.SuspendAfterDays, p.ReminderDays, p.Note, p.CreatedAt);
 
     private static Error? Validate(PlanDto plan, PlanPriceInput input, DateOnly today)
     {

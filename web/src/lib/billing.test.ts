@@ -41,8 +41,8 @@ describe('billing helpers', () => {
   })
 
   it('builds the policy with an empty grace as never suspend', () => {
-    expect(buildPolicy({ effectiveFrom: '2027-01-01', dueDays: '7', suspendAfterDays: '', note: '' })).toEqual({ effectiveFrom: '2027-01-01', dueDays: 7, suspendAfterDays: null, note: null })
-    expect(buildPolicy({ effectiveFrom: '2027-01-01', dueDays: '0', suspendAfterDays: '0', note: 'x' })).toMatchObject({ dueDays: 0, suspendAfterDays: 0 })
+    expect(buildPolicy({ effectiveFrom: '2027-01-01', dueDays: '7', suspendAfterDays: '', reminderDays: '3', note: '' })).toEqual({ effectiveFrom: '2027-01-01', dueDays: 7, suspendAfterDays: null, reminderDays: 3, note: null })
+    expect(buildPolicy({ effectiveFrom: '2027-01-01', dueDays: '0', suspendAfterDays: '0', reminderDays: '0', note: 'x' })).toMatchObject({ dueDays: 0, suspendAfterDays: 0, reminderDays: 0 })
   })
 
   it('builds the commission terms with the tiers as shares', () => {

@@ -61,6 +61,45 @@ public sealed class NullBusinessNotices : IBusinessNotices
     public Task DocumentRejectedAsync(DocumentRejectedNotice notice, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+/// <summary>What a collection notice tells (ADR-068). Each kind is told once per charge (and once per payment for <see cref="PaymentReceived"/>).</summary>
+public enum BillingNoticeKind
+{
+    /// <summary>A charge was issued.</summary>
+    ChargeIssued = 1,
+
+    /// <summary>A charge falls due in a few days.</summary>
+    DueSoon = 2,
+
+    /// <summary>A charge is past its due date and the account is not yet suspended.</summary>
+    Overdue = 3,
+
+    /// <summary>The account is a few days from being suspended for the charge.</summary>
+    SuspensionNear = 4,
+
+    /// <summary>A payment was recorded.</summary>
+    PaymentReceived = 5,
+}
+
+/// <summary>
+/// A collection notice for the owners of an account (ADR-068). <paramref name="ChargeId"/> and <paramref name="PaymentId"/> name the fact (the dedupe key). <paramref name="Balance"/> is what is still
+/// owed after the fact. The notice carries no secret: only the amounts and dates that the owners already see in their plan screen.
+/// </summary>
+public sealed record BillingNotice(
+    BillingNoticeKind Kind, Guid TenantId, Guid ChargeId, string Period, decimal Total, decimal Balance, string Currency, DateOnly DueOn, DateOnly? SuspendOn, Guid? PaymentId = null, decimal? PaymentAmount = null);
+
+/// <summary>Tells the owners of an account about what it owes and what it paid. A failed notice never undoes the charge or the payment that it announces.</summary>
+public interface IBillingNotices
+{
+    /// <returns>True when the notice was queued for at least one owner; false when nobody was to receive it, it was already told, or no e-mail channel is configured.</returns>
+    Task<bool> SendAsync(BillingNotice notice, CancellationToken cancellationToken);
+}
+
+/// <summary>The default when nobody listens (a host without the notices): the work goes on and nothing is sent.</summary>
+public sealed class NullBillingNotices : IBillingNotices
+{
+    public Task<bool> SendAsync(BillingNotice notice, CancellationToken cancellationToken) => Task.FromResult(false);
+}
+
 /// <summary>Sends an e-mail through the channel that the operator configured. Throws <see cref="EmailDeliveryException"/> when it cannot.</summary>
 public interface IEmailSender
 {
