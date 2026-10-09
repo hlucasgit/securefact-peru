@@ -1,0 +1,19 @@
+meta {
+  name: Llaves de API - listar
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/api-keys
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Las llaves las administra una persona de la cuenta con su token de acceso.
+}

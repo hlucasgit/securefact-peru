@@ -1,0 +1,35 @@
+meta {
+  name: Facturas - emitir
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/documents
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+auth:bearer {
+  token: {{apiKey}}
+}
+
+body:json {
+  {
+    "seriesId": "{{seriesId}}",
+    "issueDate": "{{issueDate}}",
+    "currency": "PEN",
+    "buyer": { "documentTypeCode": "6", "documentNumber": "20100066603", "name": "CLIENTE SAC" },
+    "lines": [
+      { "description": "Servicio de consultoría", "unitCode": "ZZ", "tax": { "quantity": 1, "unitValue": 100, "igvAffectationCode": "10" } }
+    ]
+  }
+}
+
+docs {
+  Emite y numera una factura. Repetir la misma solicitud con la misma Idempotency-Key devuelve la original. issueDate es una fecha aaaa-mm-dd: defínala en el ambiente.
+}

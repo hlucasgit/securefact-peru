@@ -31,13 +31,15 @@ public static class Permissions
     public const string SubscriptionsManage = "subscriptions.manage";
     public const string ResellerCommissionsRead = "reseller.commissions.read";
     public const string AccountBillingManage = "account.billing.manage";
+    public const string ApiKeysManage = "apikeys.manage";
+    public const string WebhooksManage = "webhooks.manage";
 
     public static IReadOnlyList<string> All { get; } =
     [
         TenantsCreate, TenantsRead, TenantsManage, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
         SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
         CertificatesRead, CertificatesManage, CpeSend, ResellerTenantsRead, ResellerTenantsCreate, ResellerTenantsManage, ResellerBrandingManage, ResellerTenantsSuspend,
-        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead, AccountBillingManage,
+        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead, AccountBillingManage, ApiKeysManage, WebhooksManage,
     ];
 }
 
@@ -76,12 +78,12 @@ public static class RoleCatalog
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
              Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage,
-             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage]),
+             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage, Permissions.ApiKeysManage, Permissions.WebhooksManage]),
         [Roles.TenantAdmin] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
              Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage,
-             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage]),
+             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage, Permissions.ApiKeysManage, Permissions.WebhooksManage]),
         [Roles.BillingAdmin] = (RoleLevel.Tenant, [Permissions.AccountBillingManage, Permissions.TenantsRead, Permissions.CompaniesRead, Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate, Permissions.CpeSend, Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage]),
         [Roles.Accountant] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead]),
         [Roles.Sales] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.DocumentsCreate, Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead]),

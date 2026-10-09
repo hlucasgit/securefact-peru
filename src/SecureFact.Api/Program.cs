@@ -12,6 +12,8 @@ using SecureFact.CpeEngine.Contracts;
 using SecureFact.Gre;
 using SecureFact.Gre.Contracts;
 using SecureFact.Subscriptions;
+using SecureFact.Webhooks;
+using SecureFact.Webhooks.Application;
 using SecureFact.Customers;
 using SecureFact.Products;
 using SecureFact.Identity;
@@ -78,7 +80,25 @@ builder.Services.AddProblemDetails(options =>
     });
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
+{
+    document.Info = new Microsoft.OpenApi.OpenApiInfo
+    {
+        Title = "SecureFact Perú API",
+        Version = "v1",
+        Description = "API pública de SecureFact Perú. Autenticación: llave de API (Authorization: Bearer sfk_… o X-Api-Key) o token de acceso de una persona. Errores: Problem Details (RFC 9457) con códigos SF-<ÁREA>-nnn. Idempotencia: encabezado Idempotency-Key al emitir. La guía está en docs/api/README.md.",
+    };
+    document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
+    document.Components.SecuritySchemes ??= new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
+    document.Components.SecuritySchemes["bearer"] = new Microsoft.OpenApi.OpenApiSecurityScheme
+    {
+        Type = Microsoft.OpenApi.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "Access token or sfk_ API key",
+        Description = "Authorization: Bearer <token de acceso o llave sfk_…>",
+    };
+    return Task.CompletedTask;
+}));
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"]);
 
@@ -129,6 +149,7 @@ if (appConnection is not null)
     builder.Services.AddCpePipeline(appConnection);
     builder.Services.AddGreModule(appConnection);
     builder.Services.AddSubscriptionsModule(appConnection);
+    builder.Services.AddWebhooksModule(appConnection, builder.Configuration.GetSection(WebhookOptions.SectionName).Get<WebhookOptions>() ?? new WebhookOptions(), builder.Environment.IsProduction());
 
     // SUNAT is never reached implicitly: the environment must be named. Without it, documents are prepared and signed but not sent.
     switch (builder.Configuration["Sunat:Environment"])
@@ -176,6 +197,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await SecureFact.CpeEngine.CpeEngineModule.MigrateAsync(migrationsConnection);
     await SecureFact.Gre.GreModule.MigrateAsync(migrationsConnection);
     await SecureFact.Subscriptions.SubscriptionsModule.MigrateAsync(migrationsConnection);
+    await WebhooksModule.MigrateAsync(migrationsConnection);
     await ProductsModule.MigrateAsync(migrationsConnection);
     return;
 }
@@ -209,14 +231,14 @@ app.UseAuthorization();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = c => c.Tags.Contains("live") }).AllowAnonymous();
 app.MapHealthChecks("/health/ready").AllowAnonymous();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi().AllowAnonymous();
-}
+// The description of the API is public in every environment: it is the contract that integrators build on (ADR-066).
+app.MapOpenApi().AllowAnonymous();
 
 app.MapAuthEndpoints();
 app.MapUserAndTenantEndpoints();
 app.MapPlanEndpoints();
+app.MapApiKeyEndpoints();
+app.MapWebhookEndpoints();
 app.MapResellerEndpoints();
 app.MapBrandingEndpoints();
 app.MapDomainEndpoints();

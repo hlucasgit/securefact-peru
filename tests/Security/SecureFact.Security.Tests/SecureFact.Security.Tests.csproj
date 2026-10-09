@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\..\src\Modules\Customers\SecureFact.Customers\SecureFact.Customers.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Certificates\SecureFact.Certificates\SecureFact.Certificates.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\CpeEngine\SecureFact.CpeEngine\SecureFact.CpeEngine.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Webhooks\SecureFact.Webhooks\SecureFact.Webhooks.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Subscriptions\SecureFact.Subscriptions\SecureFact.Subscriptions.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Gre\SecureFact.Gre\SecureFact.Gre.csproj" />
     <ProjectReference Include="..\..\..\src\SecureFact.Workers\SecureFact.Workers.csproj" />

@@ -132,6 +132,8 @@ public sealed class ApiFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Domains__PlatformHosts__0", FakeDomainNameSystem.PlatformHost);
         Environment.SetEnvironmentVariable("Domains__EdgeSecret", FakeDomainNameSystem.EdgeSecret);
         Environment.SetEnvironmentVariable("Domains__MinimumCheckSeconds", "2");
+        // The webhooks of the tests point at a receiver on this machine (ADR-067); the API refuses that in production and the tests that check the refusal turn it off.
+        Environment.SetEnvironmentVariable("Webhooks__AllowLocalTargets", "true");
         Environment.SetEnvironmentVariable("Web__PublicUrl", PublicUrl);
         // A channel is configured so that the notices are queued (ADR-054); the sender itself is the one of the tests, which keeps what would leave.
         Environment.SetEnvironmentVariable("Email__Provider", "Sandbox");

@@ -1,0 +1,15 @@
+meta {
+  name: Webhooks - entregas
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/webhooks/{{webhookId}}/deliveries?state=Dead
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -30,6 +30,7 @@ public static class IdentityModule
         services.AddSingleton<TokenService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserAdministration, UserAdministration>();
+        services.AddScoped<IApiKeys, ApiKeyService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IPlatformBootstrapper, PlatformBootstrapper>();
         services.AddScoped<IAccountDirectory, AccountDirectory>();

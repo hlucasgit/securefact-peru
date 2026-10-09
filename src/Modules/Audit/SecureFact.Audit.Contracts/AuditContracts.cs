@@ -20,6 +20,13 @@ public static class AuditActions
     public const string TenantReactivated = "tenancy.tenant.reactivated";
     public const string TenantClosed = "tenancy.tenant.closed";
 
+    public const string ApiKeyCreated = "identity.api_key.created";
+    public const string ApiKeyRevoked = "identity.api_key.revoked";
+    public const string WebhookCreated = "webhooks.webhook.created";
+    public const string WebhookUpdated = "webhooks.webhook.updated";
+    public const string WebhookDeleted = "webhooks.webhook.deleted";
+    public const string WebhookSecretRotated = "webhooks.webhook.secret_rotated";
+
     public const string PricePublished = "subscriptions.price.published";
     public const string BillingPolicyPublished = "subscriptions.policy.published";
     public const string ChargeVoided = "subscriptions.charge.voided";

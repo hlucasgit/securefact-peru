@@ -18,6 +18,8 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
 
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -45,6 +47,24 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
             b.HasMany(u => u.Roles).WithOne().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
             b.Navigation(u => u.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
             ConfigureOptionalTenantOwned(b);
+        });
+
+        modelBuilder.Entity<ApiKey>(b =>
+        {
+            b.ToTable("api_key");
+            b.HasKey(k => k.Id);
+            b.Property(k => k.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(k => k.Name).HasColumnName("name").HasMaxLength(60).IsRequired();
+            b.Property(k => k.Role).HasColumnName("role").HasMaxLength(64).IsRequired();
+            b.Property(k => k.SecretHash).HasColumnName("secret_hash").IsRequired();
+            b.Property(k => k.Prefix).HasColumnName("prefix").HasMaxLength(8).IsRequired();
+            b.Property(k => k.CreatedBy).HasColumnName("created_by");
+            b.Property(k => k.CreatedAt).HasColumnName("created_at");
+            b.Property(k => k.ExpiresAt).HasColumnName("expires_at");
+            b.Property(k => k.LastUsedAt).HasColumnName("last_used_at");
+            b.Property(k => k.RevokedAt).HasColumnName("revoked_at");
+            b.Property(k => k.Version).IsRowVersion();
+            ConfigureTenantOwned(b);
         });
 
         modelBuilder.Entity<UserRole>(b =>

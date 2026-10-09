@@ -18,6 +18,8 @@
     <ProjectReference Include="..\Modules\TaxEngine\SecureFact.TaxEngine\SecureFact.TaxEngine.csproj" />
     <ProjectReference Include="..\Modules\Catalogs\SecureFact.Catalogs\SecureFact.Catalogs.csproj" />
     <ProjectReference Include="..\Modules\CpeEngine\SecureFact.CpeEngine\SecureFact.CpeEngine.csproj" />
+    <ProjectReference Include="..\Modules\Webhooks\SecureFact.Webhooks\SecureFact.Webhooks.csproj" />
+    <ProjectReference Include="..\Modules\Webhooks\SecureFact.Webhooks.Contracts\SecureFact.Webhooks.Contracts.csproj" />
     <ProjectReference Include="..\Modules\Subscriptions\SecureFact.Subscriptions\SecureFact.Subscriptions.csproj" />
     <ProjectReference Include="..\Modules\Subscriptions\SecureFact.Subscriptions.Contracts\SecureFact.Subscriptions.Contracts.csproj" />
     <ProjectReference Include="..\Modules\Gre\SecureFact.Gre\SecureFact.Gre.csproj" />

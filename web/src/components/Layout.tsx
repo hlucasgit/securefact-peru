@@ -23,7 +23,7 @@ const RESELLER_GROUPS: { title: string; items: Item[] }[] = [
 const GROUPS: { title: string; items: Item[] }[] = [
   { title: 'Operación', items: [{ to: '/', label: 'Panel' }, { to: '/documentos', label: 'Documentos' }, { to: '/documentos/nuevo', label: 'Emitir', roles: BILLING_ROLES }, { to: '/resumenes', label: 'Resumen diario', roles: BILLING_ROLES }, { to: '/guias', label: 'Guías de remisión' }] },
   { title: 'Datos', items: [{ to: '/clientes', label: 'Clientes' }, { to: '/productos', label: 'Productos' }, { to: '/empresas', label: 'Empresas' }] },
-  { title: 'Cuenta', items: [{ to: '/usuarios', label: 'Usuarios', roles: ADMIN_ROLES }, { to: '/plan', label: 'Plan y consumo', roles: PLAN_ROLES }, { to: '/auditoria', label: 'Auditoría', roles: AUDIT_ROLES }, { to: '/mensajes', label: 'Mensajes fallidos', roles: QUEUE_ROLES }, { to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
+  { title: 'Cuenta', items: [{ to: '/usuarios', label: 'Usuarios', roles: ADMIN_ROLES }, { to: '/integraciones', label: 'Integraciones', roles: ['TenantOwner', 'TenantAdmin'] }, { to: '/plan', label: 'Plan y consumo', roles: PLAN_ROLES }, { to: '/auditoria', label: 'Auditoría', roles: AUDIT_ROLES }, { to: '/mensajes', label: 'Mensajes fallidos', roles: QUEUE_ROLES }, { to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
 ]
 
 export function Layout() {

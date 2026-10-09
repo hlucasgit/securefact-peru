@@ -1,0 +1,8 @@
+docs {
+  Colección de la API pública de SecureFact Perú (docs/api/README.md).
+
+  1. Cree una llave de API en la interfaz (Cuenta → Integraciones) y póngala en la variable secreta `apiKey` del ambiente.
+  2. Los webhooks y las llaves los administra una persona, no una llave: inicie sesión (POST /api/v1/auth/login) y ponga el accessToken en la variable secreta `accessToken`.
+  3. Cambie `baseUrl` si no usa la API local.
+  4. Las llamadas de emisión usan una clave de idempotencia nueva en cada envío ({{$guid}}); para probar la repetición, fíjela a mano.
+}

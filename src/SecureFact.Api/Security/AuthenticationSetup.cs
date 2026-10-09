@@ -11,13 +11,24 @@ namespace SecureFact.Api.Security;
 
 public static class AuthenticationSetup
 {
+    private const string Combined = "SecureFact";
+
     public static IServiceCollection AddSecureFactAuthentication(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
         services.AddScoped<SecureFact.SharedKernel.Tenancy.ICurrentUser>(sp =>
             new HttpCurrentUser(() => sp.GetRequiredService<IHttpContextAccessor>().HttpContext?.User));
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        // One scheme in front of two: a call with an API key (ADR-066) goes to the key handler, any other to the token of a person.
+        services.AddAuthentication(options =>
+            {
+                options.DefaultScheme = Combined;
+                options.DefaultChallengeScheme = Combined;
+            })
+            .AddPolicyScheme(Combined, "API key or access token", options =>
+                options.ForwardDefaultSelector = context => ApiKeyAuthenticationHandler.Presented(context.Request) is not null ? ApiKeyAuthenticationHandler.SchemeName : JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer()
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, _ => { });
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<IOptions<IdentityOptions>>((jwt, identity) =>
             {

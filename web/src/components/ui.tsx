@@ -177,9 +177,24 @@ export function useToast() {
 }
 
 /** Asks before an action that cannot be undone. */
-export function ConfirmButton({ label, message, onConfirm, className = 'btn small danger', disabled }: { label: string; message: string; onConfirm: () => void; className?: string; disabled?: boolean }) {
+export function ConfirmButton({
+  label,
+  message,
+  onConfirm,
+  className = 'btn small danger',
+  disabled,
+  ariaLabel,
+}: {
+  label: string
+  message: string
+  onConfirm: () => void
+  className?: string
+  disabled?: boolean
+  /** What a screen reader says when the visible text is short and the row has several of them. */
+  ariaLabel?: string
+}) {
   return (
-    <button type="button" className={className} disabled={disabled} onClick={() => window.confirm(message) && onConfirm()}>
+    <button type="button" className={className} disabled={disabled} aria-label={ariaLabel} onClick={() => window.confirm(message) && onConfirm()}>
       {label}
     </button>
   )

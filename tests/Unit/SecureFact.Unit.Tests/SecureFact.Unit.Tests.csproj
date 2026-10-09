@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\..\src\Modules\Identity\SecureFact.Identity\SecureFact.Identity.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Audit\SecureFact.Audit\SecureFact.Audit.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Notifications\SecureFact.Notifications\SecureFact.Notifications.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Webhooks\SecureFact.Webhooks\SecureFact.Webhooks.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Subscriptions\SecureFact.Subscriptions\SecureFact.Subscriptions.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Gre\SecureFact.Gre\SecureFact.Gre.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\TaxEngine\SecureFact.TaxEngine\SecureFact.TaxEngine.csproj" />

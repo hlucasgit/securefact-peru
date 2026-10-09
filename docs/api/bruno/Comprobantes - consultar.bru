@@ -1,0 +1,15 @@
+meta {
+  name: Comprobantes - consultar
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/documents/{{documentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{apiKey}}
+}

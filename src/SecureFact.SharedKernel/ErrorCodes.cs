@@ -54,6 +54,18 @@ public static class ErrorCodes
 
     public const string ChargeDocumentNotFound = "SF-SUB-011";
 
+    public const string InvalidApiKey = "SF-KEY-001";
+
+    public const string ApiKeyNotFound = "SF-KEY-002";
+
+    public const string ApiKeyLimit = "SF-KEY-003";
+
+    public const string InvalidWebhook = "SF-WHK-001";
+
+    public const string WebhookNotFound = "SF-WHK-002";
+
+    public const string WebhookLimit = "SF-WHK-003";
+
     public const string InvalidBranding = "SF-BRAND-001";
 
     public const string InvalidLogo = "SF-BRAND-002";

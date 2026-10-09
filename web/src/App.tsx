@@ -12,6 +12,7 @@ import { DocumentDetail } from './pages/DocumentDetail'
 import { Documents } from './pages/Documents'
 import { GuideDetail } from './pages/GuideDetail'
 import { Guides } from './pages/Guides'
+import { Integrations } from './pages/Integrations'
 import { Login } from './pages/Login'
 import { RecoverPassword } from './pages/RecoverPassword'
 import { ResetPassword } from './pages/ResetPassword'
@@ -78,6 +79,7 @@ export function App() {
         <Route path="empresas" element={<Companies />} />
         <Route path="empresas/:id" element={<CompanyDetail />} />
         <Route path="usuarios" element={<Users />} />
+        <Route path="integraciones" element={<Integrations />} />
         <Route path="seguridad" element={<Security />} />
         <Route path="reglas" element={<Rules />} />
         <Route path="*" element={<Navigate to="/" replace />} />

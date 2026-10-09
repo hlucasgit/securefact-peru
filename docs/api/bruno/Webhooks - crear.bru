@@ -1,0 +1,27 @@
+meta {
+  name: Webhooks - crear
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhooks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "url": "https://hooks.su-empresa.pe/securefact",
+    "description": "Sistema de ventas",
+    "events": ["document.accepted", "document.rejected"]
+  }
+}
+
+docs {
+  Devuelve el secreto de firma whsec_… una sola vez.
+}

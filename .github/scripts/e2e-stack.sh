@@ -33,6 +33,8 @@ export Email__Provider=Sandbox
 export Email__From=no-responder@securefact.test
 export Email__Sandbox__Directory="${MAIL_DIR}"
 export Web__PublicUrl=http://localhost:5173
+# The webhooks of the tests point at a server on this machine (ADR-067); the API refuses this in production.
+export Webhooks__AllowLocalTargets=true
 # The tests sign in many times from one address; the limit of the sign-in endpoint is raised for them only.
 export RateLimiting__AuthPermitPerMinute=1000
 # The workers look for work every 3 seconds instead of every 15.

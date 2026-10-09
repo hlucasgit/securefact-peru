@@ -1,0 +1,19 @@
+meta {
+  name: Webhooks - listar
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/webhooks
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Los webhooks los administra una persona de la cuenta con su token de acceso (variable accessToken, de POST /api/v1/auth/login), no una llave de API.
+}

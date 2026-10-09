@@ -633,7 +633,9 @@
           "SecureFact.Subscriptions": "[1.0.0, )",
           "SecureFact.Subscriptions.Contracts": "[1.0.0, )",
           "SecureFact.TaxEngine": "[1.0.0, )",
-          "SecureFact.Tenancy": "[1.0.0, )"
+          "SecureFact.Tenancy": "[1.0.0, )",
+          "SecureFact.Webhooks": "[1.0.0, )",
+          "SecureFact.Webhooks.Contracts": "[1.0.0, )"
         }
       },
       "securefact.audit": {
@@ -936,6 +938,24 @@
           "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },
+      "securefact.webhooks": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Http": "[10.0.12, )",
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.Webhooks.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.webhooks.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "securefact.workers": {
         "type": "Project",
         "dependencies": {
@@ -959,7 +979,9 @@
           "SecureFact.Subscriptions": "[1.0.0, )",
           "SecureFact.Subscriptions.Contracts": "[1.0.0, )",
           "SecureFact.TaxEngine": "[1.0.0, )",
-          "SecureFact.Tenancy": "[1.0.0, )"
+          "SecureFact.Tenancy": "[1.0.0, )",
+          "SecureFact.Webhooks": "[1.0.0, )",
+          "SecureFact.Webhooks.Contracts": "[1.0.0, )"
         }
       },
       "AWSSDK.S3": {

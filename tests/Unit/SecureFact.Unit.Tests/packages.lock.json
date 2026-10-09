@@ -480,6 +480,24 @@
           "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },
+      "securefact.webhooks": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Http": "[10.0.12, )",
+          "SecureFact.Audit.Contracts": "[1.0.0, )",
+          "SecureFact.Billing.Contracts": "[1.0.0, )",
+          "SecureFact.CpeEngine.Contracts": "[1.0.0, )",
+          "SecureFact.Platform": "[1.0.0, )",
+          "SecureFact.SharedKernel": "[1.0.0, )",
+          "SecureFact.Webhooks.Contracts": "[1.0.0, )"
+        }
+      },
+      "securefact.webhooks.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "SecureFact.SharedKernel": "[1.0.0, )"
+        }
+      },
       "ExcelDataReader": {
         "type": "CentralTransitive",
         "requested": "[3.9.0, )",

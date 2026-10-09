@@ -4,7 +4,14 @@ import type {
   AppUser,
   ArchivedFile,
   AuditRecord,
+  ApiKey,
   AuditVerification,
+  CreatedApiKey,
+  CreatedWebhook,
+  Webhook,
+  WebhookDelivery,
+  WebhookDeliveryState,
+  WebhookInput,
   BillingProfile,
   BillingProfileInput,
   InvoicingCompanyOption,
@@ -102,6 +109,9 @@ export const keys = {
   terms: (tenantId: string) => ['platform', 'tenant', tenantId, 'terms'] as const,
   myTerms: ['subscription'] as const,
   myProfile: ['billing-profile'] as const,
+  apiKeys: ['api-keys'] as const,
+  webhooks: ['webhooks'] as const,
+  webhookDeliveries: (id: string, state: string) => ['webhooks', id, 'deliveries', state] as const,
   tenantProfile: (id: string) => ['platform', 'tenant', id, 'billing-profile'] as const,
   invoicing: ['platform', 'invoicing'] as const,
   invoicingOptions: (tenantId: string) => ['platform', 'invoicing', 'options', tenantId] as const,
@@ -433,3 +443,21 @@ export const useInvoicingSettings = () =>
 export const useSetInvoicingSettings = () => useAction((input: InvoicingSettings) => put<InvoicingSettings>('/api/v1/platform/invoicing', input), [keys.invoicing, ['audit']])
 export const useInvoicingOptions = (tenantId: string) =>
   useQuery({ queryKey: keys.invoicingOptions(tenantId), queryFn: () => get<InvoicingCompanyOption[]>(`/api/v1/platform/invoicing/options?tenantId=${tenantId}`), enabled: !!tenantId })
+
+// API keys and webhooks (ADR-066, ADR-067)
+export const useApiKeys = () => useQuery({ queryKey: keys.apiKeys, queryFn: () => get<ApiKey[]>('/api/v1/api-keys') })
+export const useApiKeyRoles = () => useQuery({ queryKey: [...keys.apiKeys, 'roles'], queryFn: () => get<string[]>('/api/v1/api-keys/roles') })
+export const useCreateApiKey = () =>
+  useAction((input: { name: string; role: string; expiresAt: string | null }) => post<CreatedApiKey>('/api/v1/api-keys', input), [keys.apiKeys, ['audit']])
+export const useRevokeApiKey = () => useAction((id: string) => post<ApiKey>(`/api/v1/api-keys/${id}/revoke`), [keys.apiKeys, ['audit']])
+
+export const useWebhooks = () => useQuery({ queryKey: keys.webhooks, queryFn: () => get<Webhook[]>('/api/v1/webhooks') })
+export const useWebhookEvents = () => useQuery({ queryKey: [...keys.webhooks, 'events'], queryFn: () => get<string[]>('/api/v1/webhooks/events') })
+export const useCreateWebhook = () => useAction((input: WebhookInput) => post<CreatedWebhook>('/api/v1/webhooks', input), [keys.webhooks, ['audit']])
+export const useUpdateWebhook = (id: string) => useAction((input: WebhookInput) => put<Webhook>(`/api/v1/webhooks/${id}`, input), [keys.webhooks, ['audit']])
+export const useDeleteWebhook = () => useAction((id: string) => del<void>(`/api/v1/webhooks/${id}`), [keys.webhooks, ['audit']])
+export const useRotateWebhookSecret = () => useAction((id: string) => post<CreatedWebhook>(`/api/v1/webhooks/${id}/rotate-secret`), [keys.webhooks, ['audit']])
+export const useTestWebhook = () => useAction((id: string) => post<WebhookDelivery>(`/api/v1/webhooks/${id}/test`), [keys.webhooks])
+export const useWebhookDeliveries = (id: string, state: WebhookDeliveryState | '') =>
+  useQuery({ queryKey: keys.webhookDeliveries(id, state), queryFn: () => get<WebhookDelivery[]>(`/api/v1/webhooks/${id}/deliveries${state ? `?state=${state}` : ''}`) })
+export const useRedeliver = () => useAction((id: string) => post<WebhookDelivery>(`/api/v1/webhooks/deliveries/${id}/redeliver`), [keys.webhooks])

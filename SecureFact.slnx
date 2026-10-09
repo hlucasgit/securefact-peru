@@ -32,6 +32,10 @@
     <Project Path="src/Modules/Customers/SecureFact.Customers.Contracts/SecureFact.Customers.Contracts.csproj" />
     <Project Path="src/Modules/Customers/SecureFact.Customers/SecureFact.Customers.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Webhooks/">
+    <Project Path="src/Modules/Webhooks/SecureFact.Webhooks.Contracts/SecureFact.Webhooks.Contracts.csproj" />
+    <Project Path="src/Modules/Webhooks/SecureFact.Webhooks/SecureFact.Webhooks.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Subscriptions/">
     <Project Path="src/Modules/Subscriptions/SecureFact.Subscriptions.Contracts/SecureFact.Subscriptions.Contracts.csproj" />
     <Project Path="src/Modules/Subscriptions/SecureFact.Subscriptions/SecureFact.Subscriptions.csproj" />

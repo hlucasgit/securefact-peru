@@ -1,0 +1,19 @@
+meta {
+  name: Webhooks - probar
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhooks/{{webhookId}}/test
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Envía un webhook.ping y contesta cómo le fue.
+}

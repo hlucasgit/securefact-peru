@@ -852,3 +852,64 @@ export interface CommissionOverview {
   currentRate: number | null
   months: CommissionMonth[]
 }
+
+// ---------- API keys and webhooks (ADR-066, ADR-067) ----------
+
+export interface ApiKey {
+  id: string
+  name: string
+  role: string
+  prefix: string
+  createdAt: string
+  expiresAt: string | null
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+
+/** The secret is shown only here, when the key is created. */
+export interface CreatedApiKey {
+  key: ApiKey
+  secret: string
+}
+
+export interface Webhook {
+  id: string
+  url: string
+  description: string | null
+  events: string[]
+  isActive: boolean
+  secretHint: string
+  consecutiveFailures: number
+  createdAt: string
+  disabledAt: string | null
+  disabledReason: string | null
+}
+
+export interface WebhookInput {
+  url: string
+  description: string | null
+  events: string[]
+  isActive: boolean
+}
+
+/** The secret is shown only here, when the webhook is created or its secret rotated. */
+export interface CreatedWebhook {
+  endpoint: Webhook
+  secret: string
+}
+
+export type WebhookDeliveryState = 'Pending' | 'Delivered' | 'Failed' | 'Dead'
+
+export interface WebhookDelivery {
+  id: string
+  endpointId: string
+  eventId: string
+  eventType: string
+  state: WebhookDeliveryState
+  attempts: number
+  nextAttemptAt: string | null
+  lastStatusCode: number | null
+  lastError: string | null
+  createdAt: string
+  deliveredAt: string | null
+}

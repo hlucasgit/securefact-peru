@@ -1,0 +1,19 @@
+meta {
+  name: Empresas - listar
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/companies?skip=0&take=50
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{apiKey}}
+}
+
+docs {
+  Las empresas de la cuenta de la llave.
+}
