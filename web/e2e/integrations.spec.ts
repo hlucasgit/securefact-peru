@@ -96,7 +96,7 @@ test.describe('integraciones', () => {
 
       // The delivery is in the list, and rotating the secret changes the one that signs.
       await app.getByRole('button', { name: `Entregas de ${receiver.url}` }).click()
-      await expect(app.getByRole('dialog').getByText('Entregado')).toBeVisible()
+      await expect(app.getByRole('dialog').getByRole('cell', { name: 'Entregado' })).toBeVisible()
       await app.keyboard.press('Escape')
       app.once('dialog', (confirm) => void confirm.accept())
       await app.getByRole('button', { name: `Rotar el secreto de ${receiver.url}` }).click()
