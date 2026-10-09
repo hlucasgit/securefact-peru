@@ -31,13 +31,13 @@ export function PartyFields({ title, value, onChange, identityTypes }: { title: 
   )
 }
 
-export function AddressFields({ title, value, onChange, annex }: { title: string; value: AddressState; onChange: (value: AddressState) => void; annex: boolean }) {
+export function AddressFields({ title, value, onChange, annex, addressRequired = true }: { title: string; value: AddressState; onChange: (value: AddressState) => void; annex: boolean; addressRequired?: boolean }) {
   return (
     <>
       <h3>{title}</h3>
       <div className="form-grid">
         <TextField label="Ubigeo" required pattern="\d{6}" maxLength={6} value={value.ubigeoCode} onChange={(event) => onChange({ ...value, ubigeoCode: event.target.value })} />
-        <TextField label="Dirección" required value={value.address} onChange={(event) => onChange({ ...value, address: event.target.value })} />
+        <TextField label="Dirección" required={addressRequired} value={value.address} onChange={(event) => onChange({ ...value, address: event.target.value })} />
         {annex && (
           <>
             <TextField label="RUC del establecimiento" hint="Del titular, si es un establecimiento anexo" pattern="\d{11}" maxLength={11} value={value.establishmentRuc} onChange={(event) => onChange({ ...value, establishmentRuc: event.target.value })} />

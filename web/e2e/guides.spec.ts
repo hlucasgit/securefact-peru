@@ -40,7 +40,7 @@ test.describe('guías de remisión', () => {
     await fillSale(app, world.company.ruc)
     await app.getByRole('button', { name: 'Preparar guía' }).click()
 
-    await expect(app.getByRole('heading', { name: 'Guía de remisión T001-1' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Guía de remisión del remitente T001-1' })).toBeVisible()
     await expect(app.getByText('Preparada', { exact: true })).toBeVisible()
 
     await app.getByRole('button', { name: 'Enviar a SUNAT' }).click()

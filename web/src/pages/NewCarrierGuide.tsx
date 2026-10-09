@@ -54,6 +54,7 @@ export function NewCarrierGuide() {
   const relatedTypes = (relatedCatalog.data ?? []).filter((entry) => (entry.metadata['GRE Aplicable'] ?? '').toLowerCase().includes('transportista') && ['01', '03', '04', '12', '48'].includes(entry.code))
   const set = <K extends keyof CarrierGuideForm>(key: K, value: CarrierGuideForm[K]) => setForm((current) => ({ ...current, [key]: value }))
   const listedBySenderGuide = form.senderGuide.trim() !== ''
+  const addressRequired = !listedBySenderGuide && !form.plannedTransshipment
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -102,8 +103,8 @@ export function NewCarrierGuide() {
             value={form.senderGuide}
             onChange={(event) => set('senderGuide', event.target.value)}
           />
-          <AddressFields title="Punto de partida" value={form.origin} onChange={(value) => set('origin', value)} annex={false} />
-          <AddressFields title="Punto de llegada" value={form.destination} onChange={(value) => set('destination', value)} annex={false} />
+          <AddressFields title="Punto de partida" value={form.origin} onChange={(value) => set('origin', value)} annex={false} addressRequired={addressRequired} />
+          <AddressFields title="Punto de llegada" value={form.destination} onChange={(value) => set('destination', value)} annex={false} addressRequired={addressRequired} />
         </div>
 
         <div className="card stack">
