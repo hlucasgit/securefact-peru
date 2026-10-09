@@ -323,7 +323,7 @@ export function Collections() {
 // ---------- the price and the charges of one account ----------
 
 function TermsSummary({ terms }: { terms: TenantTerms }) {
-  if (!terms.price) return <p>El plan <strong>{terms.planName}</strong> no tiene precio: esta cuenta no se cobra.</p>
+  if (!terms.price) return <p>Esta cuenta no se cobra: su plan no tiene precio.</p>
   const price = terms.price
   return (
     <>
