@@ -44,20 +44,11 @@ internal sealed class GreService(
 
     private static readonly Error Missing = Error.NotFound(ErrorCodes.GuideNotFound, "Guía no encontrada", "La guía no existe o no es visible para este contexto.");
 
-    private static readonly HashSet<string> NotYetSupportedMotives = new(["08", "09", "18", "19"], StringComparer.Ordinal);
-
     public async Task<Result<GreDto>> CreateAsync(CreateGreRequest request, CancellationToken cancellationToken)
     {
-        if (request is null || request.Goods is null || request.Recipient is null || request.Origin is null || request.Destination is null)
+        if (request is null || request.Recipient is null || request.Origin is null)
         {
-            return Error.Validation(ErrorCodes.InvalidGuide, "Guía inválida", "Faltan datos obligatorios: destinatario, puntos de partida y llegada, o bienes.");
-        }
-
-        if (NotYetSupportedMotives.Contains(request.MotiveCode ?? string.Empty))
-        {
-            return Error.Validation(
-                ErrorCodes.GuideNotSupported, "Motivo aún no disponible",
-                "Importación (08), exportación (09), traslado de mercancía extranjera (19) y emisor itinerante (18) aún no se emiten desde aquí: emítalos en SUNAT Operaciones en Línea.");
+            return Error.Validation(ErrorCodes.InvalidGuide, "Guía inválida", "Faltan datos obligatorios: destinatario o punto de partida.");
         }
 
         return await PrepareAsync(
@@ -441,6 +432,12 @@ internal sealed class GreService(
             return entries.IsSuccess ? entries.Value : [];
         }
 
+        async Task<IReadOnlyDictionary<string, string>?> UbigeosAsync(string number)
+        {
+            var entries = await EntriesAsync(number);
+            return entries.Count == 0 ? null : entries.ToDictionary(e => e.Code, e => e.Metadata.GetValueOrDefault("Ubigeo") ?? string.Empty, StringComparer.Ordinal);
+        }
+
         var related = await EntriesAsync("61");
         return new GreValidationContext(
             senderRuc,
@@ -452,7 +449,10 @@ internal sealed class GreService(
                 (await EntriesAsync("06")).Select(e => e.Code).ToHashSet(StringComparer.Ordinal),
                 (await EntriesAsync("18")).Select(e => e.Code).ToHashSet(StringComparer.Ordinal),
                 (await EntriesAsync("20")).Select(e => e.Code).ToHashSet(StringComparer.Ordinal),
-                related.ToDictionary(e => e.Code, e => e.Metadata.GetValueOrDefault("GRE Aplicable") ?? string.Empty, StringComparer.Ordinal)));
+                related.ToDictionary(e => e.Code, e => e.Metadata.GetValueOrDefault("GRE Aplicable") ?? string.Empty, StringComparer.Ordinal),
+                await UbigeosAsync("63"),
+                await UbigeosAsync("64"),
+                (await EntriesAsync("65")) is { Count: > 0 } customsUnits ? customsUnits.Select(e => e.Code).ToHashSet(StringComparer.Ordinal) : null));
     }
 
     private async Task<Result<GreChannelCredentials>> CredentialsAsync(Guide guide, CancellationToken cancellationToken)

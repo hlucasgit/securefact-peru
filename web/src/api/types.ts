@@ -527,11 +527,34 @@ export interface GreAddress {
   establishmentCode?: string | null
 }
 
+export interface GreGoodCustoms {
+  declarationNumber?: string | null
+  declarationSeries?: string | null
+  transportDocument?: string | null
+  transportDetail?: string | null
+  manifestContainer?: string | null
+  seal?: string | null
+  emptyContainer?: boolean | null
+}
+
 export interface GreGoodInput {
   description: string
   unitCode: string
   quantity: number
   code?: string | null
+  customs?: GreGoodCustoms | null
+}
+
+/** What import (08), export (09) and foreign goods (19) add: the port or airport, the net weight and the containers. */
+export interface GreCustomsBody {
+  portCode?: string | null
+  portType?: string | null
+  portName?: string | null
+  wholeTransfer: boolean
+  manifestContainers: boolean
+  netWeight?: number | null
+  weightNote?: string | null
+  containers?: { number: string; seal?: string | null }[] | null
 }
 
 /** What the form sends; the API checks it against the rules of the validation workbook of SUNAT. */
@@ -552,12 +575,14 @@ export interface CreateGuideBody {
   supplier?: GreParty | null
   buyer?: GreParty | null
   origin: GreAddress
-  destination: GreAddress
+  /** Null only for the itinerant issuer (18). */
+  destination?: GreAddress | null
   carrier?: { ruc: string; name: string; mtcRegistration?: string | null } | null
   vehicle?: { plate: string; circulationCard?: string | null } | null
   driver?: { documentTypeCode: string; documentNumber: string; firstNames: string; lastNames: string; licenseNumber: string } | null
   goods: GreGoodInput[]
   relatedDocuments?: { typeCode: string; number: string; issuerRuc?: string | null }[] | null
+  customs?: GreCustomsBody | null
 }
 
 export type GreFreightPayer = 'Sender' | 'Subcontractor' | 'ThirdParty'

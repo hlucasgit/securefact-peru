@@ -35,7 +35,12 @@ internal static class GreSamples
                 ["50"] = "remitente, transportista",
                 ["80"] = "remitente, transportista",
                 ["91"] = "solo remitente",
-            }));
+                ["52"] = "solo remitente",
+                ["92"] = "solo remitente",
+            },
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["CLL"] = "070101", ["PAI"] = "200901" },
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["AQP"] = "040104", ["LIM"] = "070101" },
+            new HashSet<string>(["U", "2U", "KGM", "NIU"], StringComparer.Ordinal)));
 
     public static readonly IReadOnlyDictionary<string, string> DocumentNames = new Dictionary<string, string>(StringComparer.Ordinal)
     {

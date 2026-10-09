@@ -30,9 +30,13 @@ export const GRE_MOTIVES: Record<string, string> = {
   '05': 'Consignación',
   '06': 'Devolución',
   '07': 'Recojo de bienes transformados',
+  '08': 'Importación',
+  '09': 'Exportación',
   '13': 'Otros',
   '14': 'Venta sujeta a confirmación del comprador',
   '17': 'Traslado de bienes para transformación',
+  '18': 'Traslado emisor itinerante CP',
+  '19': 'Traslado de mercancía extranjera',
 }
 
 export function GuideDetail() {

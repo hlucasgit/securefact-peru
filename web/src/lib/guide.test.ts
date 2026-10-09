@@ -1,4 +1,4 @@
-import { buildGuide, emptyGood, emptyGuide, emptyRelated, toNumber } from './guide'
+import { buildGuide, emptyContainer, emptyGood, emptyGuide, emptyRelated, isCustomsMotive, relatedTypesFor, toNumber } from './guide'
 
 const sale = () => {
   const form = emptyGuide('2026-10-08')
@@ -26,7 +26,7 @@ describe('buildGuide', () => {
     expect(body.carrier).toBeNull()
     expect(body.grossWeight).toBe(12.5)
     expect(body.recipient).toEqual({ documentTypeCode: '6', documentNumber: '20100070970', name: 'CLIENTE DEMO SAC' })
-    expect(body.goods).toEqual([{ description: 'Caja de repuestos', unitCode: 'NIU', quantity: 3, code: null }])
+    expect(body.goods).toEqual([{ description: 'Caja de repuestos', unitCode: 'NIU', quantity: 3, code: null, customs: null }])
   })
 
   it('sends the carrier and the handover day in public transport, and no vehicle', () => {
@@ -72,5 +72,65 @@ describe('toNumber', () => {
     expect(toNumber('1.5')).toBe(1.5)
     expect(toNumber(' 1,5 ')).toBe(1.5)
     expect(toNumber('abc')).toBeNaN()
+  })
+})
+
+describe('guides with customs documents and the itinerant issuer', () => {
+  it('sends no point of arrival for the itinerant issuer and no customs data for the other motives', () => {
+    const form = sale()
+    form.motiveCode = '18'
+    form.portCode = 'CLL'
+    form.wholeTransfer = true
+
+    const body = buildGuide(form)
+
+    expect(body.destination).toBeNull()
+    expect(body.customs).toBeNull()
+    expect(buildGuide(sale()).destination).toMatchObject({ ubigeoCode: '150122' })
+  })
+
+  it('sends the port, the weights and the containers of an export, with the properties of each good', () => {
+    const form = sale()
+    form.motiveCode = '09'
+    form.portType = '1'
+    form.portCode = 'cll'
+    form.portName = 'Callao'
+    form.netWeight = '1450,5'
+    form.weightNote = 'incluye sacos'
+    form.containers = [{ ...emptyContainer(), number: 'msku1234567', seal: 'seal001' }, emptyContainer()]
+    form.goods = [{ ...emptyGood(), description: 'Café', unitCode: '2u', declarationNumber: '118-2026-40-654321', declarationSeries: '1' }, { ...emptyGood(), description: '' }]
+
+    const body = buildGuide(form)
+
+    expect(body.customs).toEqual({
+      portCode: 'CLL',
+      portType: '1',
+      portName: 'Callao',
+      wholeTransfer: false,
+      manifestContainers: false,
+      netWeight: 1450.5,
+      weightNote: 'incluye sacos',
+      containers: [{ number: 'MSKU1234567', seal: 'SEAL001' }],
+    })
+    expect(body.goods).toHaveLength(1)
+    expect(body.goods[0]).toMatchObject({ unitCode: '2U', customs: { declarationNumber: '118-2026-40-654321', declarationSeries: '1', emptyContainer: null } })
+  })
+
+  it('reads the empty-container indicator of a manifest line', () => {
+    const form = sale()
+    form.motiveCode = '19'
+    form.goods = [{ ...emptyGood(), description: 'Contenedor', transportDocument: 'hbl-998', transportDetail: '1', manifestContainer: 'msku1234567', emptyContainer: '1' }]
+
+    expect(buildGuide(form).goods[0].customs).toMatchObject({ transportDocument: 'HBL-998', manifestContainer: 'MSKU1234567', emptyContainer: true })
+  })
+
+  it('offers the customs documents only to the motives that carry them', () => {
+    const all = ['01', '09', '50', '52', '91', '92']
+
+    expect(relatedTypesFor('01', all)).toEqual(['01', '09'])
+    expect(relatedTypesFor('08', all)).toEqual(['09', '50', '52'])
+    expect(relatedTypesFor('09', all)).toEqual(['09', '50', '52'])
+    expect(relatedTypesFor('19', all)).toEqual(['50', '52', '91', '92'])
+    expect(['08', '09', '19', '18', '01'].map(isCustomsMotive)).toEqual([true, true, true, false, false])
   })
 })

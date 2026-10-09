@@ -40,20 +40,67 @@ public sealed record GreVehicleInput(string Plate, string? CirculationCard = nul
 
 public sealed record GreDriverInput(string DocumentTypeCode, string DocumentNumber, string FirstNames, string LastNames, string LicenseNumber);
 
-/// <param name="UnitCode">Catalogue 03 code (for example <c>NIU</c>, <c>ZZ</c>, <c>KGM</c>).</param>
+/// <param name="UnitCode">Catalogue 03 code (for example <c>NIU</c>, <c>ZZ</c>, <c>KGM</c>); catalogue 65 for the goods of a customs declaration.</param>
 /// <param name="SunatProductCode">UNSPSC code of up to 8 digits (catalogue 25), optional.</param>
-public sealed record GreGoodInput(string Description, string UnitCode, decimal Quantity, string? Code = null, string? SunatProductCode = null, string? Gtin = null);
+/// <param name="Customs">What a good says about its customs declaration or its manifest line; only for the motives 08, 09 and 19 (ADR-059).</param>
+public sealed record GreGoodInput(string Description, string UnitCode, decimal Quantity, string? Code = null, string? SunatProductCode = null, string? Gtin = null, GreGoodCustomsInput? Customs = null);
+
+/// <summary>
+/// The properties of the catalogue 55 that a good carries in the guides with customs documents: the number of the declaration and the series of the good in it (export, 7021 and 7023), and the
+/// line of the cargo manifest with its container (foreign goods, 7024 to 7028).
+/// </summary>
+/// <param name="DeclarationNumber">7021, as «118-2026-40-123456»: it is one of the related declarations (DAM or DS).</param>
+/// <param name="DeclarationSeries">7023, the number of series of the good in the declaration, up to 4 digits.</param>
+/// <param name="TransportDocument">7024, the transport document of the manifest, up to 25 capital letters, digits, «/», «\» and «-».</param>
+/// <param name="TransportDetail">7025, the number of the detail of the transport document, up to 5 digits and more than zero.</param>
+/// <param name="ManifestContainer">7026, the container of the line: one of the containers of the guide.</param>
+/// <param name="Seal">7027, the seal of the container; required when the container is not empty.</param>
+/// <param name="EmptyContainer">7028: true when the container travels empty.</param>
+public sealed record GreGoodCustomsInput(
+    string? DeclarationNumber = null,
+    string? DeclarationSeries = null,
+    string? TransportDocument = null,
+    string? TransportDetail = null,
+    string? ManifestContainer = null,
+    string? Seal = null,
+    bool? EmptyContainer = null);
+
+/// <param name="Number">Up to 17 capital letters, digits, «-» and «/».</param>
+/// <param name="Seal">Up to 100 capital letters and digits; several are separated by a comma.</param>
+public sealed record GreContainerInput(string Number, string? Seal = null);
+
+/// <summary>
+/// What the guides of import (08), export (09) and foreign goods (19) add: the port or airport, whether the whole customs declaration travels, the net weight and its justification, and up to two
+/// containers (ADR-059).
+/// </summary>
+/// <param name="PortCode">Catalogue 63 (port) or 64 (airport) code, according to <paramref name="PortType"/>.</param>
+/// <param name="PortType"><c>1</c> port, <c>2</c> airport.</param>
+/// <param name="PortName">Name of the port or airport, up to 200 characters.</param>
+/// <param name="WholeTransfer">The whole declaration (DAM or DS) travels: the goods are not listed one by one.</param>
+/// <param name="ManifestContainers">The goods are lines of a cargo manifest (91) that travel in containers.</param>
+/// <param name="NetWeight">Net weight in kilograms of the goods of the declaration, up to 12 integers and 3 decimals.</param>
+/// <param name="WeightNote">Why the gross weight of the load differs from the weight of the goods, up to 250 characters.</param>
+public sealed record GreCustomsInput(
+    string? PortCode = null,
+    string? PortType = null,
+    string? PortName = null,
+    bool WholeTransfer = false,
+    bool ManifestContainers = false,
+    decimal? NetWeight = null,
+    string? WeightNote = null,
+    IReadOnlyList<GreContainerInput>? Containers = null);
 
 /// <param name="TypeCode">Catalogue 61 code of a document that applies to the guide of the sender (for example <c>01</c> invoice, <c>03</c> receipt, <c>09</c> guide).</param>
 /// <param name="IssuerRuc">RUC of the issuer of the document; required for invoices, receipts, purchase settlements, guides, operation vouchers and port orders.</param>
 public sealed record GreRelatedDocumentInput(string TypeCode, string Number, string? IssuerRuc = null);
 
 /// <summary>
-/// Data of a guide of the sender (GRE remitente, type 09). The sender is the company. Scope of the first delivery (ADR-056): motives 01 to 07, 13, 14, 17 and 18, either modality;
-/// import, export and foreign goods (08, 09, 19) are not accepted yet.
+/// Data of a guide of the sender (GRE remitente, type 09). The sender is the company. All the motives of the catalogue 20 except «otros» with a customs declaration (ADR-056, ADR-059): the guides of import
+/// (08), export (09) and foreign goods (19) carry customs documents and <see cref="Customs"/>; the itinerant issuer (18) has no point of arrival.
 /// </summary>
 /// <param name="MotiveCode">Catalogue 20.</param>
 /// <param name="MotiveDescription">Only for the motive 13 («otros»): what the transfer is, from 3 to 100 characters.</param>
+/// <param name="Destination">The point of arrival; null only for the itinerant issuer (18), who does not know it.</param>
 /// <param name="ModalityCode">Catalogue 18: 01 public transport, 02 private transport.</param>
 /// <param name="TransferStartDate">Private transport: the day the transfer starts.</param>
 /// <param name="HandoverDate">Public transport: the day the goods are handed to the carrier.</param>
@@ -76,7 +123,7 @@ public sealed record CreateGreRequest(
     GrePartyInput? Supplier,
     GrePartyInput? Buyer,
     GreAddressInput Origin,
-    GreAddressInput Destination,
+    GreAddressInput? Destination,
     GreCarrierInput? Carrier,
     GreVehicleInput? Vehicle,
     IReadOnlyList<GreVehicleInput>? SecondaryVehicles,
@@ -87,7 +134,8 @@ public sealed record CreateGreRequest(
     bool PlannedTransshipment = false,
     bool VehicleCategoryM1OrL = false,
     bool ReturnWithEmptyPackaging = false,
-    bool ReturnEmptyVehicle = false);
+    bool ReturnEmptyVehicle = false,
+    GreCustomsInput? Customs = null);
 
 /// <summary>Who pays the freight of a guide of the carrier (the indicators <c>SUNAT_Envio_IndicadorPagadorFlete_*</c>, rule 4388).</summary>
 public enum GreFreightPayer

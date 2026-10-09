@@ -114,6 +114,7 @@ internal static class GrePdfRenderer
         }
 
         Points(flow, request.Origin, request.Destination);
+        Customs(flow, model, request);
 
         flow.Heading("Transporte");
         if (request.ModalityCode == "01" && request.Carrier is { } carrier)
@@ -253,12 +254,60 @@ internal static class GrePdfRenderer
         flow.Pair(Name(model, "6", party.DocumentTypeCode) is { Length: > 0 } type ? type : "Documento", party.DocumentNumber);
     }
 
-    private static void Points(Flow flow, GreAddressInput origin, GreAddressInput destination)
+    private static void Points(Flow flow, GreAddressInput origin, GreAddressInput? destination)
     {
         flow.Heading("Punto de partida");
         Point(flow, origin);
+        if (destination is null)
+        {
+            flow.Heading("Punto de llegada");
+            flow.Pair("Punto de llegada", "No se informa (emisor itinerante)");
+            return;
+        }
+
         flow.Heading("Punto de llegada");
         Point(flow, destination);
+    }
+
+    /// <summary>What the guides of import, export and foreign goods add: the port or airport, the net weight and the containers.</summary>
+    private static void Customs(Flow flow, GrePrintModel model, CreateGreRequest request)
+    {
+        var customs = request.Customs;
+        if (customs is null || request.MotiveCode is not ("08" or "09" or "19"))
+        {
+            return;
+        }
+
+        flow.Heading("Aduanas");
+        if (!string.IsNullOrWhiteSpace(customs.PortCode))
+        {
+            flow.Pair(customs.PortType == "2" ? "Aeropuerto" : "Puerto", $"{customs.PortCode} - {customs.PortName}");
+        }
+
+        if (customs.WholeTransfer)
+        {
+            flow.Pair("Traslado", "Total de la declaración (DAM o DS)");
+        }
+
+        if (customs.ManifestContainers)
+        {
+            flow.Pair("Traslado", "En contenedores del manifiesto de carga");
+        }
+
+        if (customs.NetWeight is { } net)
+        {
+            flow.Pair("Peso neto", $"{Number(net)} KGM");
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.WeightNote))
+        {
+            flow.Pair("Sustento de la diferencia de peso", customs.WeightNote);
+        }
+
+        foreach (var (container, index) in (customs.Containers ?? []).Select((c, i) => (c, i)))
+        {
+            flow.Pair($"Contenedor {index + 1}", string.IsNullOrWhiteSpace(container.Seal) ? container.Number : $"{container.Number} - precinto {container.Seal}");
+        }
     }
 
     private static void Point(Flow flow, GreAddressInput point)

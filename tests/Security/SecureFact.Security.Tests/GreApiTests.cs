@@ -154,14 +154,15 @@ public sealed partial class GreApiTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task A_guide_with_a_motive_that_is_not_supported_yet_is_refused_without_taking_a_number()
+    public async Task A_guide_of_import_without_its_customs_declaration_is_refused_without_taking_a_number()
     {
         var setup = await NewTenantAsync("gre-motive");
 
         var response = await setup.Owner.PostAsJsonAsync("/api/v1/gre/guides", Guide(setup, motive: "08"));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal("SF-GRE-003", await ProblemCodeAsync(response));
+        Assert.Equal("SF-GRE-001", await ProblemCodeAsync(response));
+        Assert.Contains("3440", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         var next = await CreateOkAsync(setup);
         Assert.Equal("T001-1", next.Name);
     }

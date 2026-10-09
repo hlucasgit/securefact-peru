@@ -11,8 +11,8 @@ La guía de remisión electrónica remitente es el documento que ampara el trasl
 Un módulo propio, `Gre` (`src/Modules/Gre`), con su esquema `gre`, que reutiliza lo que ya existe: la firma XMLDSig (`IXmlSigner`), el empaquetado (`ICpePackager`), el lector de CDR (`ICdrParser`), el certificado activo, los catálogos y las reglas versionadas. No toca el módulo de comprobantes.
 
 ### Alcance de esta entrega
-- **Remitente `09`**, series `T` + 3 caracteres, motivos **01, 02, 03, 04, 05, 06, 07, 13, 14 y 17**, transporte público (01) y privado (02).
-- Los motivos **08 (importación), 09 (exportación), 18 (emisor itinerante) y 19 (mercancía extranjera)** se rechazan con `SF-GRE-003` y un texto que manda al contribuyente a SUNAT Operaciones en Línea; no se emiten mal. La guía del **transportista (`31`)** se hizo después (ADR-057).
+- **Remitente `09`**, series `T` + 3 caracteres, motivos **01, 02, 03, 04, 05, 06, 07, 13, 14 y 17** (más los de aduanas, ADR-059), transporte público (01) y privado (02).
+- Los motivos **08 (importación), 09 (exportación), 18 (emisor itinerante) y 19 (mercancía extranjera)** se hicieron después (ADR-059). La guía del **transportista (`31`)** se hizo después (ADR-057).
 
 ### Flujo
 1. **Crear** (`POST /api/v1/gre/guides`): valida con las reglas del libro de validación de SUNAT que se aplican a la forma del archivo (`GreValidator`, cada mensaje lleva el código de la regla); toma el número **en la base** (`UPDATE … SET last_number = last_number + 1 … RETURNING`, dentro de la transacción que guarda la guía; nunca máximo más uno); genera el `DespatchAdvice` (`GreUblGenerator`, validado contra el XSD UBL 2.1 oficial), lo firma con el certificado activo y lo guarda **preparada**.

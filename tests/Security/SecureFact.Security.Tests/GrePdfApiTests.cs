@@ -22,7 +22,7 @@ public sealed partial class GreApiTests
             using var zlib = new ZLibStream(new MemoryStream(Encoding.Latin1.GetBytes(stream.Groups["body"].Value)), CompressionMode.Decompress);
             using var reader = new StreamReader(zlib, Encoding.Latin1);
             var content = reader.ReadToEnd();
-            lines.AddRange(Regex.Matches(content, @"\((?<t>(?:\\.|[^\\)])*)\) Tj", RegexOptions.None, TimeSpan.FromSeconds(5)).Select(m => m.Groups["t"].Value));
+            lines.AddRange(Regex.Matches(content, @"\((?<t>(?:\\.|[^\\)])*)\) Tj", RegexOptions.None, TimeSpan.FromSeconds(5)).Select(m => Regex.Replace(m.Groups["t"].Value, @"\\(.)", "$1", RegexOptions.None, TimeSpan.FromSeconds(1))));
         }
 
         return string.Join(' ', lines);

@@ -16,12 +16,18 @@ internal sealed record GreValidationContext(
     IReadOnlySet<string> GenericMotiveDescriptions,
     GreCatalogs Catalogs);
 
+/// <param name="Ports">Catalogue 63: the ubigeo of each port by code. Null when the catalogue is not loaded: its codes are then not checked.</param>
+/// <param name="Airports">Catalogue 64: the ubigeo of each airport by code.</param>
+/// <param name="CustomsUnits">Catalogue 65: the units of measure of the goods of a customs declaration.</param>
 internal sealed record GreCatalogs(
     IReadOnlySet<string> UnitCodes,
     IReadOnlySet<string> DocumentTypes,
     IReadOnlySet<string> Modalities,
     IReadOnlySet<string> Motives,
-    IReadOnlyDictionary<string, string> RelatedDocumentApplicability);
+    IReadOnlyDictionary<string, string> RelatedDocumentApplicability,
+    IReadOnlyDictionary<string, string>? Ports = null,
+    IReadOnlyDictionary<string, string>? Airports = null,
+    IReadOnlySet<string>? CustomsUnits = null);
 
 /// <summary>
 /// The rules of the validation workbook of the GRE (S27, sheet «Guía-Remitente2_0») that SUNAT applies to the shape of the file (the ones marked XSL), written as the guide of the
@@ -30,14 +36,14 @@ internal sealed record GreCatalogs(
 /// </summary>
 internal static partial class GreValidator
 {
-    /// <summary>Motives that the first delivery issues: 08, 09 and 19 need customs documents, ports and containers, and 18 is the itinerant issuer (R-068).</summary>
-    public static readonly IReadOnlySet<string> SupportedMotives = new HashSet<string>(["01", "02", "03", "04", "05", "06", "07", "13", "14", "17"], StringComparer.Ordinal);
+    /// <summary>Every motive of the catalogue 20 is issued; import, export and foreign goods carry customs documents (ADR-059).</summary>
+    public static readonly IReadOnlySet<string> SupportedMotives = new HashSet<string>(["01", "02", "03", "04", "05", "06", "07", "08", "09", "13", "14", "17", "18", "19"], StringComparer.Ordinal);
 
-    /// <summary>Related documents of customs and ports, which belong to the motives not supported yet.</summary>
+    /// <summary>Related documents of customs and ports: declarations (50 DAM, 52 DS), cargo manifest (91) and delivery order of the port terminal (92).</summary>
     private static readonly HashSet<string> CustomsDocuments = new(["50", "52", "91", "92"], StringComparer.Ordinal);
 
-    private static readonly HashSet<string> RecipientIsSender = new(["02", "04", "07"], StringComparer.Ordinal);
-    private static readonly HashSet<string> RecipientIsNotSender = new(["01", "03", "05", "06", "14", "17"], StringComparer.Ordinal);
+    private static readonly HashSet<string> RecipientIsSender = new(["02", "04", "07", "18"], StringComparer.Ordinal);
+    private static readonly HashSet<string> RecipientIsNotSender = new(["01", "03", "05", "06", "09", "14", "17"], StringComparer.Ordinal);
     private static readonly HashSet<string> RelatedDocumentsWithIssuer = new(["01", "03", "04", "09", "12", "48", "92"], StringComparer.Ordinal);
 
     [GeneratedRegex("^[A-Z0-9]{1,3}$")]
@@ -82,13 +88,23 @@ internal static partial class GreValidator
         void Add(string rule, string message) => issues.Add($"[{rule}] {message}");
 
         var issueDate = request.IssueDate ?? context.Today;
+        var customs = CustomsView.Of(request);
         Header(request, context, issueDate, Add);
         Parties(request, context, Add);
-        Shipment(request, issueDate, Add);
+        Shipment(request, customs, issueDate, Add);
         Transport(request, Add);
-        Points(request, context, request.MotiveCode ?? string.Empty, Add);
-        Goods(request.Goods, context, Add);
-        RelatedDocuments(request, context, request.Recipient, Add);
+        Points(request, context, request.MotiveCode ?? string.Empty, customs, Add);
+        if (customs.IsCustoms)
+        {
+            CustomsGoods(request, context, customs, Add);
+        }
+        else
+        {
+            Goods(request.Goods, context, Add);
+        }
+
+        RelatedDocuments(request, context, request.Recipient, customs, Add);
+        CustomsShipment(request, context, customs, Add);
         return issues;
     }
 
@@ -172,7 +188,7 @@ internal static partial class GreValidator
                 add("2554", "Con este motivo el destinatario es el propio remitente.");
             }
 
-            if (motive is "06" or "17" && recipient.DocumentTypeCode != "6")
+            if (motive is "06" or "17" or "19" && recipient.DocumentTypeCode != "6")
             {
                 add("3417", "Con este motivo el destinatario se identifica con RUC.");
             }
@@ -282,9 +298,21 @@ internal static partial class GreValidator
         }
     }
 
-    private static void Shipment(CreateGreRequest request, DateOnly issueDate, Action<string, string> add)
+    private static void Shipment(CreateGreRequest request, CustomsView customs, DateOnly issueDate, Action<string, string> add)
     {
-        Weight(request.GrossWeight, request.WeightUnit, request.PackageCount, add);
+        if (customs.Has92)
+        {
+            // The delivery order of the port terminal carries its own data: the guide has no weight (the tags must not exist).
+            if (request.GrossWeight != 0)
+            {
+                add("3625", "Con la cita u orden de entrega del terminal portuario (92) la guía no lleva peso bruto.");
+            }
+        }
+        else
+        {
+            Weight(request.GrossWeight, request.WeightUnit, request.PackageCount, add);
+        }
+
 
         if (request.ModalityCode == "02")
         {
@@ -468,10 +496,21 @@ internal static partial class GreValidator
 
     // ---------- points ----------
 
-    private static void Points(CreateGreRequest request, GreValidationContext context, string motive, Action<string, string> add)
+    private static void Points(CreateGreRequest request, GreValidationContext context, string motive, CustomsView customs, Action<string, string> add)
     {
         Point("partida", request.Origin, add);
-        Point("llegada", request.Destination, add);
+        if (motive == "18")
+        {
+            // The itinerant issuer does not know where the goods go: the point of arrival does not exist.
+            if (request.Destination is not null)
+            {
+                add("3416", "Con el motivo emisor itinerante (18) no se informa el punto de llegada.");
+            }
+        }
+        else
+        {
+            Point("llegada", request.Destination, add);
+        }
 
         if (motive == "04")
         {
@@ -488,7 +527,9 @@ internal static partial class GreValidator
             }
         }
 
-        if (motive is "02" or "07" && request.Origin?.EstablishmentRuc?.Trim() == context.SenderRuc)
+        CustomsPoints(request, context, motive, customs, add);
+
+        if (motive is "02" or "07" or "08" && request.Origin?.EstablishmentRuc?.Trim() == context.SenderRuc)
         {
             add("3411", "Con este motivo el establecimiento de partida no es del remitente.");
         }
@@ -542,7 +583,7 @@ internal static partial class GreValidator
 
     // ---------- goods ----------
 
-    private static void Goods(IReadOnlyList<GreGoodInput>? list, GreValidationContext context, Action<string, string> add, bool required = true)
+    private static void Goods(IReadOnlyList<GreGoodInput>? list, GreValidationContext context, Action<string, string> add, bool required = true, IReadOnlySet<string>? units = null)
     {
         var goods = list ?? [];
         if (goods.Count == 0 && required)
@@ -565,7 +606,14 @@ internal static partial class GreValidator
             }
 
             var unit = good.UnitCode?.Trim() ?? string.Empty;
-            if (context.Catalogs.UnitCodes.Count == 0)
+            if (units is not null)
+            {
+                if (!units.Contains(unit))
+                {
+                    add("3446", $"{at}: la unidad de medida de un bien de una declaración aduanera está en el catálogo 65.");
+                }
+            }
+            else if (context.Catalogs.UnitCodes.Count == 0)
             {
                 // The catalogue 03 is the UN/ECE Recommendation 20, an external list that is not loaded: only the shape of the code is checked and SUNAT observes an unknown one (4320).
                 if (!UnitShape().IsMatch(unit))
@@ -602,9 +650,10 @@ internal static partial class GreValidator
 
     // ---------- related documents ----------
 
-    private static void RelatedDocuments(CreateGreRequest request, GreValidationContext context, GrePartyInput? recipient, Action<string, string> add)
+    private static void RelatedDocuments(CreateGreRequest request, GreValidationContext context, GrePartyInput? recipient, CustomsView customs, Action<string, string> add)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        CustomsDocumentSet(request.MotiveCode ?? string.Empty, customs, add);
         foreach (var document in request.RelatedDocuments ?? [])
         {
             var type = document.TypeCode?.Trim() ?? string.Empty;
@@ -615,9 +664,15 @@ internal static partial class GreValidator
                 continue;
             }
 
-            if (CustomsDocuments.Contains(type))
+            if (!CustomsOtherDocumentFits(request.MotiveCode, type))
             {
-                add("3445", $"El documento relacionado «{type}» (aduanas, manifiesto o terminal portuario) es de los motivos que aún no se emiten aquí.");
+                add("3445", $"El documento relacionado «{type}» no se relaciona con este motivo de traslado.");
+                continue;
+            }
+
+            if (CustomsDocuments.Contains(type) && !CustomsDocumentAllowed(request.MotiveCode, type))
+            {
+                add("3445", $"El documento relacionado «{type}» no corresponde al motivo de traslado (las declaraciones 50 y 52 son de los motivos 08, 09 y 19; el manifiesto 91 y la orden 92, del 19).");
                 continue;
             }
 
@@ -632,9 +687,9 @@ internal static partial class GreValidator
                 add("3340", $"El documento relacionado «{type}» {number} se repite.");
             }
 
-            if (!RelatedNumberIsValid(type, number))
+            if (CustomsDocuments.Contains(type) ? !CustomsNumberIsValid(type, request.MotiveCode, number, request.Customs?.PortType) : !RelatedNumberIsValid(type, number))
             {
-                add("3441", $"El número «{number}» no tiene la forma del documento relacionado «{type}».");
+                add("3441", $"El número «{number}» no tiene la forma del documento relacionado «{type}»{CustomsNumberHint(type, request.MotiveCode)}.");
             }
 
             var issuer = document.IssuerRuc?.Trim() ?? string.Empty;

@@ -81,9 +81,17 @@ internal static partial class GreUblGenerator
         }
 
         root.Add(Shipment(request));
-        for (var i = 0; i < request.Goods.Count; i++)
+        var manifestContainers = request.Customs?.ManifestContainers == true;
+        var goods = request.Goods ?? [];
+        for (var i = 0; i < goods.Count; i++)
         {
-            root.Add(Line(i + 1, request.Goods[i]));
+            root.Add(Line(i + 1, goods[i], manifestContainers));
+        }
+
+        if (goods.Count == 0)
+        {
+            // The schema asks for at least one line: when the goods are not listed (the whole declaration travels, or the delivery order of the port terminal says it all) it is a line of form.
+            root.Add(new XElement(Cac + "DespatchLine", new XElement(Cbc + "ID", "1"), new XElement(Cac + "OrderLineReference", new XElement(Cbc + "LineID", "1")), new XElement(Cac + "Item")));
         }
 
         return Serialize(root);
@@ -169,7 +177,21 @@ internal static partial class GreUblGenerator
             shipment.Add(new XElement(Cbc + "HandlingInstructions", request.MotiveDescription!.Trim()));
         }
 
-        shipment.Add(new XElement(Cbc + "GrossWeightMeasure", new XAttribute("unitCode", request.WeightUnit), Number(request.GrossWeight)));
+        if (!string.IsNullOrWhiteSpace(request.Customs?.WeightNote))
+        {
+            shipment.Add(new XElement(Cbc + "Information", request.Customs.WeightNote.Trim()));
+        }
+
+        if (request.GrossWeight > 0)
+        {
+            shipment.Add(new XElement(Cbc + "GrossWeightMeasure", new XAttribute("unitCode", request.WeightUnit), Number(request.GrossWeight)));
+        }
+
+        if (request.Customs?.NetWeight is { } net)
+        {
+            shipment.Add(new XElement(Cbc + "NetWeightMeasure", new XAttribute("unitCode", "KGM"), Number(net)));
+        }
+
         if (request.PackageCount is { } packages)
         {
             shipment.Add(new XElement(Cbc + "TotalTransportHandlingUnitQuantity", packages.ToString(CultureInfo.InvariantCulture)));
@@ -181,9 +203,14 @@ internal static partial class GreUblGenerator
         }
 
         shipment.Add(Stage(request), Delivery(request));
-        if (Vehicles(request.Vehicle, request.SecondaryVehicles) is { } vehicles)
+        if (TransportUnit(request.Vehicle, request.SecondaryVehicles, request.Customs?.Containers) is { } unit)
         {
-            shipment.Add(vehicles);
+            shipment.Add(unit);
+        }
+
+        if (PortLocation(request.Customs) is { } port)
+        {
+            shipment.Add(port);
         }
 
         return shipment;
@@ -209,6 +236,16 @@ internal static partial class GreUblGenerator
         if (request.ReturnEmptyVehicle)
         {
             yield return "SUNAT_Envio_IndicadorRetornoVehiculoVacio";
+        }
+
+        if (request.Customs?.WholeTransfer == true)
+        {
+            yield return "SUNAT_Envio_IndicadorTrasladoTotalDAMoDS";
+        }
+
+        if (request.Customs?.ManifestContainers == true)
+        {
+            yield return "SUNAT_Envio_IndicadorTrasladoContenedorManifiestoCarga";
         }
     }
 
@@ -269,11 +306,17 @@ internal static partial class GreUblGenerator
             new XElement(Cbc + "JobTitle", kind),
             new XElement(Cac + "IdentityDocumentReference", new XElement(Cbc + "ID", driver.LicenseNumber.Trim().ToUpperInvariant())));
 
-    private static XElement Delivery(CreateGreRequest request) =>
-        new(
-            Cac + "Delivery",
-            Address("DeliveryAddress", request.Destination),
-            new XElement(Cac + "Despatch", Address("DespatchAddress", request.Origin)));
+    private static XElement Delivery(CreateGreRequest request)
+    {
+        var delivery = new XElement(Cac + "Delivery");
+        if (request.Destination is { } destination)
+        {
+            delivery.Add(Address("DeliveryAddress", destination));
+        }
+
+        delivery.Add(new XElement(Cac + "Despatch", Address("DespatchAddress", request.Origin)));
+        return delivery;
+    }
 
     private static XElement Address(string name, GreAddressInput address)
     {
@@ -295,6 +338,45 @@ internal static partial class GreUblGenerator
     }
 
     /// <summary>The vehicles of the private transport: the principal one and up to two attached, in a single transport handling unit.</summary>
+    private static XElement? TransportUnit(GreVehicleInput? vehicle, IReadOnlyList<GreVehicleInput>? secondaries, IReadOnlyList<GreContainerInput>? containers)
+    {
+        var unit = Vehicles(vehicle, secondaries);
+        foreach (var container in (containers ?? []).Where(c => !string.IsNullOrWhiteSpace(c.Number)))
+        {
+            unit ??= new XElement(Cac + "TransportHandlingUnit");
+            var package = new XElement(Cac + "Package", new XElement(Cbc + "ID", container.Number.Trim()));
+            if (!string.IsNullOrWhiteSpace(container.Seal))
+            {
+                package.Add(new XElement(Cbc + "TraceID", container.Seal.Trim()));
+            }
+
+            unit.Add(package);
+        }
+
+        return unit;
+    }
+
+    /// <summary>The port or the airport of the transfer: its code, whether it is one or the other and its name.</summary>
+    private static XElement? PortLocation(GreCustomsInput? customs)
+    {
+        if (string.IsNullOrWhiteSpace(customs?.PortCode))
+        {
+            return null;
+        }
+
+        var port = customs.PortType == "1";
+        return new XElement(
+            Cac + "FirstArrivalPortLocation",
+            new XElement(
+                Cbc + "ID",
+                new XAttribute("schemeAgencyName", Agency),
+                new XAttribute("schemeName", port ? "Puertos" : "Aeropuertos"),
+                new XAttribute("schemeURI", CatalogueUri + (port ? "63" : "64")),
+                customs.PortCode.Trim().ToUpperInvariant()),
+            new XElement(Cbc + "LocationTypeCode", customs.PortType),
+            new XElement(Cbc + "Name", customs.PortName?.Trim() ?? string.Empty));
+    }
+
     private static XElement? Vehicles(GreVehicleInput? vehicle, IReadOnlyList<GreVehicleInput>? secondaries)
     {
         if (vehicle is null)
@@ -322,7 +404,7 @@ internal static partial class GreUblGenerator
         return new XElement(Cac + "TransportHandlingUnit", equipment);
     }
 
-    private static XElement Line(int order, GreGoodInput good)
+    private static XElement Line(int order, GreGoodInput good, bool manifestContainers = false)
     {
         var item = new XElement(Cac + "Item", new XElement(Cbc + "Description", good.Description.Trim()));
         if (!string.IsNullOrWhiteSpace(good.Code))
@@ -347,17 +429,77 @@ internal static partial class GreUblGenerator
                     good.SunatProductCode.Trim())));
         }
 
-        return new XElement(
-            Cac + "DespatchLine",
-            new XElement(Cbc + "ID", order.ToString(CultureInfo.InvariantCulture)),
-            new XElement(
+        foreach (var (code, name, value) in CustomsProperties(good.Customs))
+        {
+            item.Add(new XElement(
+                Cac + "AdditionalItemProperty",
+                new XElement(Cbc + "Name", name),
+                new XElement(
+                    Cbc + "NameCode",
+                    new XAttribute("listName", "Propiedad del item"),
+                    new XAttribute("listAgencyName", Agency),
+                    new XAttribute("listURI", CatalogueUri + "55"),
+                    code),
+                new XElement(Cbc + "Value", value)));
+        }
+
+        var line = new XElement(Cac + "DespatchLine", new XElement(Cbc + "ID", order.ToString(CultureInfo.InvariantCulture)));
+        if (!manifestContainers)
+        {
+            line.Add(new XElement(
                 Cbc + "DeliveredQuantity",
                 new XAttribute("unitCode", good.UnitCode.Trim()),
                 new XAttribute("unitCodeListID", "UN/ECE rec 20"),
                 new XAttribute("unitCodeListAgencyName", "United Nations Economic Commission for Europe"),
-                Number(good.Quantity)),
-            new XElement(Cac + "OrderLineReference", new XElement(Cbc + "LineID", order.ToString(CultureInfo.InvariantCulture))),
-            item);
+                Number(good.Quantity)));
+        }
+
+        line.Add(new XElement(Cac + "OrderLineReference", new XElement(Cbc + "LineID", order.ToString(CultureInfo.InvariantCulture))), item);
+        return line;
+    }
+
+    /// <summary>The properties of the catalogue 55 that a good carries in a guide with customs documents, in the order of the sheet.</summary>
+    private static IEnumerable<(string Code, string Name, string Value)> CustomsProperties(GreGoodCustomsInput? customs)
+    {
+        if (customs is null)
+        {
+            yield break;
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.DeclarationNumber))
+        {
+            yield return ("7021", "Numeración de la DAM o DS", customs.DeclarationNumber.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.DeclarationSeries))
+        {
+            yield return ("7023", "Número de serie en la DAM o DS", customs.DeclarationSeries.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.TransportDocument))
+        {
+            yield return ("7024", "Documento de transporte del MC", customs.TransportDocument.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.TransportDetail))
+        {
+            yield return ("7025", "Número de detalle del MC", customs.TransportDetail.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.ManifestContainer))
+        {
+            yield return ("7026", "Contenedor del MC", customs.ManifestContainer.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(customs.Seal))
+        {
+            yield return ("7027", "Precinto", customs.Seal.Trim());
+        }
+
+        if (customs.EmptyContainer is { } empty)
+        {
+            yield return ("7028", "Indicador de contenedor vacío", empty ? "1" : "0");
+        }
     }
 
     /// <summary>A decimal as the schema writes it: no exponent, the point as separator and no trailing zeros.</summary>
