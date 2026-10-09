@@ -53,7 +53,7 @@ Además del usuario y la clave SOL, la API de SUNAT pide `client_id` y `client_s
 - **Nunca se probó contra SUNAT real.** No hay beta documentado de la GRE; lo implementado sigue el Manual de Servicios y el Manual URL (S28, S29). Son supuestos: la representación hexadecimal en minúsculas del `hashZip`; que el CDR de la GRE es un `ApplicationResponse` como el de las facturas; y que el `DespatchAdvice` lleva el elemento `cac:Signature` como el UBL de las facturas.
 - **Lo que solo SUNAT sabe** (que el transportista, el vehículo o el conductor estén registrados, la licencia, el establecimiento anexo, el estado del destinatario) no se valida aquí: SUNAT lo contesta en el CDR.
 - **Ubigeo** solo por formato (la lista del INEI no viene en el libro) y **unidad de medida del bien** solo por forma (el catálogo 03 es la Recomendación 20 de la ONU, una lista externa); SUNAT observa (4320) una unidad desconocida.
-- **Sin representación impresa** (PDF con QR) de la guía; se entrega el XML firmado y el CDR.
+- La representación impresa (PDF) se hizo después (ADR-058).
 - **Sin idempotencia al crear**: dos envíos del formulario crean dos guías y consumen dos números (el botón se bloquea mientras espera).
 - La interfaz no ofrece vehículos ni conductores secundarios, el trasbordo programado, el indicador de vehículo de categoría M1/L ni el de retorno con envases o vehículo vacío, aunque la solicitud de la API sí los admite.
 - El caché de tokens es **por proceso**: la API y cada worker piden su propio token.

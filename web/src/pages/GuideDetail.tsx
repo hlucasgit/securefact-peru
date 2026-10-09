@@ -7,12 +7,18 @@ import { GreBadge } from '../components/GreBadge'
 import { ErrorAlert, KeyValues, Loading, PageHeader, useToast } from '../components/ui'
 import { BILLING_ROLES, date, dateTime } from '../lib/format'
 
-function save(blob: Blob, name: string) {
+function save(blob: Blob, name: string, tab: Window | null = null) {
   const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = name
-  link.click()
+  if (tab) {
+    // The tab was opened by the click itself (a window opened after the wait for the file is taken for a pop-up and blocked); it is told where to go now, cut from this page.
+    tab.opener = null
+    tab.location.href = url
+  } else {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+  }
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
@@ -46,10 +52,17 @@ function Detail({ guide }: { guide: Guide }) {
   const canSend = hasRole(...BILLING_ROLES)
   const answered = guide.cdrResponseCode !== null
 
-  async function download(kind: 'xml' | 'cdr') {
+  async function download(kind: 'xml' | 'cdr' | 'pdf') {
+    const tab = kind === 'pdf' ? window.open('', '_blank') : null
+    if (kind === 'pdf' && !tab) {
+      toast.fail(new Error('El navegador bloqueó la ventana del PDF. Permita las ventanas emergentes de este sitio.'))
+      return
+    }
+
     try {
-      save(await fetchBlob(`/api/v1/gre/guides/${guide.id}/${kind}`), kind === 'xml' ? `${guide.name}.xml` : `R-${guide.name}.zip`)
+      save(await fetchBlob(`/api/v1/gre/guides/${guide.id}/${kind}`), kind === 'xml' ? `${guide.name}.xml` : `R-${guide.name}.zip`, tab)
     } catch (error) {
+      tab?.close()
       toast.fail(error)
     }
   }
@@ -110,6 +123,7 @@ function Detail({ guide }: { guide: Guide }) {
               {refresh.isPending ? 'Consultando…' : 'Consultar a SUNAT'}
             </button>
           )}
+          <button className="btn" type="button" onClick={() => void download('pdf')}>Ver PDF</button>
           <button className="btn" type="button" onClick={() => void download('xml')}>Descargar XML</button>
           {answered && <button className="btn" type="button" onClick={() => void download('cdr')}>Descargar CDR</button>}
         </div>

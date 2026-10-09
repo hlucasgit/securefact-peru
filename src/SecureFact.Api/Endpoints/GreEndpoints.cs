@@ -42,6 +42,9 @@ internal static class GreEndpoints
         guides.MapGet("/{id:guid}/xml", async (Guid id, IGreService service, HttpContext http, CancellationToken ct) =>
             (await service.GetXmlAsync(id, ct)).ToHttp(http, xml => Results.Text(xml, "application/xml"))).RequireAuthorization(Permissions.DocumentsRead);
 
+        guides.MapGet("/{id:guid}/pdf", async (Guid id, IGreService service, HttpContext http, CancellationToken ct) =>
+            (await service.GetPdfAsync(id, ct)).ToHttp(http, pdf => Results.File(pdf, "application/pdf", $"{id:N}.pdf"))).RequireAuthorization(Permissions.DocumentsRead);
+
         guides.MapGet("/{id:guid}/cdr", async (Guid id, IGreService service, HttpContext http, CancellationToken ct) =>
             (await service.GetCdrAsync(id, ct)).ToHttp(http, zip => Results.File(zip, "application/zip", $"R-{id:N}.zip"))).RequireAuthorization(Permissions.DocumentsRead);
     }

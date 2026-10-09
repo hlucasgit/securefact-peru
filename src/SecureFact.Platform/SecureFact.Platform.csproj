@@ -5,6 +5,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="QRCoder" />
     <ProjectReference Include="..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
   </ItemGroup>
 </Project>

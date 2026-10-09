@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Xml.Linq;
 using Microsoft.EntityFrameworkCore;
 using SecureFact.Audit.Contracts;
 using SecureFact.Catalogs.Contracts;
@@ -7,6 +8,7 @@ using SecureFact.CpeEngine.Contracts;
 using SecureFact.Gre.Contracts;
 using SecureFact.Gre.Domain;
 using SecureFact.Gre.Infrastructure;
+using SecureFact.Gre.Printing;
 using SecureFact.Organizations.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.Rules.Contracts;
@@ -356,6 +358,57 @@ internal sealed class GreService(
         }
 
         return guide.CdrZip is { } zip ? zip : Error.NotFound(ErrorCodes.GuideNotFound, "CDR no disponible", "SUNAT todavía no entregó la constancia de esta guía.");
+    }
+
+    public async Task<Result<byte[]>> GetPdfAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var guide = await db.Guides.AsNoTracking().SingleOrDefaultAsync(g => g.Id == id, cancellationToken);
+        if (guide is null)
+        {
+            return Missing;
+        }
+
+        var company = await companies.GetAsync(guide.CompanyId, cancellationToken);
+        if (!company.IsSuccess)
+        {
+            return company.Error;
+        }
+
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), Lima).DateTime);
+        var names = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var number in new[] { "06", "18", "20", "61" })
+        {
+            var entries = await catalogs.GetEntriesAsync(number, today, cancellationToken);
+            names[number.TrimStart('0')] = entries.IsSuccess ? entries.Value.ToDictionary(e => e.Code, e => e.Description, StringComparer.Ordinal) : new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        string? qr = null;
+        if (guide.CdrZip is { } zip && guide.State is GreState.Accepted or GreState.AcceptedWithObservations)
+        {
+            var unzipped = packager.Unzip(zip);
+            qr = unzipped.IsSuccess ? GreQrUrl.Find(unzipped.Value.Content) : null;
+        }
+
+        var model = new GrePrintModel(
+            company.Value.Ruc, company.Value.LegalName, company.Value.FiscalAddress, guide.DocumentTypeCode, guide.Series, guide.Number, guide.IssueDate, IssueTime(guide.SignedXml),
+            guide.State, guide.CdrResponseCode, guide.CdrDescription, JsonSerializer.Deserialize<List<GreObservation>>(guide.CdrObservationsJson, Json) ?? [], guide.ProcessedAt, guide.DigestValue, qr, names,
+            guide.DocumentTypeCode == DocumentTypes.Sender ? JsonSerializer.Deserialize<CreateGreRequest>(guide.RequestJson, Json) : null,
+            guide.DocumentTypeCode == DocumentTypes.Carrier ? JsonSerializer.Deserialize<CreateGreCarrierRequest>(guide.RequestJson, Json) : null);
+        return GrePdfRenderer.Render(model);
+    }
+
+    /// <summary>The hour of the XML (<c>cbc:IssueTime</c>), which the row does not keep apart.</summary>
+    private static string IssueTime(string signedXml)
+    {
+        XNamespace cbc = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
+        try
+        {
+            return XDocument.Parse(signedXml).Root?.Element(cbc + "IssueTime")?.Value ?? string.Empty;
+        }
+        catch (System.Xml.XmlException)
+        {
+            return string.Empty;
+        }
     }
 
     // ---------- helpers ----------

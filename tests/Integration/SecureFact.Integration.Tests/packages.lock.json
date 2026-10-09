@@ -586,7 +586,6 @@
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Http": "[10.0.12, )",
-          "QRCoder": "[1.8.0, )",
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Billing.Contracts": "[1.0.0, )",
           "SecureFact.Certificates.Contracts": "[1.0.0, )",
@@ -708,6 +707,7 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
+          "QRCoder": "[1.8.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )"
         }
       },

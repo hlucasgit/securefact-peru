@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using QRCoder;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.CpeEngine.Printing;
+using SecureFact.Platform.Printing;
 using SecureFact.SharedKernel;
 
 namespace SecureFact.Unit.Tests.CpeEngine;

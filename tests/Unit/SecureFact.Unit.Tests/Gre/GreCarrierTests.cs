@@ -20,7 +20,7 @@ public class GreCarrierTests
     /// <summary>The carrier is the company whose RUC the context holds; the sender is another taxpayer.</summary>
     private static GreValidationContext Context() => GreSamples.Context() with { SenderRuc = GreSamples.CarrierRuc };
 
-    private static CreateGreCarrierRequest WithGoods() => new(
+    internal static CreateGreCarrierRequest WithGoods() => new(
         CompanyId: Guid.Empty,
         SeriesId: Guid.Empty,
         IssueDate: GreSamples.Today,
@@ -42,7 +42,7 @@ public class GreCarrierTests
         RelatedDocuments: [new GreRelatedDocumentInput("01", "F001-123", SenderGuideIssuer)]);
 
     /// <summary>The same transfer when the guide of the sender already lists the goods and the addresses.</summary>
-    private static CreateGreCarrierRequest WithSenderGuide() => WithGoods() with
+    internal static CreateGreCarrierRequest WithSenderGuide() => WithGoods() with
     {
         Goods = null,
         Origin = new GreAddressInput("150101", string.Empty),

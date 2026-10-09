@@ -209,6 +209,9 @@ public interface IGreService
 
     /// <summary>The CDR zip that SUNAT answered with, when it did.</summary>
     Task<Result<byte[]>> GetCdrAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The printed representation (PDF) of the guide, of any state: a guide that SUNAT has not accepted carries a mark that says it does not support the transfer (ADR-058).</summary>
+    Task<Result<byte[]>> GetPdfAsync(Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>Sends the pending work of the guides (ADR-056): asks SUNAT for the tickets that are waiting. Platform scope, across accounts.</summary>

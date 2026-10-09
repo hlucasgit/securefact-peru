@@ -2,9 +2,9 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 
-namespace SecureFact.CpeEngine.Printing;
+namespace SecureFact.Platform.Printing;
 
-internal enum PdfFont
+public enum PdfFont
 {
     Regular,
     Bold,
@@ -14,7 +14,7 @@ internal enum PdfFont
 /// A deliberately small PDF 1.4 writer: A4 pages, the two standard Helvetica fonts (no font files to ship or license), text, lines and
 /// filled rectangles. Output is deterministic (no timestamps or random ids), which makes it testable and cacheable.
 /// </summary>
-internal sealed class PdfWriter
+public sealed class PdfWriter
 {
     public const double PageWidth = 595.28;
     public const double PageHeight = 841.89;
@@ -94,10 +94,10 @@ internal sealed class PdfWriter
         return output.ToArray();
     }
 
-    internal static string Number(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    public static string Number(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     /// <summary>Escapes a string for a PDF literal and keeps only characters WinAnsiEncoding can show (others become '?').</summary>
-    internal static string Escape(string text)
+    public static string Escape(string text)
     {
         var builder = new StringBuilder(text.Length);
         foreach (var c in text)
@@ -121,7 +121,7 @@ internal sealed class PdfWriter
     }
 }
 
-internal sealed class PdfPage
+public sealed class PdfPage
 {
     public StringBuilder Content { get; } = new();
 
@@ -157,7 +157,7 @@ internal sealed class PdfPage
 }
 
 /// <summary>Advance widths (1/1000 em) of the standard Helvetica fonts for ASCII; accented Latin-1 letters take the width of their base letter.</summary>
-internal static class Helvetica
+public static class Helvetica
 {
     private const string Printable = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
@@ -202,5 +202,50 @@ internal static class Helvetica
         }
 
         return total * size / 1000.0;
+    }
+}
+
+/// <summary>Draws a QR code on a page as vector squares, so that it prints sharp at any size. QR Code 2005, error correction Q, UTF-8 (S19, numeral 6.4.2).</summary>
+public static class PdfQr
+{
+    /// <summary>Draws the QR in a square of <paramref name="size"/> points whose lower left corner is (<paramref name="x"/>, <paramref name="y"/>), leaving <paramref name="quietZone"/> points free on each side. Dark runs on a row are merged into one rectangle.</summary>
+    /// <returns>The x where the square ends.</returns>
+    public static double Draw(PdfPage page, string payload, double x, double y, double size, double quietZone)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentException.ThrowIfNullOrEmpty(payload);
+        using var generator = new QRCoder.QRCodeGenerator();
+        using var data = generator.CreateQrCode(payload, QRCoder.QRCodeGenerator.ECCLevel.Q, forceUtf8: true, utf8BOM: false, eciMode: QRCoder.QRCodeGenerator.EciMode.Utf8);
+        var matrix = data.ModuleMatrix;
+
+        // QRCoder keeps a 4-module quiet zone inside the matrix; the symbol itself is what lies inside it.
+        const int padding = 4;
+        var modules = matrix.Count - (2 * padding);
+        var module = (size - (2 * quietZone)) / modules;
+        var originX = x + quietZone;
+        var originY = y + quietZone;
+
+        for (var row = 0; row < modules; row++)
+        {
+            var column = 0;
+            while (column < modules)
+            {
+                if (!matrix[row + padding][column + padding])
+                {
+                    column++;
+                    continue;
+                }
+
+                var start = column;
+                while (column < modules && matrix[row + padding][column + padding])
+                {
+                    column++;
+                }
+
+                page.FillRectangle(originX + (start * module), originY + ((modules - 1 - row) * module), (column - start) * module, module);
+            }
+        }
+
+        return x + size;
     }
 }

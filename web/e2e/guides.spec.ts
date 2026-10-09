@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import type { Page } from '@playwright/test'
+import type { Download, Page } from '@playwright/test'
 import { expect, test } from './fixtures.ts'
 
 /** Fills the form of a sale in private transport: one good, one vehicle, one driver and the invoice of the sale. */
@@ -58,6 +58,11 @@ test.describe('guías de remisión', () => {
     const cdrDownload = app.waitForEvent('download')
     await app.getByRole('button', { name: 'Descargar CDR' }).click()
     expect(readFileSync((await (await cdrDownload).path())!).subarray(0, 2).toString('latin1')).toBe('PK')
+
+    // The PDF opens in a new tab as a blob. Headless Chromium has no PDF viewer, so it hands the file over as a download of that tab.
+    const pdfDownload = new Promise<Download>((resolve) => app.context().on('page', (tab) => tab.on('download', resolve)))
+    await app.getByRole('button', { name: 'Ver PDF' }).click()
+    expect(readFileSync((await (await pdfDownload).path())!).subarray(0, 4).toString('latin1')).toBe('%PDF')
 
     await app.getByRole('link', { name: 'Guías de remisión', exact: true }).click()
     const row = app.getByRole('row', { name: /T001-1/ })

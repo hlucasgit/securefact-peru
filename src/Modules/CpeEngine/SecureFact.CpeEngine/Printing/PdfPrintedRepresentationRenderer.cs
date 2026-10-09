@@ -1,5 +1,5 @@
 using System.Globalization;
-using QRCoder;
+using SecureFact.Platform.Printing;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Results;
@@ -311,7 +311,7 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
 
         // QR at the bottom left, with the summary value and the legend beside it.
         var qrY = Margin;
-        var next = DrawQr(page, document.QrPayload, Left, qrY);
+        var next = PdfQr.Draw(page, document.QrPayload, Left, qrY, QrSize, QuietZone);
         page.Text(PdfFont.Regular, 7, next + 8, qrY + QrSize - 10, legend);
         page.Text(PdfFont.Bold, 7, next + 8, qrY + QrSize - 24, "Resumen (hash):");
         var hashY = qrY + QrSize - 34;
@@ -320,44 +320,6 @@ internal sealed class PdfPrintedRepresentationRenderer : IPrintedRepresentationR
             page.Text(PdfFont.Regular, 7, next + 8, hashY, chunk);
             hashY -= 9;
         }
-    }
-
-    /// <summary>Draws the QR as vector squares and returns the x where it ends. Dark runs on a row are merged into one rectangle.</summary>
-    private static double DrawQr(PdfPage page, string payload, double x, double y)
-    {
-        using var generator = new QRCodeGenerator();
-        using var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q, forceUtf8: true, utf8BOM: false, eciMode: QRCodeGenerator.EciMode.Utf8);
-        var matrix = data.ModuleMatrix;
-
-        // QRCoder keeps a 4-module quiet zone inside the matrix; the symbol itself is what lies inside it.
-        const int padding = 4;
-        var modules = matrix.Count - (2 * padding);
-        var module = (QrSize - (2 * QuietZone)) / modules;
-        var originX = x + QuietZone;
-        var originY = y + QuietZone;
-
-        for (var row = 0; row < modules; row++)
-        {
-            var column = 0;
-            while (column < modules)
-            {
-                if (!matrix[row + padding][column + padding])
-                {
-                    column++;
-                    continue;
-                }
-
-                var start = column;
-                while (column < modules && matrix[row + padding][column + padding])
-                {
-                    column++;
-                }
-
-                page.FillRectangle(originX + (start * module), originY + ((modules - 1 - row) * module), (column - start) * module, module);
-            }
-        }
-
-        return x + QrSize;
     }
 
     private static IEnumerable<string> Chunk(string text, int size)

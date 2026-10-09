@@ -51,7 +51,7 @@ Dashboard, emisión web, búsqueda, descarga, importación masiva, usuarios, pla
 Resellers, branding, dominios, precios, subcuentas, consumo, plantillas.
 
 ## Fase 7 — Tributario avanzado
-Detracciones, retenciones, percepciones, exportaciones, GRE (bounded context independiente; el remitente `09` está hecho contra el simulador, ADR-056; el transportista `31` también, ADR-057; faltan los motivos 08, 09, 18 y 19, el traslado total de bienes, la representación impresa y probar con SUNAT), conciliaciones. Cada pieza empieza leyendo su fuente.
+Detracciones, retenciones, percepciones, exportaciones, GRE (bounded context independiente; el remitente `09` está hecho contra el simulador, ADR-056; el transportista `31` también, ADR-057; faltan los motivos 08, 09, 18 y 19, el traslado total de bienes, y probar con SUNAT; la representación impresa de las guías está hecha, ADR-058, salvo el QR real), conciliaciones. Cada pieza empieza leyendo su fuente.
 
 ## Fase 8 — SecureFact PSE
 Solo cuando comercialmente corresponda: ejecutar `docs/pse/gap-analysis.md` contra la norma vigente; capital/activos ≥ 150 UIT, ≥ 5 trabajadores, ISO/IEC 27001, soporte de primer nivel, KPI de rechazo ≤ 10 % → 5 %. Nunca afirmar ser PSE antes de la inscripción oficial.
