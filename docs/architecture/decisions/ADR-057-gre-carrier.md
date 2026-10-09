@@ -38,7 +38,7 @@ Se escriben como las del remitente, por el código de la regla de SUNAT, y las q
 
 ## Límites (P)
 - Valen los de ADR-056: **sin SUNAT real** (no hay beta documentado), con los mismos supuestos sobre el `hashZip`, el CDR y `cac:Signature`. La representación impresa se hizo después (ADR-058).
-- El indicador de traslado total de bienes se hizo después (ADR-060). **Sin** las guías por eventos (cambio de vehículo, imposibilidad de arribo o de entrega), ni los documentos de aduanas, constancias de depósito, ni otras guías del transportista (`31`) como documento relacionado.
+- El indicador de traslado total de bienes se hizo después (ADR-060). **Sin** las guías por eventos (ADR-061: no se emiten desde un sistema propio), ni los documentos de aduanas, constancias de depósito, ni otras guías del transportista (`31`) como documento relacionado.
 - De la `09` relacionada solo se admiten las electrónicas (serie `T…`): las impresas, de serie numérica, no.
 - **No se comprueba contra la guía del remitente** que el destinatario coincida (3434) ni que exista: no está en nuestra base si la emitió otro contribuyente; SUNAT lo contesta.
 - La autorización especial del transportista y del vehículo (entidad autorizadora, catálogo D-37) y la georreferencia de los puntos no se informan.
