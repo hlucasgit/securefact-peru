@@ -17,6 +17,7 @@ import { RecoverPassword } from './pages/RecoverPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { Customers, Products } from './pages/MasterData'
 import { NewDocument } from './pages/NewDocument'
+import { NewCarrierGuide } from './pages/NewCarrierGuide'
 import { NewGuide } from './pages/NewGuide'
 import { NewNote } from './pages/NewNote'
 import { ResellerBrand } from './pages/Brand'
@@ -66,6 +67,7 @@ export function App() {
         <Route path="resumenes" element={<Summaries />} />
         <Route path="guias" element={<Guides />} />
         <Route path="guias/nueva" element={<NewGuide />} />
+        <Route path="guias/transportista/nueva" element={<NewCarrierGuide />} />
         <Route path="guias/:id" element={<GuideDetail />} />
         <Route path="clientes" element={<Customers />} />
         <Route path="productos" element={<Products />} />

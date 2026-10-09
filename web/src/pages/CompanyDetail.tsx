@@ -205,16 +205,17 @@ function GreSeriesSection({ companyId }: { companyId: string }) {
     <>
       <div className="card">
         <h2>Series de guía de remisión</h2>
-        <p className="muted">Guía de remisión remitente (tipo 09): la serie empieza con «T» y lleva tres letras o dígitos más.</p>
+        <p className="muted">Remitente (tipo 09): la serie empieza con «T». Transportista (tipo 31): empieza con «V». Las dos llevan tres letras o dígitos más.</p>
         <ErrorAlert error={error ?? deactivate.error} />
         {isPending ? <Loading /> : data && data.length > 0 ? (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Serie</th><th className="num">Último número</th><th>Estado</th><th /></tr></thead>
+              <thead><tr><th>Serie</th><th>Tipo</th><th className="num">Último número</th><th>Estado</th><th /></tr></thead>
               <tbody>
                 {data.map((item) => (
                   <tr key={item.id}>
                     <td className="mono">{item.code}</td>
+                    <td>{item.documentTypeCode === '31' ? 'Transportista' : 'Remitente'}</td>
                     <td className="num">{item.lastNumber}</td>
                     <td><Badge tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? 'Activa' : 'Inactiva'}</Badge></td>
                     <td className="right">{item.isActive && <ConfirmButton label="Desactivar" message={`¿Desactivar la serie ${item.code}? Ya no podrá emitir guías con ella.`} onConfirm={() => deactivate.mutate(item.id)} />}</td>
@@ -229,7 +230,7 @@ function GreSeriesSection({ companyId }: { companyId: string }) {
         <h2>Nueva serie de guía</h2>
         <ErrorAlert error={create.error} />
         <div className="form-grid">
-          <TextField label="Serie" hint="4 caracteres: T… (por ejemplo T001)" required maxLength={4} minLength={4} pattern="[Tt][A-Za-z0-9]{3}" value={code} onChange={(event) => setCode(event.target.value)} />
+          <TextField label="Serie" hint="4 caracteres: T… para el remitente, V… para el transportista" required maxLength={4} minLength={4} pattern="[TtVv][A-Za-z0-9]{3}" value={code} onChange={(event) => setCode(event.target.value)} />
         </div>
         <div><button className="btn primary" type="submit" disabled={create.isPending}>Registrar serie de guía</button></div>
       </form>

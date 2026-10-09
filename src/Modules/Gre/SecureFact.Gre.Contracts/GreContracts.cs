@@ -89,6 +89,62 @@ public sealed record CreateGreRequest(
     bool ReturnWithEmptyPackaging = false,
     bool ReturnEmptyVehicle = false);
 
+/// <summary>Who pays the freight of a guide of the carrier (the indicators <c>SUNAT_Envio_IndicadorPagadorFlete_*</c>, rule 4388).</summary>
+public enum GreFreightPayer
+{
+    /// <summary>The sender of the goods.</summary>
+    Sender,
+
+    /// <summary>The company that the carrier subcontracted.</summary>
+    Subcontractor,
+
+    /// <summary>A third party, who then has to be named.</summary>
+    ThirdParty,
+}
+
+/// <summary>
+/// Data of a guide of the carrier (GRE transportista, type 31, series <c>V###</c>). The carrier is the company. It states who sends the goods, who receives them, the vehicle and the driver that
+/// run the transfer, and either the goods or the guide of the sender (09) that already lists them (ADR-057).
+/// </summary>
+/// <param name="TransferStartDate">The day the transfer starts; not before the issue date.</param>
+/// <param name="MtcRegistration">Registration of the carrier in the MTC; optional, up to 20 uppercase letters and digits.</param>
+/// <param name="Sender">Who sends the goods (the shipper): not the carrier itself.</param>
+/// <param name="Recipient">Who receives the goods.</param>
+/// <param name="Vehicle">The principal vehicle, with its circulation card.</param>
+/// <param name="Driver">The principal driver.</param>
+/// <param name="Goods">The goods; none when a guide of the sender (09, series <c>T…</c>) is the related document, because that guide already lists them.</param>
+/// <param name="RelatedDocuments">One related document, or several when one of them is a guide of the sender.</param>
+/// <param name="Subcontractor">The company that the carrier subcontracted; required when <paramref name="Subcontracted"/>.</param>
+/// <param name="FreightPayer">Who pays the freight.</param>
+/// <param name="ThirdPartyPayer">The third party that pays; required when <paramref name="FreightPayer"/> is <see cref="GreFreightPayer.ThirdParty"/>.</param>
+public sealed record CreateGreCarrierRequest(
+    Guid CompanyId,
+    Guid SeriesId,
+    DateOnly? IssueDate,
+    DateOnly TransferStartDate,
+    decimal GrossWeight,
+    string WeightUnit,
+    int? PackageCount,
+    string? Note,
+    string? MtcRegistration,
+    GrePartyInput Sender,
+    GrePartyInput Recipient,
+    GreAddressInput Origin,
+    GreAddressInput Destination,
+    GreVehicleInput Vehicle,
+    IReadOnlyList<GreVehicleInput>? SecondaryVehicles,
+    GreDriverInput Driver,
+    IReadOnlyList<GreDriverInput>? SecondaryDrivers,
+    IReadOnlyList<GreGoodInput>? Goods,
+    IReadOnlyList<GreRelatedDocumentInput>? RelatedDocuments,
+    GreFreightPayer FreightPayer = GreFreightPayer.Sender,
+    GrePartyInput? ThirdPartyPayer = null,
+    bool Subcontracted = false,
+    GrePartyInput? Subcontractor = null,
+    bool PlannedTransshipment = false,
+    bool ReturnWithEmptyPackaging = false,
+    bool ReturnEmptyVehicle = false);
+
 public sealed record GreObservation(string Code, string Message);
 
 public sealed record GreDto(
@@ -98,8 +154,9 @@ public sealed record GreDto(
     long Number,
     string Name,
     DateOnly IssueDate,
-    string MotiveCode,
-    string ModalityCode,
+    string DocumentTypeCode,
+    string? MotiveCode,
+    string? ModalityCode,
     GreState State,
     string RecipientDocument,
     string RecipientName,
@@ -114,11 +171,12 @@ public sealed record GreDto(
     string? ErrorCode,
     string? ErrorMessage);
 
-public sealed record GreSeriesDto(Guid Id, Guid CompanyId, string Code, long LastNumber, bool IsActive, DateTimeOffset CreatedAt);
+/// <param name="DocumentTypeCode"><c>09</c> sender (series <c>T…</c>) or <c>31</c> carrier (series <c>V…</c>).</param>
+public sealed record GreSeriesDto(Guid Id, Guid CompanyId, string DocumentTypeCode, string Code, long LastNumber, bool IsActive, DateTimeOffset CreatedAt);
 
 public interface IGreSeriesAdministration
 {
-    /// <summary>A series of the guide of the sender starts with «T» and has three more uppercase letters or digits (R-062).</summary>
+    /// <summary>A series of the guide of the sender starts with «T», one of the carrier with «V», and each has three more uppercase letters or digits (R-062, R-069).</summary>
     Task<Result<GreSeriesDto>> CreateAsync(Guid companyId, string code, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<GreSeriesDto>> ListAsync(Guid companyId, CancellationToken cancellationToken);
@@ -132,6 +190,9 @@ public interface IGreService
     /// Checks the data against the rules of the official validation workbook, takes the next number of the series, builds the XML, signs it and stores it: the guide is <see cref="GreState.Prepared"/>.
     /// </summary>
     Task<Result<GreDto>> CreateAsync(CreateGreRequest request, CancellationToken cancellationToken);
+
+    /// <summary>The same for a guide of the carrier (type 31, ADR-057).</summary>
+    Task<Result<GreDto>> CreateCarrierAsync(CreateGreCarrierRequest request, CancellationToken cancellationToken);
 
     /// <summary>Sends a prepared guide to SUNAT. Without an answer yet the guide is <see cref="GreState.Pending"/> with its ticket.</summary>
     Task<Result<GreDto>> SubmitAsync(Guid id, CancellationToken cancellationToken);

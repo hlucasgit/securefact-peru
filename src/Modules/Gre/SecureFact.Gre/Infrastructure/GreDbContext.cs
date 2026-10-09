@@ -24,6 +24,7 @@ internal sealed class GreDbContext(DbContextOptions<GreDbContext> options, IData
             b.HasKey(s => s.Id);
             b.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
             b.Property(s => s.CompanyId).HasColumnName("company_id");
+            b.Property(s => s.DocumentTypeCode).HasColumnName("document_type_code").HasMaxLength(2).IsRequired().HasDefaultValue(DocumentTypes.Sender);
             b.Property(s => s.Code).HasColumnName("code").HasMaxLength(4).IsRequired();
             b.Property(s => s.LastNumber).HasColumnName("last_number");
             b.Property(s => s.IsActive).HasColumnName("is_active");
@@ -44,8 +45,9 @@ internal sealed class GreDbContext(DbContextOptions<GreDbContext> options, IData
             b.Property(g => g.Series).HasColumnName("series").HasMaxLength(4).IsRequired();
             b.Property(g => g.Number).HasColumnName("number");
             b.Property(g => g.IssueDate).HasColumnName("issue_date");
-            b.Property(g => g.MotiveCode).HasColumnName("motive_code").HasMaxLength(2).IsRequired();
-            b.Property(g => g.ModalityCode).HasColumnName("modality_code").HasMaxLength(2).IsRequired();
+            b.Property(g => g.DocumentTypeCode).HasColumnName("document_type_code").HasMaxLength(2).IsRequired().HasDefaultValue(DocumentTypes.Sender);
+            b.Property(g => g.MotiveCode).HasColumnName("motive_code").HasMaxLength(2);
+            b.Property(g => g.ModalityCode).HasColumnName("modality_code").HasMaxLength(2);
             b.Property(g => g.RecipientDocument).HasColumnName("recipient_document").HasMaxLength(20).IsRequired();
             b.Property(g => g.RecipientName).HasColumnName("recipient_name").HasMaxLength(250).IsRequired();
             b.Property(g => g.RequestJson).HasColumnName("request").HasColumnType("jsonb").IsRequired();

@@ -32,9 +32,14 @@ internal sealed class Guide : ITenantOwned
 
     public DateOnly IssueDate { get; private set; }
 
-    public string MotiveCode { get; private set; } = string.Empty;
+    /// <summary><c>09</c> sender or <c>31</c> carrier.</summary>
+    public string DocumentTypeCode { get; private set; } = DocumentTypes.Sender;
 
-    public string ModalityCode { get; private set; } = string.Empty;
+    /// <summary>Only the guide of the sender has a motive of transfer.</summary>
+    public string? MotiveCode { get; private set; }
+
+    /// <summary>Only the guide of the sender has a modality of transport.</summary>
+    public string? ModalityCode { get; private set; }
 
     public string RecipientDocument { get; private set; } = string.Empty;
 
@@ -84,7 +89,7 @@ internal sealed class Guide : ITenantOwned
     public bool IsFinal => State is GreState.Accepted or GreState.AcceptedWithObservations or GreState.Rejected or GreState.Failed;
 
     public static Guide Prepare(
-        Guid id, Guid tenantId, Guid companyId, GreSeries series, long number, DateOnly issueDate, string motiveCode, string modalityCode,
+        Guid id, Guid tenantId, Guid companyId, GreSeries series, long number, DateOnly issueDate, string? motiveCode, string? modalityCode,
         string recipientDocument, string recipientName, string requestJson, string fileBaseName, string signedXml, string digestValue, DateTimeOffset now) => new()
     {
         Id = id,
@@ -94,6 +99,7 @@ internal sealed class Guide : ITenantOwned
         Series = series.Code,
         Number = number,
         IssueDate = issueDate,
+        DocumentTypeCode = series.DocumentTypeCode,
         MotiveCode = motiveCode,
         ModalityCode = modalityCode,
         RecipientDocument = recipientDocument,

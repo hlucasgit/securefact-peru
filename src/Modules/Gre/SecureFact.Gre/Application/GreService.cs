@@ -35,7 +35,6 @@ internal sealed class GreService(
     IAuditTrail audit) : IGreService
 {
     private const int MaxPage = 100;
-    private const string CompanyType = "09";
 
     private static readonly TimeZoneInfo Lima = TimeZoneInfo.FindSystemTimeZoneById("America/Lima");
 
@@ -47,11 +46,6 @@ internal sealed class GreService(
 
     public async Task<Result<GreDto>> CreateAsync(CreateGreRequest request, CancellationToken cancellationToken)
     {
-        if (scope.Kind != DataScopeKind.Tenant || scope.Current is not { } tenant)
-        {
-            return Error.Forbidden(ErrorCodes.TenantNotResolved, "Tenant requerido", "Esta operación requiere un contexto de tenant.");
-        }
-
         if (request is null || request.Goods is null || request.Recipient is null || request.Origin is null || request.Destination is null)
         {
             return Error.Validation(ErrorCodes.InvalidGuide, "Guía inválida", "Faltan datos obligatorios: destinatario, puntos de partida y llegada, o bienes.");
@@ -64,16 +58,72 @@ internal sealed class GreService(
                 "Importación (08), exportación (09), traslado de mercancía extranjera (19) y emisor itinerante (18) aún no se emiten desde aquí: emítalos en SUNAT Operaciones en Línea.");
         }
 
-        var company = await companies.GetAsync(request.CompanyId, cancellationToken);
+        return await PrepareAsync(
+            new Preparation(
+                DocumentTypes.Sender, request.CompanyId, request.SeriesId, request.IssueDate, request.MotiveCode, request.ModalityCode,
+                request.Recipient, JsonSerializer.Serialize(request, Json)),
+            context => GreValidator.Validate(request, context),
+            (data, names) => GreUblGenerator.Generate(new GreXmlData(data.Ruc, data.Name, data.Series, data.Number, data.IssueDate, data.IssueTime, request, names)),
+            cancellationToken);
+    }
+
+    public async Task<Result<GreDto>> CreateCarrierAsync(CreateGreCarrierRequest request, CancellationToken cancellationToken)
+    {
+        if (request is null || request.Recipient is null || request.Sender is null || request.Origin is null || request.Destination is null || request.Vehicle is null || request.Driver is null)
+        {
+            return Error.Validation(ErrorCodes.InvalidGuide, "Guía inválida", "Faltan datos obligatorios: remitente, destinatario, puntos de partida y llegada, vehículo o conductor.");
+        }
+
+        return await PrepareAsync(
+            new Preparation(
+                DocumentTypes.Carrier, request.CompanyId, request.SeriesId, request.IssueDate, null, null,
+                request.Recipient, JsonSerializer.Serialize(request, Json)),
+            context => GreValidator.ValidateCarrier(request, context),
+            (data, names) => GreUblGenerator.GenerateCarrier(new GreCarrierXmlData(data.Ruc, data.Name, data.Series, data.Number, data.IssueDate, data.IssueTime, request, names)),
+            cancellationToken);
+    }
+
+    /// <summary>What differs between the guides: the type, the data that the screens show, and the request as it was received.</summary>
+    private sealed record Preparation(
+        string DocumentTypeCode, Guid CompanyId, Guid SeriesId, DateOnly? IssueDate, string? MotiveCode, string? ModalityCode, GrePartyInput Recipient, string RequestJson);
+
+    /// <summary>The numbered guide that is about to be written: who issues it and when.</summary>
+    private sealed record Numbered(string Ruc, string Name, string Series, long Number, DateOnly IssueDate, TimeOnly IssueTime);
+
+    /// <summary>
+    /// What the two guides share: the tenant, the company, the series of the right type, the validation with the catalogues and rules as data, the number taken in the database, the signature and the
+    /// row. The guide itself (rules and XML) comes from the callers.
+    /// </summary>
+    private async Task<Result<GreDto>> PrepareAsync(
+        Preparation preparation,
+        Func<GreValidationContext, IReadOnlyList<string>> validate,
+        Func<Numbered, IReadOnlyDictionary<string, string>, string> build,
+        CancellationToken cancellationToken)
+    {
+        if (scope.Kind != DataScopeKind.Tenant || scope.Current is not { } tenant)
+        {
+            return Error.Forbidden(ErrorCodes.TenantNotResolved, "Tenant requerido", "Esta operación requiere un contexto de tenant.");
+        }
+
+        var company = await companies.GetAsync(preparation.CompanyId, cancellationToken);
         if (!company.IsSuccess)
         {
             return company.Error;
         }
 
-        var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == request.SeriesId && s.CompanyId == request.CompanyId, cancellationToken);
+        var series = await db.Series.AsNoTracking().SingleOrDefaultAsync(s => s.Id == preparation.SeriesId && s.CompanyId == preparation.CompanyId, cancellationToken);
         if (series is null || !series.IsActive)
         {
             return Error.NotFound(ErrorCodes.GreSeriesNotFound, "Serie no encontrada", "La serie no existe, está desactivada o no es de esa empresa.");
+        }
+
+        if (series.DocumentTypeCode != preparation.DocumentTypeCode)
+        {
+            return Error.Validation(
+                ErrorCodes.InvalidGreSeries, "Serie de otro tipo de guía",
+                preparation.DocumentTypeCode == DocumentTypes.Sender
+                    ? "La guía del remitente usa una serie «T…»; la serie elegida es de guías del transportista."
+                    : "La guía del transportista usa una serie «V…»; la serie elegida es de guías del remitente.");
         }
 
         var now = clock.GetUtcNow();
@@ -85,13 +135,13 @@ internal sealed class GreService(
             return context.Error;
         }
 
-        var issues = GreValidator.Validate(request, context.Value);
+        var issues = validate(context.Value);
         if (issues.Count > 0)
         {
             return Error.Validation(ErrorCodes.InvalidGuide, "Guía inválida", string.Join(" ", issues.Select(i => $"• {i}")));
         }
 
-        var issueDate = request.IssueDate ?? today;
+        var issueDate = preparation.IssueDate ?? today;
         var certificate = await certificates.GetActiveSigningCertificateAsync(company.Value.Id, cancellationToken);
         if (!certificate.IsSuccess)
         {
@@ -116,7 +166,7 @@ internal sealed class GreService(
         }
 
         var number = numbers[0];
-        var xml = GreUblGenerator.Generate(new GreXmlData(company.Value.Ruc, company.Value.LegalName, series.Code, number, issueDate, TimeOnly.FromDateTime(local.DateTime), request, names));
+        var xml = build(new Numbered(company.Value.Ruc, company.Value.LegalName, series.Code, number, issueDate, TimeOnly.FromDateTime(local.DateTime)), names);
         var signed = signer.Sign(xml, signingCertificate);
         if (!signed.IsSuccess)
         {
@@ -124,18 +174,18 @@ internal sealed class GreService(
             return signed.Error;
         }
 
-        var baseName = $"{company.Value.Ruc}-{CompanyType}-{series.Code}-{number}";
+        var baseName = $"{company.Value.Ruc}-{preparation.DocumentTypeCode}-{series.Code}-{number}";
         var guide = Guide.Prepare(
-            Guid.CreateVersion7(), tenant.Value, company.Value.Id, series, number, issueDate, request.MotiveCode!, request.ModalityCode!,
-            $"{request.Recipient.DocumentTypeCode.Trim()}-{request.Recipient.DocumentNumber.Trim()}", request.Recipient.Name.Trim(),
-            JsonSerializer.Serialize(request with { IssueDate = issueDate }, Json), baseName, signed.Value.Xml, signed.Value.DigestValue, now);
+            Guid.CreateVersion7(), tenant.Value, company.Value.Id, series, number, issueDate, preparation.MotiveCode, preparation.ModalityCode,
+            $"{preparation.Recipient.DocumentTypeCode.Trim()}-{preparation.Recipient.DocumentNumber.Trim()}", preparation.Recipient.Name.Trim(),
+            preparation.RequestJson, baseName, signed.Value.Xml, signed.Value.DigestValue, now);
         db.Guides.Add(guide);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         await audit.RecordAsync(new AuditEvent(
             AuditActions.GuideCreated, "gre_guide", guide.Id.ToString("D"), tenant.Value,
-            NewValues: new Dictionary<string, object?> { ["number"] = $"{guide.Series}-{guide.Number}", ["motive"] = guide.MotiveCode, ["modality"] = guide.ModalityCode }), cancellationToken);
+            NewValues: new Dictionary<string, object?> { ["number"] = $"{guide.Series}-{guide.Number}", ["type"] = guide.DocumentTypeCode, ["motive"] = guide.MotiveCode, ["modality"] = guide.ModalityCode }), cancellationToken);
         return ToDto(guide);
     }
 
@@ -169,7 +219,7 @@ internal sealed class GreService(
             return zip.Error;
         }
 
-        var outcome = await channel.SubmitAsync(new GreSubmission(credentials.Value, CompanyType, guide.Series, guide.Number, guide.FileBaseName, zip.Value), cancellationToken);
+        var outcome = await channel.SubmitAsync(new GreSubmission(credentials.Value, guide.DocumentTypeCode, guide.Series, guide.Number, guide.FileBaseName, zip.Value), cancellationToken);
         var now = clock.GetUtcNow();
         switch (outcome.Status)
         {
@@ -415,7 +465,7 @@ internal sealed class GreService(
     {
         var observations = JsonSerializer.Deserialize<List<GreObservation>>(g.CdrObservationsJson, Json) ?? [];
         return new GreDto(
-            g.Id, g.CompanyId, g.Series, g.Number, $"{g.Series}-{g.Number}", g.IssueDate, g.MotiveCode, g.ModalityCode, g.State, g.RecipientDocument, g.RecipientName,
+            g.Id, g.CompanyId, g.Series, g.Number, $"{g.Series}-{g.Number}", g.IssueDate, g.DocumentTypeCode, g.MotiveCode, g.ModalityCode, g.State, g.RecipientDocument, g.RecipientName,
             g.Ticket, g.Attempts, g.CreatedAt, g.SentAt, g.ProcessedAt, g.CdrResponseCode, g.CdrDescription, observations, g.ErrorCode, g.ErrorMessage);
     }
 }

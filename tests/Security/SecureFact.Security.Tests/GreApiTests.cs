@@ -18,7 +18,7 @@ public sealed partial class GreApiTests(ApiFixture api)
     private const string ApiSecret = "api-gre-client-value-5521";
     private static int _rucCounter = 8_000_000;
 
-    private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, GreSeriesDto Series);
+    private sealed record Setup(Guid TenantId, HttpClient Owner, CompanyDto Company, GreSeriesDto Series, GreSeriesDto CarrierSeries);
 
     private static string NewRuc()
     {
@@ -65,7 +65,8 @@ public sealed partial class GreApiTests(ApiFixture api)
         }
 
         var series = await SeriesAsync(owner, company.Id, "T001");
-        return new Setup(tenantId, owner, company, series);
+        var carrierSeries = await SeriesAsync(owner, company.Id, "V001");
+        return new Setup(tenantId, owner, company, series, carrierSeries);
     }
 
     private static async Task<GreSeriesDto> SeriesAsync(HttpClient owner, Guid companyId, string code)
@@ -75,10 +76,10 @@ public sealed partial class GreApiTests(ApiFixture api)
         return (await response.Content.ReadFromJsonAsync<GreSeriesDto>(ApiFixture.JsonOptions))!;
     }
 
-    private static object Guide(Setup setup, string motive = "01", string? note = null) => new
+    private static object Guide(Setup setup, string motive = "01", string? note = null, Guid? seriesId = null) => new
     {
         companyId = setup.Company.Id,
-        seriesId = setup.Series.Id,
+        seriesId = seriesId ?? setup.Series.Id,
         motiveCode = motive,
         modalityCode = "02",
         transferStartDate = Today(),
@@ -129,7 +130,8 @@ public sealed partial class GreApiTests(ApiFixture api)
         Assert.Equal("SF-GRE-007", await ProblemCodeAsync(repeated));
 
         var listed = await setup.Owner.GetFromJsonAsync<GreSeriesDto[]>($"/api/v1/gre/series?companyId={setup.Company.Id}", ApiFixture.JsonOptions);
-        Assert.Single(listed!);
+        Assert.Equal(2, listed!.Length);
+        Assert.Equal(["09", "31"], listed.Select(item => item.DocumentTypeCode).Order().ToArray());
     }
 
     [Fact]

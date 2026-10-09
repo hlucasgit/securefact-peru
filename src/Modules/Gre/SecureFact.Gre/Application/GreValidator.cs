@@ -87,14 +87,15 @@ internal static partial class GreValidator
         Shipment(request, issueDate, Add);
         Transport(request, Add);
         Points(request, context, request.MotiveCode ?? string.Empty, Add);
-        Goods(request, context, Add);
+        Goods(request.Goods, context, Add);
         RelatedDocuments(request, context, request.Recipient, Add);
         return issues;
     }
 
     // ---------- header ----------
 
-    private static void Header(CreateGreRequest request, GreValidationContext context, DateOnly issueDate, Action<string, string> add)
+    /// <summary>The rules of the date of issue and of the note, which the guides of the sender and of the carrier share.</summary>
+    private static void DateAndNote(DateOnly issueDate, string? note, GreValidationContext context, Action<string, string> add)
     {
         if (issueDate > context.Today)
         {
@@ -105,10 +106,15 @@ internal static partial class GreValidator
             add("2108", $"La fecha de emisión no puede ser anterior en más de {context.MaxIssueLagDays} día(s) a la de envío.");
         }
 
-        if (request.Note is not null && !IsPlainText(request.Note, 1, 250))
+        if (note is not null && !IsPlainText(note, 1, 250))
         {
             add("4186", "Las observaciones admiten hasta 250 caracteres, sin saltos de línea ni tabulaciones.");
         }
+    }
+
+    private static void Header(CreateGreRequest request, GreValidationContext context, DateOnly issueDate, Action<string, string> add)
+    {
+        DateAndNote(issueDate, request.Note, context, add);
 
         if (!context.Catalogs.Motives.Contains(request.MotiveCode ?? string.Empty))
         {
@@ -258,22 +264,27 @@ internal static partial class GreValidator
 
     // ---------- shipment ----------
 
-    private static void Shipment(CreateGreRequest request, DateOnly issueDate, Action<string, string> add)
+    private static void Weight(decimal grossWeight, string? unit, int? packageCount, Action<string, string> add)
     {
-        if (request.GrossWeight <= 0 || request.GrossWeight >= 1_000_000_000_000m || decimal.Round(request.GrossWeight, 3) != request.GrossWeight)
+        if (grossWeight <= 0 || grossWeight >= 1_000_000_000_000m || decimal.Round(grossWeight, 3) != grossWeight)
         {
             add("2523", "El peso bruto total es positivo, de hasta 12 enteros y 3 decimales.");
         }
 
-        if (request.WeightUnit is not ("KGM" or "TNE"))
+        if (unit is not ("KGM" or "TNE"))
         {
             add("2523", "La unidad del peso bruto es KGM (kilogramos) o TNE (toneladas).");
         }
 
-        if (request.PackageCount is < 0)
+        if (packageCount is < 0)
         {
             add("3489", "El número de bultos es un entero de hasta 13 dígitos.");
         }
+    }
+
+    private static void Shipment(CreateGreRequest request, DateOnly issueDate, Action<string, string> add)
+    {
+        Weight(request.GrossWeight, request.WeightUnit, request.PackageCount, add);
 
         if (request.ModalityCode == "02")
         {
@@ -531,10 +542,10 @@ internal static partial class GreValidator
 
     // ---------- goods ----------
 
-    private static void Goods(CreateGreRequest request, GreValidationContext context, Action<string, string> add)
+    private static void Goods(IReadOnlyList<GreGoodInput>? list, GreValidationContext context, Action<string, string> add, bool required = true)
     {
-        var goods = request.Goods ?? [];
-        if (goods.Count == 0)
+        var goods = list ?? [];
+        if (goods.Count == 0 && required)
         {
             add("2580", "Hay que informar al menos un bien a trasladar.");
         }

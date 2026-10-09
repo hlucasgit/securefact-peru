@@ -27,6 +27,9 @@ internal static class GreEndpoints
         guides.MapPost(string.Empty, async (CreateGreRequest body, IGreService service, HttpContext http, CancellationToken ct) =>
             (await service.CreateAsync(body, ct)).ToHttp(http, dto => Results.Created($"/api/v1/gre/guides/{dto.Id}", dto))).RequireAuthorization(Permissions.CpeSend);
 
+        guides.MapPost("/carrier", async (CreateGreCarrierRequest body, IGreService service, HttpContext http, CancellationToken ct) =>
+            (await service.CreateCarrierAsync(body, ct)).ToHttp(http, dto => Results.Created($"/api/v1/gre/guides/{dto.Id}", dto))).RequireAuthorization(Permissions.CpeSend);
+
         guides.MapGet("/{id:guid}", async (Guid id, IGreService service, HttpContext http, CancellationToken ct) =>
             (await service.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
 

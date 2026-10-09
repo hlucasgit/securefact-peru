@@ -476,6 +476,8 @@ export type GreState = 'Prepared' | 'Pending' | 'Accepted' | 'AcceptedWithObserv
 export interface GreSeries {
   id: string
   companyId: string
+  /** 09 guide of the sender (series T…) or 31 guide of the carrier (series V…). */
+  documentTypeCode: string
   code: string
   lastNumber: number
   isActive: boolean
@@ -494,8 +496,9 @@ export interface Guide {
   number: number
   name: string
   issueDate: string
-  motiveCode: string
-  modalityCode: string
+  documentTypeCode: string
+  motiveCode: string | null
+  modalityCode: string | null
   state: GreState
   recipientDocument: string
   recipientName: string
@@ -555,4 +558,36 @@ export interface CreateGuideBody {
   driver?: { documentTypeCode: string; documentNumber: string; firstNames: string; lastNames: string; licenseNumber: string } | null
   goods: GreGoodInput[]
   relatedDocuments?: { typeCode: string; number: string; issuerRuc?: string | null }[] | null
+}
+
+export type GreFreightPayer = 'Sender' | 'Subcontractor' | 'ThirdParty'
+
+/** What the form of the guide of the carrier sends; the API checks it against the rules of the validation workbook of SUNAT. */
+export interface CreateCarrierGuideBody {
+  companyId: string
+  seriesId: string
+  issueDate?: string | null
+  transferStartDate: string
+  grossWeight: number
+  weightUnit: string
+  packageCount?: number | null
+  note?: string | null
+  mtcRegistration?: string | null
+  sender: GreParty
+  recipient: GreParty
+  origin: GreAddress
+  destination: GreAddress
+  vehicle: { plate: string; circulationCard?: string | null }
+  secondaryVehicles?: { plate: string; circulationCard?: string | null }[] | null
+  driver: { documentTypeCode: string; documentNumber: string; firstNames: string; lastNames: string; licenseNumber: string }
+  secondaryDrivers?: { documentTypeCode: string; documentNumber: string; firstNames: string; lastNames: string; licenseNumber: string }[] | null
+  goods?: GreGoodInput[] | null
+  relatedDocuments?: { typeCode: string; number: string; issuerRuc?: string | null }[] | null
+  freightPayer: GreFreightPayer
+  thirdPartyPayer?: GreParty | null
+  subcontracted: boolean
+  subcontractor?: GreParty | null
+  plannedTransshipment: boolean
+  returnWithEmptyPackaging: boolean
+  returnEmptyVehicle: boolean
 }

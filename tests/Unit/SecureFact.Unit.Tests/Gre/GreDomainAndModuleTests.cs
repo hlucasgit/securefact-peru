@@ -14,7 +14,7 @@ public class GreDomainAndModuleTests
 
     private static Guide NewGuide()
     {
-        var series = GreSeries.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "T001", Now);
+        var series = GreSeries.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DocumentTypes.Sender, "T001", Now);
         return Guide.Prepare(Guid.NewGuid(), series.TenantId, series.CompanyId, series, 1, new DateOnly(2026, 10, 8), "01", "02", "6-20100070970", "CLIENTE", "{}", "20100066603-09-T001-1", "<x/>", "digest", Now);
     }
 
@@ -86,7 +86,7 @@ public class GreDomainAndModuleTests
     [Fact]
     public void A_series_can_be_deactivated()
     {
-        var series = GreSeries.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "T002", Now);
+        var series = GreSeries.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DocumentTypes.Sender, "T002", Now);
         Assert.True(series.IsActive);
 
         series.Deactivate(Now.AddMinutes(1));

@@ -56,7 +56,7 @@ function Detail({ guide }: { guide: Guide }) {
 
   return (
     <>
-      <PageHeader title={`Guía de remisión ${guide.name}`} subtitle={company.data ? `${company.data.ruc} · ${company.data.legalName}` : undefined}>
+      <PageHeader title={`Guía de remisión ${guide.documentTypeCode === '31' ? 'del transportista' : 'del remitente'} ${guide.name}`} subtitle={company.data ? `${company.data.ruc} · ${company.data.legalName}` : undefined}>
         <GreBadge state={guide.state} />
       </PageHeader>
       <ErrorAlert error={submit.error ?? refresh.error} />
@@ -64,8 +64,12 @@ function Detail({ guide }: { guide: Guide }) {
         <KeyValues
           items={[
             ['Fecha de emisión', date(guide.issueDate)],
-            ['Motivo', `${guide.motiveCode} · ${GRE_MOTIVES[guide.motiveCode] ?? ''}`.trim()],
-            ['Modalidad', guide.modalityCode === '01' ? 'Transporte público' : 'Transporte privado'],
+            ...(guide.documentTypeCode === '31'
+              ? []
+              : ([
+                  ['Motivo', `${guide.motiveCode} · ${GRE_MOTIVES[guide.motiveCode ?? ''] ?? ''}`.trim()],
+                  ['Modalidad', guide.modalityCode === '01' ? 'Transporte público' : 'Transporte privado'],
+                ] as [string, string][])),
             ['Destinatario', `${guide.recipientName} (${guide.recipientDocument})`],
             ['Creada', dateTime(guide.createdAt)],
             ['Enviada', guide.sentAt ? dateTime(guide.sentAt) : '—'],

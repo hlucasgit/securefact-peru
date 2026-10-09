@@ -12,7 +12,7 @@ Un módulo propio, `Gre` (`src/Modules/Gre`), con su esquema `gre`, que reutiliz
 
 ### Alcance de esta entrega
 - **Remitente `09`**, series `T` + 3 caracteres, motivos **01, 02, 03, 04, 05, 06, 07, 13, 14 y 17**, transporte público (01) y privado (02).
-- Los motivos **08 (importación), 09 (exportación), 18 (emisor itinerante) y 19 (mercancía extranjera)** se rechazan con `SF-GRE-003` y un texto que manda al contribuyente a SUNAT Operaciones en Línea; no se emiten mal. La guía del **transportista (`31`)** queda para otra entrega.
+- Los motivos **08 (importación), 09 (exportación), 18 (emisor itinerante) y 19 (mercancía extranjera)** se rechazan con `SF-GRE-003` y un texto que manda al contribuyente a SUNAT Operaciones en Línea; no se emiten mal. La guía del **transportista (`31`)** se hizo después (ADR-057).
 
 ### Flujo
 1. **Crear** (`POST /api/v1/gre/guides`): valida con las reglas del libro de validación de SUNAT que se aplican a la forma del archivo (`GreValidator`, cada mensaje lleva el código de la regla); toma el número **en la base** (`UPDATE … SET last_number = last_number + 1 … RETURNING`, dentro de la transacción que guarda la guía; nunca máximo más uno); genera el `DespatchAdvice` (`GreUblGenerator`, validado contra el XSD UBL 2.1 oficial), lo firma con el certificado activo y lo guarda **preparada**.
@@ -58,4 +58,4 @@ Además del usuario y la clave SOL, la API de SUNAT pide `client_id` y `client_s
 - La interfaz no ofrece vehículos ni conductores secundarios, el trasbordo programado, el indicador de vehículo de categoría M1/L ni el de retorno con envases o vehículo vacío, aunque la solicitud de la API sí los admite.
 - El caché de tokens es **por proceso**: la API y cada worker piden su propio token.
 - La guía **no** se vincula todavía con el comprobante de venta en la base (solo se declara como documento relacionado, sin comprobar que exista).
-- Falta la guía del **transportista (`31`)**, la importación, la exportación, el emisor itinerante y la mercancía extranjera, y el indicador de traslado en vehículos de registro previo.
+- Faltan la importación, la exportación, el emisor itinerante y la mercancía extranjera, y el indicador de traslado en vehículos de registro previo.

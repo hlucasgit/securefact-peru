@@ -22,7 +22,7 @@ internal sealed record GreXmlData(
 /// The <c>DespatchAdvice</c> UBL 2.1 of the guide of the sender (type 09, <c>CustomizationID</c> 2.0), built as the tags of the sheet «Guía-Remitente2_0» of S27 say (R-062 to R-066) and
 /// in the order of the schema (S30). The result is unsigned: the signer fills the <c>ext:ExtensionContent</c>. The guide of the carrier (type 31) is not built here (R-068).
 /// </summary>
-internal static class GreUblGenerator
+internal static partial class GreUblGenerator
 {
     private static readonly XNamespace Root = "urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2";
     private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
@@ -67,7 +67,7 @@ internal static class GreUblGenerator
         }
 
         root.Add(
-            SignatureInfo(data),
+            SignatureInfo(data.SenderRuc, data.SenderName),
             new XElement(Cac + "DespatchSupplierParty", Party("6", data.SenderRuc, data.SenderName)),
             new XElement(Cac + "DeliveryCustomerParty", Party(request.Recipient.DocumentTypeCode.Trim(), request.Recipient.DocumentNumber.Trim(), request.Recipient.Name.Trim())));
         if (request.Buyer is { } buyer)
@@ -86,11 +86,16 @@ internal static class GreUblGenerator
             root.Add(Line(i + 1, request.Goods[i]));
         }
 
-        var document2 = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
+        return Serialize(root);
+    }
+
+    private static string Serialize(XElement root)
+    {
+        var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), root);
         using var buffer = new Utf8StringWriter();
         using (var writer = XmlWriter.Create(buffer, new XmlWriterSettings { Indent = true, Encoding = new UTF8Encoding(false), OmitXmlDeclaration = false }))
         {
-            document2.Save(writer);
+            document.Save(writer);
         }
 
         return buffer.ToString();
@@ -113,14 +118,14 @@ internal static class GreUblGenerator
             new XElement(Cac + "PartyIdentification", IdentityId(type, number)),
             new XElement(Cac + "PartyLegalEntity", new XElement(Cbc + "RegistrationName", name)));
 
-    private static XElement SignatureInfo(GreXmlData data) =>
+    private static XElement SignatureInfo(string ruc, string name) =>
         new(
             Cac + "Signature",
             new XElement(Cbc + "ID", "IDSignSP"),
             new XElement(
                 Cac + "SignatoryParty",
-                new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", data.SenderRuc)),
-                new XElement(Cac + "PartyName", new XElement(Cbc + "Name", data.SenderName))),
+                new XElement(Cac + "PartyIdentification", new XElement(Cbc + "ID", ruc)),
+                new XElement(Cac + "PartyName", new XElement(Cbc + "Name", name))),
             new XElement(Cac + "DigitalSignatureAttachment", new XElement(Cac + "ExternalReference", new XElement(Cbc + "URI", "#SignatureSP"))));
 
     private static XElement RelatedDocument(GreRelatedDocumentInput document, IReadOnlyDictionary<string, string> names)
@@ -176,7 +181,7 @@ internal static class GreUblGenerator
         }
 
         shipment.Add(Stage(request), Delivery(request));
-        if (Vehicles(request) is { } vehicles)
+        if (Vehicles(request.Vehicle, request.SecondaryVehicles) is { } vehicles)
         {
             shipment.Add(vehicles);
         }
@@ -290,9 +295,9 @@ internal static class GreUblGenerator
     }
 
     /// <summary>The vehicles of the private transport: the principal one and up to two attached, in a single transport handling unit.</summary>
-    private static XElement? Vehicles(CreateGreRequest request)
+    private static XElement? Vehicles(GreVehicleInput? vehicle, IReadOnlyList<GreVehicleInput>? secondaries)
     {
-        if (request.Vehicle is not { } vehicle)
+        if (vehicle is null)
         {
             return null;
         }
@@ -303,7 +308,7 @@ internal static class GreUblGenerator
             equipment.Add(new XElement(Cac + "ApplicableTransportMeans", new XElement(Cbc + "RegistrationNationalityID", vehicle.CirculationCard.Trim().ToUpperInvariant())));
         }
 
-        foreach (var secondary in request.SecondaryVehicles ?? [])
+        foreach (var secondary in secondaries ?? [])
         {
             var attached = new XElement(Cac + "AttachedTransportEquipment", new XElement(Cbc + "ID", secondary.Plate.Trim().ToUpperInvariant()));
             if (!string.IsNullOrWhiteSpace(secondary.CirculationCard))

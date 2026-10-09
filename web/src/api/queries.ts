@@ -28,6 +28,7 @@ import type {
   DocumentPreview,
   ElectronicDocument,
   ElectronicDocumentEvent,
+  CreateCarrierGuideBody,
   CreateGuideBody,
   GreSeries,
   GreState,
@@ -297,5 +298,6 @@ export const useGuides = (companyId: string | null, state: GreState | '', skip: 
 export const useGuide = (id: string) =>
   useQuery({ queryKey: keys.guide(id), queryFn: () => get<Guide>(`/api/v1/gre/guides/${id}`), refetchInterval: (query) => (query.state.data?.state === 'Pending' ? 5_000 : false) })
 export const useCreateGuide = () => useAction((body: CreateGuideBody) => post<Guide>('/api/v1/gre/guides', body), [['gre', 'guides']])
+export const useCreateCarrierGuide = () => useAction((body: CreateCarrierGuideBody) => post<Guide>('/api/v1/gre/guides/carrier', body), [['gre', 'guides']])
 export const useSubmitGuide = (id: string) => useAction(() => post<Guide>(`/api/v1/gre/guides/${id}/submit`), [keys.guide(id), ['gre', 'guides']])
 export const useRefreshGuide = (id: string) => useAction(() => post<Guide>(`/api/v1/gre/guides/${id}/refresh`), [keys.guide(id), ['gre', 'guides']])

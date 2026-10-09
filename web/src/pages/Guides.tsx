@@ -22,8 +22,13 @@ export function Guides() {
 
   return (
     <>
-      <PageHeader title="Guías de remisión" subtitle="Guías de remisión remitente, de la más reciente a la más antigua">
-        {hasRole(...BILLING_ROLES) && <Link className="btn primary" to="/guias/nueva">Emitir guía</Link>}
+      <PageHeader title="Guías de remisión" subtitle="Guías de remisión del remitente y del transportista, de la más reciente a la más antigua">
+        {hasRole(...BILLING_ROLES) && (
+          <>
+            <Link className="btn primary" to="/guias/nueva">Emitir guía del remitente</Link>
+            <Link className="btn" to="/guias/transportista/nueva">Emitir guía del transportista</Link>
+          </>
+        )}
       </PageHeader>
       <div className="card">
         <div className="form-grid" style={{ marginBottom: 12 }}>
@@ -39,14 +44,15 @@ export function Guides() {
           </SelectField>
         </div>
         <ErrorAlert error={guides.error} />
-        {guides.isPending ? <Loading /> : (guides.data?.length ?? 0) === 0 ? <Empty>Sin guías. Cree una serie «T…» en la empresa y emita la primera.</Empty> : (
+        {guides.isPending ? <Loading /> : (guides.data?.length ?? 0) === 0 ? <Empty>Sin guías. Cree una serie «T…» (remitente) o «V…» (transportista) en la empresa y emita la primera.</Empty> : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Guía</th><th>Fecha</th><th>Destinatario</th>{several && <th>Empresa</th>}<th>Estado</th></tr></thead>
+              <thead><tr><th>Guía</th><th>Tipo</th><th>Fecha</th><th>Destinatario</th>{several && <th>Empresa</th>}<th>Estado</th></tr></thead>
               <tbody>
                 {guides.data?.map((guide) => (
                   <tr key={guide.id} className="clickable" onClick={() => void navigate(`/guias/${guide.id}`)}>
                     <td className="tight"><a href={`/guias/${guide.id}`} onClick={(event) => event.preventDefault()}>{guide.name}</a></td>
+                    <td className="tight">{guide.documentTypeCode === '31' ? 'Transportista' : 'Remitente'}</td>
                     <td className="tight">{date(guide.issueDate)}</td>
                     <td>{guide.recipientName}<div className="muted">{guide.recipientDocument}</div></td>
                     {several && <td>{names.get(guide.companyId) ?? '—'}</td>}

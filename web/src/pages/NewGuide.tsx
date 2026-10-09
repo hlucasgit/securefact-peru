@@ -16,7 +16,7 @@ import {
 } from '../lib/guide'
 import { GRE_MOTIVES } from './GuideDetail'
 
-function PartyFields({ title, value, onChange, identityTypes }: { title: string; value: PartyState; onChange: (value: PartyState) => void; identityTypes: { code: string; description: string }[] }) {
+export function PartyFields({ title, value, onChange, identityTypes }: { title: string; value: PartyState; onChange: (value: PartyState) => void; identityTypes: { code: string; description: string }[] }) {
   return (
     <>
       <h3>{title}</h3>
@@ -31,7 +31,7 @@ function PartyFields({ title, value, onChange, identityTypes }: { title: string;
   )
 }
 
-function AddressFields({ title, value, onChange, annex }: { title: string; value: AddressState; onChange: (value: AddressState) => void; annex: boolean }) {
+export function AddressFields({ title, value, onChange, annex }: { title: string; value: AddressState; onChange: (value: AddressState) => void; annex: boolean }) {
   return (
     <>
       <h3>{title}</h3>
@@ -60,7 +60,7 @@ export function NewGuide() {
   const active = companies.data?.filter((company) => company.status === 'Active') ?? []
   const companyId = form.companyId || active[0]?.id || ''
   const series = useGreSeries(companyId || null)
-  const activeSeries = series.data?.filter((item) => item.isActive) ?? []
+  const activeSeries = series.data?.filter((item) => item.isActive && item.documentTypeCode === '09') ?? []
   const seriesId = activeSeries.some((item) => item.id === form.seriesId) ? form.seriesId : (activeSeries[0]?.id ?? '')
 
   if (companies.isPending) return <Loading />

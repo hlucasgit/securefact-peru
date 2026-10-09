@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SecureFact.Gre.Infrastructure;
@@ -11,9 +12,11 @@ using SecureFact.Gre.Infrastructure;
 namespace SecureFact.Gre.Infrastructure.Migrations
 {
     [DbContext(typeof(GreDbContext))]
-    partial class GreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009001136_AddCarrierGuide")]
+    partial class AddCarrierGuide
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

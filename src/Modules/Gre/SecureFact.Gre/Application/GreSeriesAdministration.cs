@@ -20,8 +20,8 @@ internal sealed partial class GreSeriesAdministration(
 {
     private static readonly Error SeriesMissing = Error.NotFound(ErrorCodes.GreSeriesNotFound, "Serie no encontrada", "La serie no existe o no es visible para este contexto.");
 
-    [GeneratedRegex("^T[A-Z0-9]{3}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
-    private static partial Regex SenderSeries();
+    [GeneratedRegex("^[TV][A-Z0-9]{3}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex GuideSeries();
 
     public async Task<Result<GreSeriesDto>> CreateAsync(Guid companyId, string code, CancellationToken cancellationToken)
     {
@@ -31,9 +31,9 @@ internal sealed partial class GreSeriesAdministration(
         }
 
         var normalized = code?.Trim().ToUpperInvariant() ?? string.Empty;
-        if (!SenderSeries().IsMatch(normalized))
+        if (!GuideSeries().IsMatch(normalized))
         {
-            return Error.Validation(ErrorCodes.InvalidGreSeries, "Serie inválida", "La serie de la guía de remisión remitente empieza con «T» y tiene tres letras o dígitos más (por ejemplo T001).");
+            return Error.Validation(ErrorCodes.InvalidGreSeries, "Serie inválida", "La serie de la guía de remisión remitente empieza con «T» y la del transportista con «V»; las dos tienen tres letras o dígitos más (por ejemplo T001 o V001).");
         }
 
         var company = await companies.GetAsync(companyId, cancellationToken);
@@ -52,12 +52,13 @@ internal sealed partial class GreSeriesAdministration(
             return Error.Conflict(ErrorCodes.GreSeriesAlreadyExists, "Serie existente", "Ya existe esa serie en la empresa.");
         }
 
-        var series = GreSeries.Create(Guid.CreateVersion7(), tenant.Value, companyId, normalized, clock.GetUtcNow());
+        var type = normalized[0] == 'T' ? DocumentTypes.Sender : DocumentTypes.Carrier;
+        var series = GreSeries.Create(Guid.CreateVersion7(), tenant.Value, companyId, type, normalized, clock.GetUtcNow());
         db.Series.Add(series);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(
             AuditActions.GreSeriesCreated, "gre_series", series.Id.ToString("D"), tenant.Value,
-            NewValues: new Dictionary<string, object?> { ["companyId"] = series.CompanyId, ["code"] = normalized }), cancellationToken);
+            NewValues: new Dictionary<string, object?> { ["companyId"] = series.CompanyId, ["type"] = type, ["code"] = normalized }), cancellationToken);
         return ToDto(series);
     }
 
@@ -81,5 +82,5 @@ internal sealed partial class GreSeriesAdministration(
         return Unit.Value;
     }
 
-    private static GreSeriesDto ToDto(GreSeries s) => new(s.Id, s.CompanyId, s.Code, s.LastNumber, s.IsActive, s.CreatedAt);
+    private static GreSeriesDto ToDto(GreSeries s) => new(s.Id, s.CompanyId, s.DocumentTypeCode, s.Code, s.LastNumber, s.IsActive, s.CreatedAt);
 }

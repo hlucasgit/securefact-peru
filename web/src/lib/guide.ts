@@ -95,9 +95,9 @@ export const emptyGuide = (today: string): GuideForm => ({
 export const needsSupplier = (motive: string) => motive === '02' || motive === '07' || motive === '13'
 export const needsBuyer = (motive: string) => motive === '03' || motive === '13'
 
-const text = (value: string) => value.trim()
-const optional = (value: string) => (value.trim() === '' ? null : value.trim())
-const party = (state: PartyState): GreParty => ({ documentTypeCode: state.documentTypeCode, documentNumber: text(state.documentNumber), name: text(state.name) })
+export const text = (value: string) => value.trim()
+export const optional = (value: string) => (value.trim() === '' ? null : value.trim())
+export const party = (state: PartyState): GreParty => ({ documentTypeCode: state.documentTypeCode, documentNumber: text(state.documentNumber), name: text(state.name) })
 const address = (state: AddressState): GreAddress => ({
   ubigeoCode: text(state.ubigeoCode),
   address: text(state.address),
