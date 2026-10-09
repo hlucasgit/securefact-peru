@@ -1,4 +1,5 @@
 using SecureFact.SharedKernel.Domain;
+using SecureFact.Subscriptions.Contracts;
 using SecureFact.Subscriptions.Application;
 using SecureFact.Subscriptions.Domain;
 using SecureFact.Tenancy.Contracts;
@@ -143,5 +144,74 @@ public class SubscriptionRulesTests
         Assert.Equal(new DateTimeOffset(2026, 9, 1, 5, 0, 0, TimeSpan.Zero), LimaCalendar.StartOf(new DateOnly(2026, 9, 1)));
         Assert.Equal(new DateOnly(2026, 2, 1), LimaCalendar.MonthStart(new DateOnly(2026, 2, 17)));
         Assert.Equal("2026-02", LimaCalendar.PeriodName(new DateOnly(2026, 2, 1)));
+    }
+}
+
+public class ChargeInvoiceRequestTests
+{
+    private static readonly Guid PlanId = Guid.NewGuid();
+    private static readonly DateTimeOffset Now = new(2026, 12, 2, 12, 0, 0, TimeSpan.FromHours(-5));
+    private static readonly InvoicingSetting Settings = InvoicingSetting.Create(new InvoicingSettingsInput(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), true), Now);
+
+    private static Charge Charge(decimal fee, int overageDocuments = 0, decimal overageAmount = 0m, int dueDays = 10)
+    {
+        var tenant = new TenantDto(new TenantId(Guid.NewGuid()), "Cliente SAC", TenantStatus.Active, TenantEnvironment.Sandbox, null, Now, PlanId);
+        var plan = new PlanDto(PlanId, "pro", "Profesional", null, null, null, true, null, true);
+        var price = PlanPrice.Create(PlanId, 1, new DateOnly(2026, 11, 1), fee, overageAmount > 0 ? 100 : null, overageAmount > 0 ? 0.5m : null, null, Now);
+        var net = fee + overageAmount;
+        var tax = Math.Round(net * 0.18m, 2, MidpointRounding.AwayFromZero);
+        var issued = new DateOnly(2026, 12, 2);
+        return SecureFact.Subscriptions.Domain.Charge.Create(
+            tenant.Id.Value, tenant.Name, new DateOnly(2026, 11, 1), plan.Id, plan.Code, plan.Name, price.Id, fee, price.IncludedDocuments, 100 + overageDocuments, overageDocuments, price.OverageUnitPrice, overageAmount, net, 0.18m, tax,
+            net + tax, issued, issued.AddDays(dueDays), null, null, null, Now);
+    }
+
+    private static BillingProfile Profile(string type, string number, string name) => BillingProfile.Create(Guid.NewGuid(), new BillingProfileInput(type, number, name, "Jr. Cusco 456", "facturas@cliente.test"), Now);
+
+    [Fact]
+    public void A_company_gets_an_invoice_on_credit_with_one_installment_on_the_due_date_of_the_charge()
+    {
+        var charge = Charge(100m);
+
+        var request = ChargeInvoicing.BuildInvoice(charge, Profile("6", "20100066603", "Cliente SAC"), Settings, new DateOnly(2026, 12, 2));
+
+        Assert.Equal((Settings.InvoiceSeriesId, new DateOnly(2026, 12, 2), "PEN"), (request.SeriesId, request.IssueDate, request.Currency));
+        Assert.Equal(("6", "20100066603", "Cliente SAC"), (request.Buyer!.DocumentTypeCode, request.Buyer.DocumentNumber, request.Buyer.Name));
+        var installment = Assert.Single(request.Installments!);
+        Assert.Equal((118m, new DateOnly(2026, 12, 12)), (installment.Amount, installment.DueDate));
+    }
+
+    [Fact]
+    public void An_invoice_due_the_day_it_is_issued_is_not_on_credit_and_a_receipt_never_is()
+    {
+        var sameDay = ChargeInvoicing.BuildInvoice(Charge(100m, dueDays: 0), Profile("6", "20100066603", "Cliente SAC"), Settings, new DateOnly(2026, 12, 2));
+        var receipt = ChargeInvoicing.BuildInvoice(Charge(100m), Profile("1", "12345678", "María Pérez"), Settings, new DateOnly(2026, 12, 2));
+
+        Assert.Null(sameDay.Installments);
+        Assert.Equal(Settings.ReceiptSeriesId, receipt.SeriesId);
+        Assert.Null(receipt.Installments);
+        Assert.Equal("1", receipt.Buyer!.DocumentTypeCode);
+    }
+
+    [Fact]
+    public void The_fee_and_the_overage_are_two_lines_with_the_amounts_the_charge_computed()
+    {
+        var lines = ChargeInvoicing.Lines(Charge(33.33m, 133, 11.31m));
+
+        Assert.Equal(2, lines.Count);
+        Assert.Equal((1m, 33.33m, "10"), (lines[0].Tax.Quantity, lines[0].Tax.UnitValue, lines[0].Tax.IgvAffectationCode));
+        Assert.Equal((1m, 11.31m), (lines[1].Tax.Quantity, lines[1].Tax.UnitValue));
+        Assert.Contains("noviembre de 2026", lines[0].Description, StringComparison.Ordinal);
+        Assert.Contains("plan Profesional", lines[0].Description, StringComparison.Ordinal);
+        Assert.Contains("133", lines[1].Description, StringComparison.Ordinal);
+        Assert.All(lines, l => Assert.Equal("ZZ", l.UnitCode));
+    }
+
+    [Fact]
+    public void A_charge_of_only_overage_has_only_that_line()
+    {
+        var lines = ChargeInvoicing.Lines(Charge(0m, 40, 20m));
+
+        Assert.Equal(20m, Assert.Single(lines).Tax.UnitValue);
     }
 }

@@ -12,6 +12,15 @@ vi.mock('../auth/session', () => ({ useSession: () => ({ hasRole: (...roles: str
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
+const PROBLEM = { type: 'x', title: 'No encontrado', detail: 'No hay.', status: 404, code: 'SF-SUB-009' }
+
+/** The answers of the calls that the screens make besides the ones a test is about: no settings, no tenants and no billing data yet. */
+const extras = (url: string): Response | null => {
+  if (url.endsWith('/api/v1/platform/invoicing') || url.endsWith('/api/v1/billing-profile')) return json(404, PROBLEM)
+  if (url.includes('/api/v1/platform/tenants?')) return json(200, [])
+  return null
+}
+
 const CHARGE = {
   id: 'c1',
   tenantId: 't1',
@@ -38,11 +47,13 @@ const CHARGE = {
   status: 'Partial',
   voidReason: null,
   createdAt: '2026-12-02T10:00:00Z',
+  invoice: 'F001-45',
 }
 
 const DETAIL = {
   charge: CHARGE,
   payments: [{ id: 'p1', chargeId: 'c1', amount: 35.7, method: 'Transfer', reference: 'Op. 4521', paidOn: '2026-12-03', note: null, reversesPaymentId: null, recordedAt: '2026-12-03T10:00:00Z' }],
+  documents: [{ id: 'd1', chargeId: 'c1', kind: 'Invoice', documentTypeCode: '01', series: 'F001', number: 45, issueDate: '2026-12-02', total: 135.7, state: 'Accepted', name: 'F001-45' }],
 }
 
 function renderPage(page: React.ReactNode) {
@@ -68,6 +79,7 @@ describe('Collections', () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-12-10T15:00:00Z') })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = String(input)
+      if (extras(url)) return Promise.resolve(extras(url)!)
       if (init?.method === 'POST') return Promise.resolve(json(201, { id: 'p2' }))
       if (url.includes('/api/v1/platform/charges/c1')) return Promise.resolve(json(200, DETAIL))
       return Promise.resolve(json(200, [CHARGE]))
@@ -96,6 +108,7 @@ describe('Collections', () => {
     const user = userEvent.setup()
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = String(input)
+      if (extras(url)) return Promise.resolve(extras(url)!)
       if (init?.method === 'POST') return Promise.resolve(json(201, { id: 'p3' }))
       if (url.includes('/api/v1/platform/charges/c1')) return Promise.resolve(json(200, DETAIL))
       return Promise.resolve(json(200, [CHARGE]))
@@ -125,14 +138,14 @@ describe('Collections', () => {
 
   it('runs the collection and says what it did', async () => {
     const user = userEvent.setup()
-    vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) =>
-      Promise.resolve(init?.method === 'POST' ? json(200, { chargesCreated: 3, tenantsSuspended: 1, tenantsReactivated: 0 }) : json(200, [])),
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      Promise.resolve(extras(String(input)) ?? (init?.method === 'POST' ? json(200, { chargesCreated: 3, tenantsSuspended: 1, tenantsReactivated: 0, invoicesIssued: 2 }) : json(200, []))),
     )
     renderPage(<Collections />)
 
     await user.click(await screen.findByRole('button', { name: 'Ejecutar la cobranza ahora' }))
 
-    expect(await screen.findByText('Cobranza ejecutada: 3 cargos nuevos, 1 cuentas suspendidas, 0 reactivadas.')).toBeVisible()
+    expect(await screen.findByText('Cobranza ejecutada: 3 cargos nuevos, 2 comprobantes emitidos, 1 cuentas suspendidas, 0 reactivadas.')).toBeVisible()
   })
 })
 
@@ -141,6 +154,7 @@ describe('MyCharges', () => {
     const user = userEvent.setup()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = String(input)
+      if (extras(url)) return Promise.resolve(extras(url)!)
       if (url.endsWith('/api/v1/subscription')) {
         return Promise.resolve(
           json(200, {
@@ -172,7 +186,7 @@ describe('MyCharges', () => {
 
   it('says that a plan without price does not charge', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) =>
-      Promise.resolve(String(input).endsWith('/api/v1/subscription') ? json(200, { tenantId: 't', planId: 'p', planCode: 'pilot', planName: 'Piloto', allowsOverage: false, planAssignedAt: '2026-10-09T10:00:00Z', price: null, firstChargePeriod: null }) : json(200, [])),
+      Promise.resolve(extras(String(input)) ?? (String(input).endsWith('/api/v1/subscription') ? json(200, { tenantId: 't', planId: 'p', planCode: 'pilot', planName: 'Piloto', allowsOverage: false, planAssignedAt: '2026-10-09T10:00:00Z', price: null, firstChargePeriod: null }) : json(200, []))),
     )
     renderPage(<MyCharges />)
 
@@ -339,5 +353,161 @@ describe('Commissions', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('Invoices of the charges', () => {
+  it('shows the invoice of a charge in the list and in the charge, and downloads its XML', async () => {
+    const user = userEvent.setup()
+    const createObjectURL = vi.fn(() => 'blob:xml')
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (extras(url)) return Promise.resolve(extras(url)!)
+      if (url.endsWith('/documents/Invoice/xml')) return Promise.resolve(new Response('<Invoice/>', { status: 200, headers: { 'Content-Type': 'application/xml' } }))
+      if (url.includes('/api/v1/platform/charges/c1')) return Promise.resolve(json(200, DETAIL))
+      return Promise.resolve(json(200, [CHARGE]))
+    })
+    renderPage(<Collections />)
+
+    expect(await screen.findByText('F001-45')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: /Ver cargo de noviembre/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('Factura o boleta (Factura)')).toBeVisible()
+    expect(within(dialog).getByText('Accepted')).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: 'XML de F001-45' }))
+
+    await vi.waitFor(() => expect(click).toHaveBeenCalled())
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/v1/platform/charges/c1/documents/Invoice/xml')).toBe(true)
+    expect(createObjectURL).toHaveBeenCalled()
+  })
+
+  it('says that a charge has no invoice yet', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (extras(url)) return Promise.resolve(extras(url)!)
+      if (url.includes('/api/v1/platform/charges/c1')) return Promise.resolve(json(200, { ...DETAIL, charge: { ...CHARGE, invoice: null }, documents: [] }))
+      return Promise.resolve(json(200, [{ ...CHARGE, invoice: null }]))
+    })
+    renderPage(<Collections />)
+
+    await user.click(await screen.findByRole('button', { name: /Ver cargo de noviembre/ }))
+
+    expect(await screen.findByText(/aún no tiene factura ni boleta/)).toBeVisible()
+  })
+
+  it('asks the account for its billing data and sends them', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url = String(input)
+      if (init?.method === 'PUT') return Promise.resolve(json(200, {}))
+      if (url.endsWith('/api/v1/billing-profile')) return Promise.resolve(json(404, PROBLEM))
+      if (url.endsWith('/api/v1/subscription')) return Promise.resolve(json(200, { tenantId: 't', planId: 'p', planCode: 'x', planName: 'X', allowsOverage: false, planAssignedAt: '2026-10-09T10:00:00Z', price: null, firstChargePeriod: null }))
+      return Promise.resolve(json(200, []))
+    })
+    mocks.roles = ['TenantOwner']
+    renderPage(<MyCharges />)
+
+    expect(await screen.findByText(/Aún no hay datos de facturación/)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Completar los datos de facturación' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('RUC'), '20100066603')
+    await user.type(within(dialog).getByLabelText('Razón social'), 'Cliente Facturado SAC')
+    await user.type(within(dialog).getByLabelText(/Correo para el comprobante/), 'facturas@cliente.pe')
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    expect(await screen.findByText('Datos de facturación guardados.')).toBeVisible()
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+    expect(put?.[0]).toBe('/api/v1/billing-profile')
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual({ documentTypeCode: '6', documentNumber: '20100066603', legalName: 'Cliente Facturado SAC', address: null, email: 'facturas@cliente.pe' })
+  })
+
+  it('shows the billing data that exist and does not offer to edit them to a reader', async () => {
+    mocks.roles = ['ReadOnly']
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/billing-profile')) return Promise.resolve(json(200, { tenantId: 't', documentTypeCode: '1', documentNumber: '12345678', legalName: 'María Pérez', address: null, email: null }))
+      if (url.endsWith('/api/v1/subscription')) return Promise.resolve(json(200, { tenantId: 't', planId: 'p', planCode: 'x', planName: 'X', allowsOverage: false, planAssignedAt: '2026-10-09T10:00:00Z', price: null, firstChargePeriod: null }))
+      return Promise.resolve(json(200, []))
+    })
+    renderPage(<MyCharges />)
+
+    expect(await screen.findByText('María Pérez')).toBeVisible()
+    expect(screen.getByText('Boleta de venta')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /datos de facturación/ })).toBeNull()
+  })
+
+  it('configures the account with which the platform invoices, choosing only series that suit', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url = String(input)
+      if (init?.method === 'PUT') return Promise.resolve(json(200, {}))
+      if (url.endsWith('/api/v1/platform/invoicing')) return Promise.resolve(json(404, PROBLEM))
+      if (url.includes('/api/v1/platform/tenants?')) return Promise.resolve(json(200, [{ id: 'issuer', name: 'Cuenta de la plataforma' }]))
+      if (url.includes('/api/v1/platform/invoicing/options')) {
+        return Promise.resolve(
+          json(200, [
+            {
+              id: 'company',
+              ruc: '20100066603',
+              legalName: 'SECUREFACT PERU SAC',
+              series: [
+                { id: 's-f', documentTypeCode: '01', code: 'F001' },
+                { id: 's-b', documentTypeCode: '03', code: 'B001' },
+                { id: 's-fc', documentTypeCode: '07', code: 'FC01' },
+                { id: 's-bc', documentTypeCode: '07', code: 'BC01' },
+              ],
+            },
+          ]),
+        )
+      }
+      return Promise.resolve(json(200, []))
+    })
+    renderPage(<Collections />)
+
+    expect(await screen.findByText(/Aún no está configurada/)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Configurar la facturación' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Guardar' })).toBeDisabled()
+    await user.selectOptions(within(dialog).getByLabelText('Cuenta emisora'), 'issuer')
+    await user.selectOptions(await within(dialog).findByLabelText('Empresa emisora'), 'company')
+    // Each list offers only the series of its type and letter: the credit notes of the invoices do not offer B001 nor BC01.
+    const notes = within(dialog).getByLabelText(/Serie de notas de crédito de facturas/)
+    expect(within(notes).getAllByRole('option').map((option) => option.textContent)).toEqual(['Elija la serie', 'FC01'])
+    await user.selectOptions(within(dialog).getByLabelText(/Serie de facturas/), 's-f')
+    await user.selectOptions(within(dialog).getByLabelText(/Serie de boletas de venta/), 's-b')
+    await user.selectOptions(notes, 's-fc')
+    await user.selectOptions(within(dialog).getByLabelText(/Serie de notas de crédito de boletas/), 's-bc')
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    expect(await screen.findByText('Configuración guardada.')).toBeVisible()
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+    expect(put?.[0]).toBe('/api/v1/platform/invoicing')
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+      issuerTenantId: 'issuer',
+      companyId: 'company',
+      invoiceSeriesId: 's-f',
+      receiptSeriesId: 's-b',
+      invoiceNoteSeriesId: 's-fc',
+      receiptNoteSeriesId: 's-bc',
+      enabled: true,
+    })
+  })
+
+  it('shows the state of the platform invoicing when it is set up and hides the button from support', async () => {
+    mocks.roles = ['PlatformSupport']
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/platform/invoicing')) return Promise.resolve(json(200, { issuerTenantId: 'issuer', companyId: 'c', invoiceSeriesId: 'a', receiptSeriesId: 'b', invoiceNoteSeriesId: 'c', receiptNoteSeriesId: 'd', enabled: false }))
+      if (url.includes('/api/v1/platform/tenants?')) return Promise.resolve(json(200, [{ id: 'issuer', name: 'Cuenta de la plataforma' }]))
+      return Promise.resolve(json(200, []))
+    })
+    renderPage(<Collections />)
+
+    expect(await screen.findByText('Cuenta de la plataforma')).toBeVisible()
+    expect(screen.getByText('Desactivada: no se emiten comprobantes')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Cambiar la configuración' })).toBeNull()
   })
 })

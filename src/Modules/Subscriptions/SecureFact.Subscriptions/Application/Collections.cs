@@ -10,7 +10,7 @@ using SecureFact.Subscriptions.Infrastructure;
 
 namespace SecureFact.Subscriptions.Application;
 
-internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, Enforcement enforcement, Commissions commissions) : ICollections
+internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, TimeProvider clock, IAuditTrail audit, Enforcement enforcement, Commissions commissions, ChargeInvoicing invoicing) : ICollections
 {
     private const int MaxPageSize = 100;
     private const int MinReasonLength = 3;
@@ -53,7 +53,10 @@ internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, T
 
         var rows = await query.OrderByDescending(r => r.Charge.Period).ThenBy(r => r.Charge.TenantName).ThenBy(r => r.Charge.Id)
             .Skip(Math.Max(filter.Skip, 0)).Take(Math.Clamp(filter.Take, 1, MaxPageSize)).ToListAsync(cancellationToken);
-        return rows.Select(r => ToDto(r.Charge, r.Paid, today)).ToList();
+        var ids = rows.Select(r => r.Charge.Id).ToList();
+        var invoices = (await db.ChargeDocuments.AsNoTracking().Where(d => ids.Contains(d.ChargeId) && d.Kind == ChargeDocumentKind.Invoice).Select(d => new { d.ChargeId, d.Series, d.Number }).ToListAsync(cancellationToken))
+            .ToDictionary(d => d.ChargeId, d => $"{d.Series}-{d.Number}");
+        return rows.Select(r => ToDto(r.Charge, r.Paid, today) with { Invoice = invoices.GetValueOrDefault(r.Charge.Id) }).ToList();
     }
 
     public async Task<Result<ChargeDetailDto>> GetChargeAsync(Guid id, CancellationToken cancellationToken)
@@ -65,7 +68,14 @@ internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, T
         }
 
         var payments = await db.Payments.AsNoTracking().Where(p => p.ChargeId == id).OrderBy(p => p.RecordedAt).ThenBy(p => p.Id).ToListAsync(cancellationToken);
-        return new ChargeDetailDto(ToDto(row.Charge, row.Paid, LimaCalendar.Today(clock.GetUtcNow())), payments.Select(ToDto).ToList());
+        var documents = new List<ChargeDocumentDto>();
+        foreach (var document in await db.ChargeDocuments.AsNoTracking().Where(d => d.ChargeId == id).OrderBy(d => d.CreatedAt).ThenBy(d => d.Id).ToListAsync(cancellationToken))
+        {
+            documents.Add(new ChargeDocumentDto(document.Id, document.ChargeId, document.Kind, document.DocumentTypeCode, document.Series, document.Number, document.IssueDate, document.Total, await invoicing.StateOfAsync(document, cancellationToken)));
+        }
+
+        var invoice = documents.FirstOrDefault(d => d.Kind == ChargeDocumentKind.Invoice)?.Name;
+        return new ChargeDetailDto(ToDto(row.Charge, row.Paid, LimaCalendar.Today(clock.GetUtcNow())) with { Invoice = invoice }, payments.Select(ToDto).ToList(), documents);
     }
 
     public async Task<Result<PaymentDto>> RecordPaymentAsync(Guid chargeId, RecordPaymentRequest request, CancellationToken cancellationToken)
@@ -202,11 +212,26 @@ internal sealed class Collections(SubscriptionsDbContext db, IDataScope scope, T
             return Error.Validation(ErrorCodes.InvalidPayment, "Cargo con pagos", "El cargo tiene pagos: revierta primero los pagos para anularlo.");
         }
 
+        // A charge that was invoiced is cancelled with a credit note first: voiding it without one would leave an invoice for something that is no longer owed.
+        var today = LimaCalendar.Today(now);
+        if (await db.ChargeDocuments.AsNoTracking().SingleOrDefaultAsync(d => d.ChargeId == id && d.Kind == ChargeDocumentKind.Invoice, cancellationToken) is { } invoiced)
+        {
+            if (await invoicing.ActiveSettingsAsync(cancellationToken) is not { } settings)
+            {
+                return Error.Validation(ErrorCodes.ChargeInvoiceFailed, "Cargo facturado", "El cargo tiene factura o boleta emitida: para anularlo hace falta la configuración de facturación de la plataforma, que emite la nota de crédito.");
+            }
+
+            var note = await invoicing.IssueCreditNoteAsync(charge, invoiced, settings, today, cancellationToken);
+            if (!note.IsSuccess)
+            {
+                return note.Error;
+            }
+        }
+
         charge.MarkVoid(why, now);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        var today = LimaCalendar.Today(now);
         await audit.RecordAsync(
             new AuditEvent(
                 AuditActions.ChargeVoided, "charge", charge.Id.ToString("D"), charge.TenantId,

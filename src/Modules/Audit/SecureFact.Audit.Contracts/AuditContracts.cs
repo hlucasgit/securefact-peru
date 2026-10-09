@@ -27,6 +27,10 @@ public static class AuditActions
     public const string PaymentReversed = "subscriptions.payment.reversed";
     public const string CommissionScheduleCreated = "subscriptions.commission_schedule.published";
     public const string CommissionSettled = "subscriptions.commission.settled";
+    public const string BillingProfileSet = "subscriptions.billing_profile.set";
+    public const string InvoicingSettingsSet = "subscriptions.invoicing_settings.set";
+    public const string ChargeInvoiced = "subscriptions.charge.invoiced";
+    public const string ChargeCreditNoted = "subscriptions.charge.credit_noted";
 
     public const string CompanyCreated = "organizations.company.created";
     public const string CompanyUpdated = "organizations.company.updated";

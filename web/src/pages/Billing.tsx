@@ -1,6 +1,14 @@
 import { useState, type FormEvent } from 'react'
+import { fetchBlob } from '../api/http'
 import {
   useBillingPolicies,
+  useInvoicingOptions,
+  useInvoicingSettings,
+  useMyBillingProfile,
+  useSetInvoicingSettings,
+  useSetMyBillingProfile,
+  useSetTenantBillingProfile,
+  useTenantBillingProfile,
   useChargeDetail,
   useCharges,
   useCommissionSchedules,
@@ -20,8 +28,9 @@ import {
   useVoidCharge,
   useResellerCommissions,
   useCommissionStatement,
+  useTenants,
 } from '../api/queries'
-import type { Charge, ChargeStatus, CommissionMonth, CommissionStatement, PaymentMethod, PlanRow, ResellerRow, TenantTerms } from '../api/types'
+import type { BillingProfile, BillingProfileInput, Charge, ChargeDocument, ChargeStatus, CommissionMonth, CommissionStatement, InvoicingSettings, PaymentMethod, PlanRow, ResellerRow, TenantTerms } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import {
@@ -39,7 +48,8 @@ import {
   percent,
   type TierForm,
 } from '../lib/billing'
-import { date, money, todayInLima } from '../lib/format'
+import { save } from '../lib/download'
+import { PLAN_ROLES, date, money, todayInLima } from '../lib/format'
 
 let tierCounter = 0
 const newTier = (minAccounts = '', pct = ''): TierForm => ({ key: `tier-${++tierCounter}`, minAccounts, percent: pct })
@@ -63,6 +73,7 @@ export function ChargesTable({ charges, withTenant, onOpen }: { charges: Charge[
             <th className="right">Total</th>
             <th className="right">Saldo</th>
             <th>Vence</th>
+            <th>Comprobante</th>
             <th>Estado</th>
             <th />
           </tr>
@@ -76,6 +87,7 @@ export function ChargesTable({ charges, withTenant, onOpen }: { charges: Charge[
               <td className="right">{money(charge.totalAmount, charge.currency)}</td>
               <td className="right">{money(charge.balance, charge.currency)}</td>
               <td>{date(charge.dueOn)}</td>
+              <td className="mono">{charge.invoice ?? '—'}</td>
               <td>
                 <ChargeBadge status={charge.status} />
               </td>
@@ -126,6 +138,7 @@ export function ChargeModal({ id, own, canManage, onClose }: { id: string; own: 
                 ...(charge.voidReason ? ([['Motivo de la anulación', charge.voidReason]] as [string, string][]) : []),
               ]}
             />
+            <DocumentList charge={charge} documents={data.documents} own={own} />
             <PaymentList charge={charge} payments={data.payments} canManage={canManage} />
             {canManage && charge.status !== 'Void' && <ChargeActions charge={charge} />}
           </div>
@@ -269,6 +282,75 @@ function ChargeActions({ charge }: { charge: Charge }) {
   )
 }
 
+const KIND_LABELS = { Invoice: 'Factura o boleta', CreditNote: 'Nota de crédito' } as const
+
+const documentTypeName = (code: string) => (code === '01' ? 'Factura' : code === '03' ? 'Boleta de venta' : 'Nota de crédito')
+
+/** The invoice (and the credit note, if the charge was voided) issued for a charge, with its files. */
+function DocumentList({ charge, documents, own }: { charge: Charge; documents: ChargeDocument[]; own: boolean }) {
+  const [error, setError] = useState<unknown>(null)
+  const base = own ? '/api/v1/charges' : '/api/v1/platform/charges'
+
+  async function download(document: ChargeDocument, kind: 'pdf' | 'xml') {
+    setError(null)
+    const tab = kind === 'pdf' ? window.open('', '_blank') : null
+    if (kind === 'pdf' && !tab) {
+      setError(new Error('El navegador bloqueó la ventana del PDF. Permita las ventanas emergentes de este sitio.'))
+      return
+    }
+    try {
+      save(await fetchBlob(`${base}/${charge.id}/documents/${document.kind}/${kind}`), `${document.name}.${kind}`, tab)
+    } catch (failure) {
+      tab?.close()
+      setError(failure)
+    }
+  }
+
+  if (documents.length === 0) {
+    return <p className="hint">Este cargo aún no tiene factura ni boleta. Se emite cuando la cuenta tiene sus datos de facturación y la plataforma factura.</p>
+  }
+
+  return (
+    <div>
+      <h3>Comprobantes</h3>
+      <ErrorAlert error={error} />
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Comprobante</th>
+              <th>Número</th>
+              <th>Fecha</th>
+              <th className="right">Total</th>
+              <th>En SUNAT</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {documents.map((document) => (
+              <tr key={document.id}>
+                <td>{`${KIND_LABELS[document.kind]} (${documentTypeName(document.documentTypeCode)})`}</td>
+                <td className="mono">{document.name}</td>
+                <td>{date(document.issueDate)}</td>
+                <td className="right">{money(document.total, charge.currency)}</td>
+                <td>{document.state ?? 'Sin preparar'}</td>
+                <td className="right tight">
+                  <button className="btn small" type="button" aria-label={`PDF de ${document.name}`} onClick={() => download(document, 'pdf')}>
+                    PDF
+                  </button>{' '}
+                  <button className="btn small" type="button" aria-label={`XML de ${document.name}`} onClick={() => download(document, 'xml')}>
+                    XML
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 const STATUS_FILTERS: ChargeStatus[] = ['Pending', 'Partial', 'Overdue', 'Paid', 'Void']
 
 /** Platform staff: every charge, with the collection pass that makes them. */
@@ -292,7 +374,8 @@ export function Collections() {
             disabled={run.isPending}
             onClick={() =>
               run.mutate(undefined, {
-                onSuccess: (result) => toast.ok(`Cobranza ejecutada: ${result.chargesCreated} cargos nuevos, ${result.tenantsSuspended} cuentas suspendidas, ${result.tenantsReactivated} reactivadas.`),
+                onSuccess: (result) =>
+                  toast.ok(`Cobranza ejecutada: ${result.chargesCreated} cargos nuevos, ${result.invoicesIssued} comprobantes emitidos, ${result.tenantsSuspended} cuentas suspendidas, ${result.tenantsReactivated} reactivadas.`),
               })
             }
           >
@@ -300,6 +383,7 @@ export function Collections() {
           </button>
         )}
       </PageHeader>
+      <InvoicingCard canManage={canManage} />
       <div className="card">
         <ErrorAlert error={error ?? run.error} />
         <div className="row" style={{ alignItems: 'flex-end', marginBottom: 12 }}>
@@ -346,6 +430,233 @@ function TermsSummary({ terms }: { terms: TenantTerms }) {
   )
 }
 
+// ---------- who the invoices are made out to ----------
+
+const DOCUMENT_TYPES = { '6': 'RUC', '1': 'DNI' } as const
+
+function ProfileSummary({ profile }: { profile: BillingProfile }) {
+  return (
+    <KeyValues
+      items={[
+        ['Se factura a', profile.legalName],
+        [DOCUMENT_TYPES[profile.documentTypeCode as '6' | '1'] ?? 'Documento', profile.documentNumber],
+        ['Comprobante', profile.documentTypeCode === '6' ? 'Factura' : 'Boleta de venta'],
+        ...(profile.address ? ([['Dirección', profile.address]] as [string, string][]) : []),
+        ...(profile.email ? ([['Correo', profile.email]] as [string, string][]) : []),
+      ]}
+    />
+  )
+}
+
+function ProfileModal({
+  initial,
+  mutation,
+  onClose,
+}: {
+  initial: BillingProfile | null
+  mutation: { mutate: (input: BillingProfileInput, options: { onSuccess: () => void }) => void; isPending: boolean; error: unknown }
+  onClose: () => void
+}) {
+  const toast = useToast()
+  const [form, setForm] = useState({
+    documentTypeCode: initial?.documentTypeCode ?? '6',
+    documentNumber: initial?.documentNumber ?? '',
+    legalName: initial?.legalName ?? '',
+    address: initial?.address ?? '',
+    email: initial?.email ?? '',
+  })
+  return (
+    <Modal title="Datos de facturación" onClose={onClose}>
+      <form
+        className="stack"
+        onSubmit={(event) => {
+          event.preventDefault()
+          mutation.mutate(
+            { documentTypeCode: form.documentTypeCode, documentNumber: form.documentNumber.trim(), legalName: form.legalName.trim(), address: form.address.trim() || null, email: form.email.trim() || null },
+            { onSuccess: () => { toast.ok('Datos de facturación guardados.'); onClose() } },
+          )
+        }}
+      >
+        <ErrorAlert error={mutation.error} />
+        <SelectField label="Se factura a" hint="un RUC recibe factura; un DNI, boleta de venta" value={form.documentTypeCode} onChange={(event) => setForm({ ...form, documentTypeCode: event.target.value })}>
+          <option value="6">Una empresa (RUC)</option>
+          <option value="1">Una persona (DNI)</option>
+        </SelectField>
+        <TextField
+          label={form.documentTypeCode === '6' ? 'RUC' : 'DNI'}
+          required
+          inputMode="numeric"
+          maxLength={form.documentTypeCode === '6' ? 11 : 8}
+          value={form.documentNumber}
+          onChange={(event) => setForm({ ...form, documentNumber: event.target.value })}
+        />
+        <TextField label={form.documentTypeCode === '6' ? 'Razón social' : 'Nombres y apellidos'} required minLength={3} maxLength={200} value={form.legalName} onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
+        <TextField label="Dirección" maxLength={200} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} />
+        <TextField label="Correo para el comprobante" type="email" maxLength={254} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <p className="hint">Se copian en cada comprobante cuando se emite: cambiarlos no cambia los que ya existen.</p>
+        <div className="actions">
+          <button className="btn" type="button" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="btn primary" type="submit" disabled={mutation.isPending}>
+            Guardar
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/** The own billing data of the account, with the warning while they are missing. */
+function MyProfile() {
+  const { hasRole } = useSession()
+  const { data, isPending, error } = useMyBillingProfile()
+  const update = useSetMyBillingProfile()
+  const [editing, setEditing] = useState(false)
+  const canEdit = hasRole(...PLAN_ROLES)
+  return (
+    <div style={{ margin: '14px 0' }}>
+      <h3>Datos de facturación</h3>
+      <ErrorAlert error={error} />
+      {isPending ? (
+        <Loading />
+      ) : data ? (
+        <ProfileSummary profile={data} />
+      ) : (
+        <p role="status" className="hint">
+          Aún no hay datos de facturación: sin ellos no se emite la factura ni la boleta de sus cargos. {canEdit ? 'Complételos para recibirlos.' : 'Pídale al propietario que los complete.'}
+        </p>
+      )}
+      {canEdit && (
+        <button className="btn small" type="button" onClick={() => setEditing(true)}>
+          {data ? 'Editar los datos de facturación' : 'Completar los datos de facturación'}
+        </button>
+      )}
+      {editing && <ProfileModal initial={data ?? null} mutation={update} onClose={() => setEditing(false)} />}
+    </div>
+  )
+}
+
+/** The billing data of one account, for platform staff (the super administrator edits them). */
+function TenantProfile({ tenantId, canEdit }: { tenantId: string; canEdit: boolean }) {
+  const { data, isPending, error } = useTenantBillingProfile(tenantId)
+  const update = useSetTenantBillingProfile(tenantId)
+  const [editing, setEditing] = useState(false)
+  return (
+    <div style={{ margin: '14px 0' }}>
+      <h3>Datos de facturación</h3>
+      <ErrorAlert error={error} />
+      {isPending ? <Loading /> : data ? <ProfileSummary profile={data} /> : <p className="hint">La cuenta aún no dio sus datos de facturación: no se le emite factura ni boleta.</p>}
+      {canEdit && (
+        <button className="btn small" type="button" onClick={() => setEditing(true)}>
+          {data ? 'Editar los datos de facturación' : 'Cargar los datos de facturación'}
+        </button>
+      )}
+      {editing && <ProfileModal initial={data ?? null} mutation={update} onClose={() => setEditing(false)} />}
+    </div>
+  )
+}
+
+// ---------- with which account the platform invoices ----------
+
+function InvoicingCard({ canManage }: { canManage: boolean }) {
+  const { data, isPending, error } = useInvoicingSettings()
+  const tenants = useTenants('', '')
+  const [editing, setEditing] = useState(false)
+  const issuer = (tenants.data ?? []).find((tenant) => tenant.id === data?.issuerTenantId)
+  return (
+    <div className="card">
+      <h2>Facturación de la plataforma</h2>
+      <ErrorAlert error={error} />
+      {isPending ? (
+        <Loading />
+      ) : data ? (
+        <KeyValues items={[['Cuenta emisora', issuer?.name ?? data.issuerTenantId], ['Estado', data.enabled ? <Badge key="on" tone="ok">Factura lo que cobra</Badge> : <Badge key="off" tone="warn">Desactivada: no se emiten comprobantes</Badge>]]} />
+      ) : (
+        <p className="hint">Aún no está configurada: los cargos se cobran, pero no se emite factura ni boleta de ellos.</p>
+      )}
+      {canManage && (
+        <button className="btn small" type="button" onClick={() => setEditing(true)}>
+          {data ? 'Cambiar la configuración' : 'Configurar la facturación'}
+        </button>
+      )}
+      {editing && <InvoicingModal initial={data ?? null} onClose={() => setEditing(false)} />}
+    </div>
+  )
+}
+
+const SERIES_FIELDS = [
+  ['invoiceSeriesId', 'Serie de facturas', '01', 'F'],
+  ['receiptSeriesId', 'Serie de boletas de venta', '03', 'B'],
+  ['invoiceNoteSeriesId', 'Serie de notas de crédito de facturas', '07', 'F'],
+  ['receiptNoteSeriesId', 'Serie de notas de crédito de boletas', '07', 'B'],
+] as const
+
+function InvoicingModal({ initial, onClose }: { initial: InvoicingSettings | null; onClose: () => void }) {
+  const tenants = useTenants('', '')
+  const save = useSetInvoicingSettings()
+  const toast = useToast()
+  const [form, setForm] = useState<InvoicingSettings>(
+    initial ?? { issuerTenantId: '', companyId: '', invoiceSeriesId: '', receiptSeriesId: '', invoiceNoteSeriesId: '', receiptNoteSeriesId: '', enabled: true },
+  )
+  const options = useInvoicingOptions(form.issuerTenantId)
+  const company = (options.data ?? []).find((candidate) => candidate.id === form.companyId)
+  const complete = !!form.issuerTenantId && !!form.companyId && SERIES_FIELDS.every(([field]) => form[field] !== '')
+  return (
+    <Modal title="Facturación de la plataforma" onClose={onClose}>
+      <form
+        className="stack"
+        onSubmit={(event) => {
+          event.preventDefault()
+          save.mutate(form, { onSuccess: () => { toast.ok('Configuración guardada.'); onClose() } })
+        }}
+      >
+        <ErrorAlert error={save.error ?? options.error} />
+        <p className="hint">La plataforma emite sus facturas desde una cuenta propia, con su empresa, su certificado y sus series, como cualquier emisor.</p>
+        <SelectField label="Cuenta emisora" value={form.issuerTenantId} onChange={(event) => setForm({ ...form, issuerTenantId: event.target.value, companyId: '', invoiceSeriesId: '', receiptSeriesId: '', invoiceNoteSeriesId: '', receiptNoteSeriesId: '' })}>
+          <option value="">Elija la cuenta</option>
+          {(tenants.data ?? []).map((tenant) => (
+            <option key={tenant.id} value={tenant.id}>
+              {tenant.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField label="Empresa emisora" value={form.companyId} onChange={(event) => setForm({ ...form, companyId: event.target.value, invoiceSeriesId: '', receiptSeriesId: '', invoiceNoteSeriesId: '', receiptNoteSeriesId: '' })}>
+          <option value="">Elija la empresa</option>
+          {(options.data ?? []).map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.legalName} ({candidate.ruc})
+            </option>
+          ))}
+        </SelectField>
+        {SERIES_FIELDS.map(([field, label, type, letter]) => (
+          <SelectField key={field} label={label} hint={`tipo ${type}, empieza con ${letter}`} value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })}>
+            <option value="">Elija la serie</option>
+            {(company?.series ?? [])
+              .filter((series) => series.documentTypeCode === type && series.code.toUpperCase().startsWith(letter))
+              .map((series) => (
+                <option key={series.id} value={series.id}>
+                  {series.code}
+                </option>
+              ))}
+          </SelectField>
+        ))}
+        <label className="checkbox">
+          <input type="checkbox" checked={form.enabled} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Emitir factura o boleta de cada cargo
+        </label>
+        <div className="actions">
+          <button className="btn" type="button" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="btn primary" type="submit" disabled={!complete || save.isPending}>
+            Guardar
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 /** The price and the charges of the own account. */
 export function MyCharges() {
   const terms = useMyTerms()
@@ -356,6 +667,7 @@ export function MyCharges() {
       <h2>Precio y cargos</h2>
       <ErrorAlert error={terms.error ?? charges.error} />
       {terms.isPending ? <Loading /> : terms.data && <TermsSummary terms={terms.data} />}
+      <MyProfile />
       {charges.isPending ? <Loading /> : charges.data && charges.data.length > 0 ? <ChargesTable charges={charges.data} withTenant={false} onOpen={(charge) => setOpen(charge.id)} /> : <Empty>Aún no tiene cargos.</Empty>}
       {open && <ChargeModal id={open} own canManage={false} onClose={() => setOpen(null)} />}
     </div>
@@ -373,6 +685,7 @@ export function TenantBillingCard({ tenantId }: { tenantId: string }) {
       <h2>Precio y cargos</h2>
       <ErrorAlert error={terms.error ?? charges.error} />
       {terms.isPending ? <Loading /> : terms.data && <TermsSummary terms={terms.data} />}
+      <TenantProfile tenantId={tenantId} canEdit={hasRole('PlatformSuperAdmin')} />
       {charges.isPending ? <Loading /> : charges.data && charges.data.length > 0 ? <ChargesTable charges={charges.data} withTenant={false} onOpen={(charge) => setOpen(charge.id)} /> : <Empty>Aún no tiene cargos.</Empty>}
       {open && <ChargeModal id={open} own={false} canManage={hasRole('PlatformSuperAdmin')} onClose={() => setOpen(null)} />}
     </div>

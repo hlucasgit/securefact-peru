@@ -52,7 +52,7 @@ Consecuencia deliberada: una versión nueva solo alcanza a las cuentas que tomen
 
 ## Límites (P)
 - **No hay pasarela de cobro.** El cobro es manual: una persona registra la transferencia o el depósito. Integrar Culqi, Niubiz, Izipay o Stripe necesita elegir proveedor y una cuenta de pruebas, y no se puede verificar contra un tercero sin ellas.
-- **El cargo no es un comprobante de pago.** SecureFact debe emitir su propia factura o boleta electrónica por lo que cobra (como cualquier contribuyente); este módulo calcula el IGV del cargo con la regla vigente pero **no emite** ese comprobante. Pendiente: emitirlo con la propia plataforma como cuenta emisora.
+- ~~El cargo no es un comprobante de pago~~: el comprobante de cada cargo lo emite la plataforma con una cuenta propia (ADR-065). El cargo calcula el IGV y el comprobante lo emite Billing; coinciden al centavo.
 - Solo soles. Los precios son decisión comercial y no fuente normativa; no se registran en `matrix.md`.
 - Una cuenta que cambia de plan a mitad de mes se cobra con el plan que tiene al cerrar el mes (el pase corre al comenzar el siguiente); no se prorratea.
 - La cuota se cobra aunque la cuenta esté suspendida (por mora, revendedor o plataforma) hasta que se cierre.

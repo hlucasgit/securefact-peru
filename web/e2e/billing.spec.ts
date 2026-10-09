@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, seriousViolations, signIn, test } from './fixtures.ts'
-import { adminCredentials } from './helpers/api.ts'
+import { adminCredentials, createTenant, newRuc } from './helpers/api.ts'
 import { createReseller } from './helpers/resellers.ts'
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
@@ -124,5 +124,55 @@ test.describe('precios, cobranza y comisiones', () => {
     await expect(dialog.getByText('Aún no hay comisiones.')).toBeVisible()
     await expect(dialog.getByText('Porcentaje actual')).toBeVisible()
     expect(await seriousViolations(page)).toEqual([])
+  })
+})
+
+test.describe('la factura de la plataforma por sus cobros', () => {
+  test('la plataforma configura la cuenta con la que factura y una cuenta completa sus datos de facturación', async ({ page, world, browser }) => {
+    // The account of the platform: a company ready to issue, with the series of the invoices, the receipts and the credit notes of both.
+    await world.tenant.api.post('/api/v1/series', { companyId: world.company.id, documentTypeCode: '07', code: 'BC01' })
+    await signInAsAdmin(page)
+
+    await nav(page).getByRole('link', { name: 'Cobranza' }).click()
+    await expect(page.getByRole('heading', { name: 'Facturación de la plataforma' })).toBeVisible()
+    await page.getByRole('button', { name: /Configurar la facturación|Cambiar la configuración/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+    await dialog.getByLabel('Cuenta emisora').selectOption({ label: world.tenant.name })
+    await dialog.getByLabel('Empresa emisora').selectOption({ index: 1 })
+    await dialog.getByLabel(/Serie de facturas/).selectOption({ label: 'F001' })
+    await dialog.getByLabel(/Serie de boletas de venta/).selectOption({ label: 'B001' })
+    await dialog.getByLabel(/Serie de notas de crédito de facturas/).selectOption({ label: 'FC01' })
+    await dialog.getByLabel(/Serie de notas de crédito de boletas/).selectOption({ label: 'BC01' })
+    expect(await seriousViolations(page)).toEqual([])
+    await dialog.getByRole('button', { name: 'Guardar' }).click()
+    await expect(page.getByText('Configuración guardada.')).toBeVisible()
+    await expect(page.getByText('Factura lo que cobra')).toBeVisible()
+
+    // A customer account: it is asked for its billing data, gives them, and the platform sees them in its detail.
+    const customer = await createTenant('Cliente factura')
+    const context = await browser.newContext()
+    const owner = await context.newPage()
+    await signIn(owner, customer.owner)
+    await owner.getByRole('link', { name: 'Plan y consumo' }).click()
+    await expect(owner.getByText(/Aún no hay datos de facturación/)).toBeVisible()
+    await owner.getByRole('button', { name: 'Completar los datos de facturación' }).click()
+    const form = owner.getByRole('dialog')
+    const ruc = newRuc()
+    await form.getByLabel('RUC').fill(ruc)
+    await form.getByLabel('Razón social').fill('Cliente Facturado SAC')
+    await form.getByLabel(/Correo para el comprobante/).fill('facturas@cliente.test')
+    expect(await seriousViolations(owner)).toEqual([])
+    await form.getByRole('button', { name: 'Guardar' }).click()
+    await expect(owner.getByText('Datos de facturación guardados.')).toBeVisible()
+    await expect(owner.getByText('Cliente Facturado SAC')).toBeVisible()
+    await expect(owner.getByText('Factura', { exact: true })).toBeVisible()
+    await context.close()
+
+    await nav(page).getByRole('link', { name: 'Inquilinos' }).click()
+    await page.getByLabel('Buscar por nombre').fill(customer.name)
+    await page.getByRole('link', { name: customer.name }).click()
+    await expect(page.getByText('Cliente Facturado SAC')).toBeVisible()
+    await expect(page.getByText(ruc)).toBeVisible()
   })
 })

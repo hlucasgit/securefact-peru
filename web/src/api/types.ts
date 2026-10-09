@@ -703,6 +703,58 @@ export interface Charge {
   status: ChargeStatus
   voidReason: string | null
   createdAt: string
+  /** The number of the invoice or receipt issued for the charge, for example F001-45. */
+  invoice: string | null
+}
+
+export type ChargeDocumentKind = 'Invoice' | 'CreditNote'
+
+export interface ChargeDocument {
+  id: string
+  chargeId: string
+  kind: ChargeDocumentKind
+  documentTypeCode: string
+  series: string
+  number: number
+  issueDate: string
+  total: number
+  /** The state of the electronic document at SUNAT; empty while it is not prepared. */
+  state: string | null
+  name: string
+}
+
+export interface BillingProfile {
+  tenantId: string
+  documentTypeCode: string
+  documentNumber: string
+  legalName: string
+  address: string | null
+  email: string | null
+}
+
+export interface BillingProfileInput {
+  documentTypeCode: string
+  documentNumber: string
+  legalName: string
+  address: string | null
+  email: string | null
+}
+
+export interface InvoicingSettings {
+  issuerTenantId: string
+  companyId: string
+  invoiceSeriesId: string
+  receiptSeriesId: string
+  invoiceNoteSeriesId: string
+  receiptNoteSeriesId: string
+  enabled: boolean
+}
+
+export interface InvoicingCompanyOption {
+  id: string
+  ruc: string
+  legalName: string
+  series: { id: string; documentTypeCode: string; code: string }[]
 }
 
 export interface Payment {
@@ -720,6 +772,7 @@ export interface Payment {
 export interface ChargeDetail {
   charge: Charge
   payments: Payment[]
+  documents: ChargeDocument[]
 }
 
 export interface PaymentInput {
@@ -734,6 +787,7 @@ export interface CollectionPassResult {
   chargesCreated: number
   tenantsSuspended: number
   tenantsReactivated: number
+  invoicesIssued: number
 }
 
 export interface CommissionTier {

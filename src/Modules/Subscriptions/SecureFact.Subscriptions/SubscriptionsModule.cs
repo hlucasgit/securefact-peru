@@ -26,6 +26,11 @@ public static class SubscriptionsModule
         services.AddScoped<Commissions>();
         services.AddScoped<ICommissions>(sp => sp.GetRequiredService<Commissions>());
         services.AddScoped<Enforcement>();
+        services.AddScoped<IssuerAccess>();
+        services.AddScoped<ChargeInvoicing>();
+        services.AddScoped<IBillingProfiles, BillingProfiles>();
+        services.AddScoped<IInvoicingSettings, InvoicingSettingsService>();
+        services.AddScoped<IChargeDocuments, ChargeDocumentFiles>();
         services.AddScoped<CollectionPass>();
         services.AddSingleton<ICollectionProcessor, CollectionProcessor>();
         return services;

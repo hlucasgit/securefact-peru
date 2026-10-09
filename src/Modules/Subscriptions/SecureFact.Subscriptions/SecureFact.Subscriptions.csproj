@@ -10,6 +10,9 @@
     <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
     <ProjectReference Include="..\..\Audit\SecureFact.Audit.Contracts\SecureFact.Audit.Contracts.csproj" />
     <ProjectReference Include="..\..\Billing\SecureFact.Billing.Contracts\SecureFact.Billing.Contracts.csproj" />
+    <ProjectReference Include="..\..\CpeEngine\SecureFact.CpeEngine.Contracts\SecureFact.CpeEngine.Contracts.csproj" />
+    <ProjectReference Include="..\..\Organizations\SecureFact.Organizations.Contracts\SecureFact.Organizations.Contracts.csproj" />
+    <ProjectReference Include="..\..\TaxEngine\SecureFact.TaxEngine.Contracts\SecureFact.TaxEngine.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\SecureFact.Rules.Contracts\SecureFact.Rules.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\SecureFact.Tenancy.Contracts\SecureFact.Tenancy.Contracts.csproj" />
     <ProjectReference Include="..\SecureFact.Subscriptions.Contracts\SecureFact.Subscriptions.Contracts.csproj" />

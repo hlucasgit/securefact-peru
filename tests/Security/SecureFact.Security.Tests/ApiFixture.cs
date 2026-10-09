@@ -58,6 +58,29 @@ public sealed partial class CapturingNotifier(CapturingEmailSender mail)
 
 public sealed record TestUser(string Email, string Password, Guid Id);
 
+/// <summary>
+/// The clock of the services of the API under test. It is the real one until a test moves it with <see cref="At"/>, to run what happens months later (the charges of a month that closed) through the
+/// real services. A test that moves it does so for a call and gives it back, and the tests of the collection run one after another, so none sees another's time.
+/// </summary>
+public sealed class ShiftedClock : TimeProvider
+{
+    private long _offsetTicks;
+
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
+
+    /// <summary>From now until the result is disposed, the services believe it is <paramref name="when"/>.</summary>
+    public IDisposable At(DateTimeOffset when)
+    {
+        Interlocked.Exchange(ref _offsetTicks, (when - base.GetUtcNow()).Ticks);
+        return new Back(this);
+    }
+
+    private sealed class Back(ShiftedClock clock) : IDisposable
+    {
+        public void Dispose() => Interlocked.Exchange(ref clock._offsetTicks, 0);
+    }
+}
+
 public sealed class ApiFixture : IAsyncLifetime
 {
     public const string AdminEmail = "platform.admin@securefact.test";
@@ -88,6 +111,8 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public PostgresFixture Postgres => _postgres;
 
+    public ShiftedClock Clock { get; } = new();
+
     public IServiceProvider Services => _factory!.Services;
 
     public async Task InitializeAsync()
@@ -116,6 +141,7 @@ public sealed class ApiFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
+                services.AddSingleton<TimeProvider>(Clock);
                 services.AddSingleton<IEmailSender>(Mail);
                 services.AddSingleton<SecureFact.CpeEngine.Contracts.ICpeSubmissionChannel>(Sunat);
                 services.AddSingleton<SecureFact.Gre.Contracts.IGreChannel>(Gre);

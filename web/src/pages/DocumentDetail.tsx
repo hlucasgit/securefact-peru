@@ -5,22 +5,8 @@ import { useArchive, useCatalog, useCompany, useCreateVoid, useDocument, useElec
 import type { Document, ElectronicDocument } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, StateBadge, TextAreaField, useToast } from '../components/ui'
+import { save } from '../lib/download'
 import { BILLING_ROLES, date, dateTime, documentName, money } from '../lib/format'
-
-function save(blob: Blob, name: string, tab: Window | null = null) {
-  const url = URL.createObjectURL(blob)
-  if (tab) {
-    // The tab was opened by the click itself (a window opened after the wait for the file is taken for a pop-up and blocked); it is told where to go now, cut from this page.
-    tab.opener = null
-    tab.location.href = url
-  } else {
-    const link = document.createElement('a')
-    link.href = url
-    link.download = name
-    link.click()
-  }
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-}
 
 export function DocumentDetail() {
   const { id = '' } = useParams()

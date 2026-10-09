@@ -17,6 +17,12 @@ internal sealed class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbCon
 
     public DbSet<Payment> Payments => Set<Payment>();
 
+    public DbSet<InvoicingSetting> InvoicingSettings => Set<InvoicingSetting>();
+
+    public DbSet<BillingProfile> Profiles => Set<BillingProfile>();
+
+    public DbSet<ChargeDocument> ChargeDocuments => Set<ChargeDocument>();
+
     public DbSet<CommissionSchedule> Schedules => Set<CommissionSchedule>();
 
     public DbSet<CommissionTier> Tiers => Set<CommissionTier>();
@@ -116,6 +122,57 @@ internal sealed class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbCon
             b.Property(p => p.RecordedAt).HasColumnName("recorded_at");
             b.HasIndex(p => p.ChargeId);
             b.HasIndex(p => p.ReversesPaymentId).IsUnique().HasFilter("reverses_payment_id IS NOT NULL");
+            ConfigureTenantOwned(b);
+        });
+
+        // With which account the platform invoices: platform staff only (RLS platform_only).
+        modelBuilder.Entity<InvoicingSetting>(b =>
+        {
+            b.ToTable("invoicing_settings");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(s => s.IssuerTenantId).HasColumnName("issuer_tenant_id");
+            b.Property(s => s.CompanyId).HasColumnName("company_id");
+            b.Property(s => s.InvoiceSeriesId).HasColumnName("invoice_series_id");
+            b.Property(s => s.ReceiptSeriesId).HasColumnName("receipt_series_id");
+            b.Property(s => s.InvoiceNoteSeriesId).HasColumnName("invoice_note_series_id");
+            b.Property(s => s.ReceiptNoteSeriesId).HasColumnName("receipt_note_series_id");
+            b.Property(s => s.Enabled).HasColumnName("enabled");
+            b.Property(s => s.UpdatedAt).HasColumnName("updated_at");
+            b.Property(s => s.Version).IsRowVersion();
+        });
+
+        // Who each tenant is invoiced as: the tenant reads and edits its own row (RLS tenant or platform).
+        modelBuilder.Entity<BillingProfile>(b =>
+        {
+            b.ToTable("billing_profile");
+            b.HasKey(p => p.TenantId);
+            b.Property(p => p.DocumentTypeCode).HasColumnName("document_type_code").HasMaxLength(1).IsRequired();
+            b.Property(p => p.DocumentNumber).HasColumnName("document_number").HasMaxLength(11).IsRequired();
+            b.Property(p => p.LegalName).HasColumnName("legal_name").HasMaxLength(200).IsRequired();
+            b.Property(p => p.Address).HasColumnName("address").HasMaxLength(200);
+            b.Property(p => p.Email).HasColumnName("email").HasMaxLength(254);
+            b.Property(p => p.UpdatedAt).HasColumnName("updated_at");
+            b.Property(p => p.Version).IsRowVersion();
+            ConfigureTenantOwned(b);
+        });
+
+        modelBuilder.Entity<ChargeDocument>(b =>
+        {
+            b.ToTable("charge_document");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(d => d.ChargeId).HasColumnName("charge_id");
+            b.Property(d => d.Kind).HasColumnName("kind").HasConversion<string>().HasMaxLength(20);
+            b.Property(d => d.IssuerTenantId).HasColumnName("issuer_tenant_id");
+            b.Property(d => d.DocumentId).HasColumnName("document_id");
+            b.Property(d => d.DocumentTypeCode).HasColumnName("document_type_code").HasMaxLength(2).IsRequired();
+            b.Property(d => d.Series).HasColumnName("series").HasMaxLength(4).IsRequired();
+            b.Property(d => d.Number).HasColumnName("number");
+            b.Property(d => d.IssueDate).HasColumnName("issue_date");
+            b.Property(d => d.Total).HasColumnName("total").HasColumnType("numeric(14,2)");
+            b.Property(d => d.CreatedAt).HasColumnName("created_at");
+            b.HasIndex(d => new { d.ChargeId, d.Kind }).IsUnique();
             ConfigureTenantOwned(b);
         });
 

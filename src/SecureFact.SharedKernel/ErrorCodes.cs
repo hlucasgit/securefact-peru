@@ -46,6 +46,14 @@ public static class ErrorCodes
 
     public const string SettlementNotAllowed = "SF-SUB-007";
 
+    public const string InvalidBillingProfile = "SF-SUB-008";
+
+    public const string InvalidInvoicingSettings = "SF-SUB-009";
+
+    public const string ChargeInvoiceFailed = "SF-SUB-010";
+
+    public const string ChargeDocumentNotFound = "SF-SUB-011";
+
     public const string InvalidBranding = "SF-BRAND-001";
 
     public const string InvalidLogo = "SF-BRAND-002";

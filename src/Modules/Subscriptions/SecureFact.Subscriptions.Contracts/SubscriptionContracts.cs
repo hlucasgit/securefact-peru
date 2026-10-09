@@ -70,12 +70,29 @@ public sealed record ChargeDto(
     decimal Balance,
     ChargeStatus Status,
     string? VoidReason,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? Invoice = null);
 
 public sealed record PaymentDto(
     Guid Id, Guid ChargeId, decimal Amount, PaymentMethod Method, string? Reference, DateOnly PaidOn, string? Note, Guid? ReversesPaymentId, DateTimeOffset RecordedAt);
 
-public sealed record ChargeDetailDto(ChargeDto Charge, IReadOnlyList<PaymentDto> Payments);
+public enum ChargeDocumentKind
+{
+    /// <summary>The factura (01) or boleta de venta (03) of the charge.</summary>
+    Invoice,
+
+    /// <summary>The nota de crédito that cancels it when the charge is voided.</summary>
+    CreditNote,
+}
+
+/// <param name="State">The state of the electronic document at SUNAT (<c>Accepted</c>, <c>Pending</c>…); empty while the document is not prepared.</param>
+public sealed record ChargeDocumentDto(
+    Guid Id, Guid ChargeId, ChargeDocumentKind Kind, string DocumentTypeCode, string Series, long Number, DateOnly IssueDate, decimal Total, string? State)
+{
+    public string Name => $"{Series}-{Number}";
+}
+
+public sealed record ChargeDetailDto(ChargeDto Charge, IReadOnlyList<PaymentDto> Payments, IReadOnlyList<ChargeDocumentDto> Documents);
 
 /// <param name="TenantId">Platform staff only; a tenant always sees its own.</param>
 public sealed record ChargeFilter(Guid? TenantId, ChargeStatus? Status, DateOnly? Period, int Skip, int Take);
@@ -115,7 +132,7 @@ public interface ICollections
     Task<Result<ChargeDto>> VoidChargeAsync(Guid id, string reason, CancellationToken cancellationToken);
 }
 
-public sealed record CollectionPassResult(int ChargesCreated, int TenantsSuspended, int TenantsReactivated);
+public sealed record CollectionPassResult(int ChargesCreated, int TenantsSuspended, int TenantsReactivated, int InvoicesIssued = 0);
 
 /// <summary>The background pass: charges for the months that closed and the suspensions and reactivations for non-payment. Platform scope.</summary>
 public interface ICollectionProcessor
@@ -163,4 +180,51 @@ public interface ICommissions
 
     /// <summary>Records that the platform settled a closed month with the reseller. One per reseller and month; its total is the sum of the entries and never changes.</summary>
     Task<Result<CommissionSettlementDto>> SettleAsync(Guid resellerId, DateOnly month, SettleCommissionRequest request, CancellationToken cancellationToken);
+}
+
+/// <param name="DocumentTypeCode">Catalogue 06: <c>6</c> RUC (the charge gets a factura) or <c>1</c> DNI (a boleta de venta).</param>
+public sealed record BillingProfileInput(string DocumentTypeCode, string DocumentNumber, string LegalName, string? Address, string? Email);
+
+public sealed record BillingProfileDto(Guid TenantId, string DocumentTypeCode, string DocumentNumber, string LegalName, string? Address, string? Email, DateTimeOffset UpdatedAt);
+
+/// <summary>
+/// Who the invoices of the platform are made out to (ADR-065). A tenant reads and edits its own; platform staff, any. A profile is copied into each document when it is issued, so editing it
+/// never changes an invoice that exists.
+/// </summary>
+public interface IBillingProfiles
+{
+    /// <summary>The profile, or not found while the tenant has not given one.</summary>
+    Task<Result<BillingProfileDto>> GetAsync(TenantId tenantId, CancellationToken cancellationToken);
+
+    /// <summary>Sets the profile. The RUC is checked by its digit; the charges that were waiting for it are invoiced by the next collection pass.</summary>
+    Task<Result<BillingProfileDto>> SetAsync(TenantId tenantId, BillingProfileInput input, CancellationToken cancellationToken);
+}
+
+/// <summary>The company and series of the account of the platform with which it invoices what it charges. Every series belongs to the company, with the right document type.</summary>
+public sealed record InvoicingSettingsInput(Guid IssuerTenantId, Guid CompanyId, Guid InvoiceSeriesId, Guid ReceiptSeriesId, Guid InvoiceNoteSeriesId, Guid ReceiptNoteSeriesId, bool Enabled);
+
+public sealed record InvoicingSettingsDto(
+    Guid IssuerTenantId, Guid CompanyId, Guid InvoiceSeriesId, Guid ReceiptSeriesId, Guid InvoiceNoteSeriesId, Guid ReceiptNoteSeriesId, bool Enabled, DateTimeOffset UpdatedAt);
+
+public sealed record InvoicingSeriesOption(Guid Id, string DocumentTypeCode, string Code);
+
+public sealed record InvoicingCompanyOption(Guid Id, string Ruc, string LegalName, IReadOnlyList<InvoicingSeriesOption> Series);
+
+/// <summary>Platform staff configure with which account the platform invoices (ADR-065). Without settings, or disabled, charges are made and collected but not invoiced.</summary>
+public interface IInvoicingSettings
+{
+    Task<Result<InvoicingSettingsDto>> GetAsync(CancellationToken cancellationToken);
+
+    Task<Result<InvoicingSettingsDto>> SetAsync(InvoicingSettingsInput input, CancellationToken cancellationToken);
+
+    /// <summary>The companies of an account with their active series, to choose the settings from.</summary>
+    Task<Result<IReadOnlyList<InvoicingCompanyOption>>> OptionsAsync(Guid issuerTenantId, CancellationToken cancellationToken);
+}
+
+/// <summary>The files of the invoice (or credit note) issued for a charge. The tenant reads those of its own charges; platform staff, all.</summary>
+public interface IChargeDocuments
+{
+    Task<Result<byte[]>> GetPdfAsync(Guid chargeId, ChargeDocumentKind kind, CancellationToken cancellationToken);
+
+    Task<Result<string>> GetXmlAsync(Guid chargeId, ChargeDocumentKind kind, CancellationToken cancellationToken);
 }

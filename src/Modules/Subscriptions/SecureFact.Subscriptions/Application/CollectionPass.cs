@@ -35,10 +35,12 @@ internal sealed partial class CollectionPass(
     IRuleProvider rules,
     Commissions commissions,
     Enforcement enforcement,
+    ChargeInvoicing invoicing,
     ILogger<CollectionPass> logger)
 {
     private const int PageSize = 100;
     private const int MaxChargesPerTenantPerPass = 24;
+    private const int MaxInvoicesPerPass = 100;
 
     public async Task<CollectionPassResult> RunAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -89,8 +91,9 @@ internal sealed partial class CollectionPass(
             }
         }
 
+        var invoiced = await invoicing.IssuePendingAsync(today, null, MaxInvoicesPerPass, cancellationToken);
         var (suspended, reactivated) = await EnforceAsync(live, today, cancellationToken);
-        return new CollectionPassResult(created, suspended, reactivated);
+        return new CollectionPassResult(created, suspended, reactivated, invoiced);
     }
 
     private async Task<int> ChargeAsync(

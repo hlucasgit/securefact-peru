@@ -13,6 +13,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - `deploy/edge/Caddyfile`: la ruta `/api/v1/edge/*` (la pregunta del *edge*) llegaba a la API desde fuera porque `respond` corre después de los bloques `handle`; ahora un `handle @internal` listado primero la contesta con 404. Validado con `caddy validate` y probado con Caddy real.
 
 ### Added
+- La plataforma emite factura o boleta de venta por lo que cobra (ADR-065, R-080): configura la cuenta emisora y sus series (`/api/v1/platform/invoicing`), cada cuenta da sus datos de facturación (`/api/v1/billing-profile`), el pase de cobranza emite un comprobante por cargo con Billing en el ámbito de la emisora (factura al crédito a un RUC, boleta a un DNI), anular un cargo facturado emite la nota de crédito, y la cuenta descarga el PDF y el XML de su comprobante.
 - Precios, cargos y pagos de la plataforma (ADR-062): módulo `Subscriptions`, precios por plan versionados e inmutables, cargo mensual por cuenta con cuota, excedente de comprobantes e IGV, política de cobranza versionada, pagos con reversa, `SubscriptionWorker`. Un plan con `allowsOverage` no rechaza comprobantes: los cobra.
 - Comisiones de revendedores (ADR-063): términos escalonados y versionados (20 %, 25 % desde 10 cuentas, 30 % desde 25) que no alcanzan a las cuentas ya hechas, asiento por pago y por reversa, estado de cuenta y liquidación mensual.
 - Suspensión automática por falta de pago y reactivación al pagar (ADR-064), origen `NonPayment`.

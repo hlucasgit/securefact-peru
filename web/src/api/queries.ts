@@ -5,6 +5,10 @@ import type {
   ArchivedFile,
   AuditRecord,
   AuditVerification,
+  BillingProfile,
+  BillingProfileInput,
+  InvoicingCompanyOption,
+  InvoicingSettings,
   BillingPolicy,
   BillingPolicyInput,
   Charge,
@@ -97,6 +101,10 @@ export const keys = {
   charge: (id: string) => ['charges', 'one', id] as const,
   terms: (tenantId: string) => ['platform', 'tenant', tenantId, 'terms'] as const,
   myTerms: ['subscription'] as const,
+  myProfile: ['billing-profile'] as const,
+  tenantProfile: (id: string) => ['platform', 'tenant', id, 'billing-profile'] as const,
+  invoicing: ['platform', 'invoicing'] as const,
+  invoicingOptions: (tenantId: string) => ['platform', 'invoicing', 'options', tenantId] as const,
   resellerCommissions: (id: string) => ['platform', 'reseller', id, 'commissions'] as const,
   commissionStatement: (id: string, month: string) => ['platform', 'reseller', id, 'commissions', month] as const,
   myCommissions: ['reseller', 'commissions'] as const,
@@ -380,3 +388,48 @@ export const useSettleCommission = (resellerId: string) =>
 export const useMyCommissions = () => useQuery({ queryKey: keys.myCommissions, queryFn: () => get<CommissionOverview>('/api/v1/reseller/commissions') })
 export const useMyCommissionStatement = (month: string | null) =>
   useQuery({ queryKey: keys.myCommissionStatement(month ?? ''), queryFn: () => get<CommissionStatement>(`/api/v1/reseller/commissions/${month}`), enabled: !!month })
+
+// The invoices of the platform (ADR-065)
+export const useMyBillingProfile = () =>
+  useQuery({
+    queryKey: keys.myProfile,
+    queryFn: async () => {
+      try {
+        return await get<BillingProfile>('/api/v1/billing-profile')
+      } catch (error) {
+        // Not having given them yet is not a failure: the screen asks for them.
+        if (error instanceof Error && 'status' in error && error.status === 404) return null
+        throw error
+      }
+    },
+  })
+export const useSetMyBillingProfile = () => useAction((input: BillingProfileInput) => put<BillingProfile>('/api/v1/billing-profile', input), [keys.myProfile])
+export const useTenantBillingProfile = (tenantId: string) =>
+  useQuery({
+    queryKey: keys.tenantProfile(tenantId),
+    queryFn: async () => {
+      try {
+        return await get<BillingProfile>(`/api/v1/platform/tenants/${tenantId}/billing-profile`)
+      } catch (error) {
+        if (error instanceof Error && 'status' in error && error.status === 404) return null
+        throw error
+      }
+    },
+  })
+export const useSetTenantBillingProfile = (tenantId: string) =>
+  useAction((input: BillingProfileInput) => put<BillingProfile>(`/api/v1/platform/tenants/${tenantId}/billing-profile`, input), [keys.tenantProfile(tenantId)])
+export const useInvoicingSettings = () =>
+  useQuery({
+    queryKey: keys.invoicing,
+    queryFn: async () => {
+      try {
+        return await get<InvoicingSettings>('/api/v1/platform/invoicing')
+      } catch (error) {
+        if (error instanceof Error && 'status' in error && error.status === 404) return null
+        throw error
+      }
+    },
+  })
+export const useSetInvoicingSettings = () => useAction((input: InvoicingSettings) => put<InvoicingSettings>('/api/v1/platform/invoicing', input), [keys.invoicing, ['audit']])
+export const useInvoicingOptions = (tenantId: string) =>
+  useQuery({ queryKey: keys.invoicingOptions(tenantId), queryFn: () => get<InvoicingCompanyOption[]>(`/api/v1/platform/invoicing/options?tenantId=${tenantId}`), enabled: !!tenantId })

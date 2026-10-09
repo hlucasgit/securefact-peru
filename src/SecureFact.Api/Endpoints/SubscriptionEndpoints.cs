@@ -22,6 +22,10 @@ internal static class SubscriptionEndpoints
 
     public sealed record SettleBody(DateOnly SettledOn, string? Reference, string? Note);
 
+    public sealed record ProfileBody(string DocumentTypeCode, string DocumentNumber, string LegalName, string? Address, string? Email);
+
+    public sealed record InvoicingBody(Guid IssuerTenantId, Guid CompanyId, Guid InvoiceSeriesId, Guid ReceiptSeriesId, Guid InvoiceNoteSeriesId, Guid ReceiptNoteSeriesId, bool Enabled);
+
     public static void MapSubscriptionEndpoints(this IEndpointRouteBuilder app)
     {
         var api = app.MapGroup("/api/v1").WithTags("Subscriptions");
@@ -69,6 +73,31 @@ internal static class SubscriptionEndpoints
         api.MapPost("/platform/subscriptions/run", async (ICollectionProcessor processor, TimeProvider clock, ICurrentUser user, CancellationToken ct) =>
             user.IsPlatform ? Results.Ok(await processor.RunAsync(clock.GetUtcNow(), ct)) : Results.Forbid()).RequireAuthorization(Permissions.SubscriptionsManage);
 
+        // ---------- the invoices of the platform (ADR-065) ----------
+
+        api.MapGet("/platform/invoicing", async (IInvoicingSettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.GetAsync(ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsRead);
+
+        api.MapPut("/platform/invoicing", async (InvoicingBody body, IInvoicingSettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.SetAsync(new InvoicingSettingsInput(body.IssuerTenantId, body.CompanyId, body.InvoiceSeriesId, body.ReceiptSeriesId, body.InvoiceNoteSeriesId, body.ReceiptNoteSeriesId, body.Enabled), ct)).ToHttp(http))
+            .RequireAuthorization(Permissions.SubscriptionsManage);
+
+        api.MapGet("/platform/invoicing/options", async (Guid tenantId, IInvoicingSettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.OptionsAsync(tenantId, ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsRead);
+
+        api.MapGet("/platform/tenants/{id:guid}/billing-profile", async (Guid id, IBillingProfiles profiles, HttpContext http, CancellationToken ct) =>
+            (await profiles.GetAsync(new TenantId(id), ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsRead);
+
+        api.MapPut("/platform/tenants/{id:guid}/billing-profile", async (Guid id, ProfileBody body, IBillingProfiles profiles, HttpContext http, CancellationToken ct) =>
+            (await profiles.SetAsync(new TenantId(id), new BillingProfileInput(body.DocumentTypeCode, body.DocumentNumber, body.LegalName, body.Address, body.Email), ct)).ToHttp(http))
+            .RequireAuthorization(Permissions.SubscriptionsManage);
+
+        api.MapGet("/platform/charges/{id:guid}/documents/{kind}/pdf", async (Guid id, ChargeDocumentKind kind, IChargeDocuments documents, HttpContext http, CancellationToken ct) =>
+            (await documents.GetPdfAsync(id, kind, ct)).ToHttp(http, pdf => Results.File(pdf, "application/pdf", $"{id:N}-{kind}.pdf"))).RequireAuthorization(Permissions.SubscriptionsRead);
+
+        api.MapGet("/platform/charges/{id:guid}/documents/{kind}/xml", async (Guid id, ChargeDocumentKind kind, IChargeDocuments documents, HttpContext http, CancellationToken ct) =>
+            (await documents.GetXmlAsync(id, kind, ct)).ToHttp(http, xml => Results.Text(xml, "application/xml"))).RequireAuthorization(Permissions.SubscriptionsRead);
+
         // ---------- commissions ----------
 
         api.MapGet("/platform/commission-schedules", async (ICommissions commissions, HttpContext http, CancellationToken ct) =>
@@ -110,6 +139,21 @@ internal static class SubscriptionEndpoints
 
         api.MapGet("/subscription", async (ICurrentUser user, IPricing pricing, HttpContext http, CancellationToken ct) =>
             user.TenantId is { } tenant ? (await pricing.TermsOfAsync(tenant, ct)).ToHttp(http) : Results.NotFound()).RequireAuthorization(Permissions.TenantsRead);
+
+        api.MapGet("/billing-profile", async (ICurrentUser user, IBillingProfiles profiles, HttpContext http, CancellationToken ct) =>
+            user.TenantId is { } tenant ? (await profiles.GetAsync(tenant, ct)).ToHttp(http) : Results.NotFound()).RequireAuthorization(Permissions.TenantsRead);
+
+        api.MapPut("/billing-profile", async (ProfileBody body, ICurrentUser user, IBillingProfiles profiles, HttpContext http, CancellationToken ct) =>
+            user.TenantId is { } tenant
+                ? (await profiles.SetAsync(tenant, new BillingProfileInput(body.DocumentTypeCode, body.DocumentNumber, body.LegalName, body.Address, body.Email), ct)).ToHttp(http)
+                : Results.NotFound()).RequireAuthorization(Permissions.AccountBillingManage);
+
+        api.MapGet("/charges/{id:guid}/documents/{kind}/pdf", async (Guid id, ChargeDocumentKind kind, ICurrentUser user, IChargeDocuments documents, HttpContext http, CancellationToken ct) =>
+            user.TenantId is null ? Results.NotFound() : (await documents.GetPdfAsync(id, kind, ct)).ToHttp(http, pdf => Results.File(pdf, "application/pdf", $"{id:N}-{kind}.pdf")))
+            .RequireAuthorization(Permissions.TenantsRead);
+
+        api.MapGet("/charges/{id:guid}/documents/{kind}/xml", async (Guid id, ChargeDocumentKind kind, ICurrentUser user, IChargeDocuments documents, HttpContext http, CancellationToken ct) =>
+            user.TenantId is null ? Results.NotFound() : (await documents.GetXmlAsync(id, kind, ct)).ToHttp(http, xml => Results.Text(xml, "application/xml"))).RequireAuthorization(Permissions.TenantsRead);
 
         api.MapGet("/charges", async (ChargeStatus? status, string? period, int? skip, int? take, ICurrentUser user, ICollections collections, HttpContext http, CancellationToken ct) =>
             user.TenantId is null ? Results.NotFound()
