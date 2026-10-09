@@ -11,6 +11,7 @@ using SecureFact.Certificates;
 using SecureFact.CpeEngine.Contracts;
 using SecureFact.Gre;
 using SecureFact.Gre.Contracts;
+using SecureFact.Subscriptions;
 using SecureFact.Customers;
 using SecureFact.Products;
 using SecureFact.Identity;
@@ -127,6 +128,7 @@ if (appConnection is not null)
     builder.Services.AddCertificatesModule(appConnection);
     builder.Services.AddCpePipeline(appConnection);
     builder.Services.AddGreModule(appConnection);
+    builder.Services.AddSubscriptionsModule(appConnection);
 
     // SUNAT is never reached implicitly: the environment must be named. Without it, documents are prepared and signed but not sent.
     switch (builder.Configuration["Sunat:Environment"])
@@ -173,6 +175,7 @@ if (args.Contains("migrate", StringComparer.Ordinal))
     await CertificatesModule.MigrateAsync(migrationsConnection);
     await SecureFact.CpeEngine.CpeEngineModule.MigrateAsync(migrationsConnection);
     await SecureFact.Gre.GreModule.MigrateAsync(migrationsConnection);
+    await SecureFact.Subscriptions.SubscriptionsModule.MigrateAsync(migrationsConnection);
     await ProductsModule.MigrateAsync(migrationsConnection);
     return;
 }
@@ -226,6 +229,7 @@ app.MapMasterDataEndpoints();
 app.MapCertificateEndpoints();
 app.MapCpeEndpoints();
 app.MapGreEndpoints();
+app.MapSubscriptionEndpoints();
 app.MapOutboxEndpoints();
 
 app.Run();

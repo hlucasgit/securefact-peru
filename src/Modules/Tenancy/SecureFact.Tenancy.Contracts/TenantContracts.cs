@@ -16,6 +16,9 @@ public enum SuspensionSource
 {
     Platform,
     Reseller,
+
+    /// <summary>The platform suspended the account because a charge went unpaid past its grace (ADR-064). Paying lifts it by itself; a reseller cannot lift it.</summary>
+    NonPayment,
 }
 
 public enum TenantEnvironment
@@ -34,7 +37,9 @@ public sealed record TenantDto(
     Guid? ResellerId,
     DateTimeOffset CreatedAt,
     Guid PlanId,
-    SuspensionSource? SuspendedBy = null);
+    SuspensionSource? SuspendedBy = null,
+    DateTimeOffset? PlanAssignedAt = null,
+    DateTimeOffset? ResellerAssignedAt = null);
 
 /// <summary>Public surface of the Tenancy module. Creating tenants is a platform-scope operation.</summary>
 public interface ITenantAdministration
@@ -51,6 +56,9 @@ public interface ITenantAdministration
     /// Suspends, reactivates or closes a tenant, with the reason (audited). A suspended tenant cannot sign in or use the API and can be reactivated; a closed one is final.
     /// </summary>
     Task<Result<TenantDto>> ChangeStatusAsync(TenantId id, TenantStatus target, string reason, CancellationToken cancellationToken);
+
+    /// <summary>The same change, saying who makes it. Only the platform scope calls it; <see cref="SuspensionSource.NonPayment"/> is for the collection pass of the Subscriptions module (ADR-064).</summary>
+    Task<Result<TenantDto>> ChangeStatusAsync(TenantId id, TenantStatus target, string reason, SuspensionSource source, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -68,10 +76,14 @@ public interface ITenantStatusReader
     Task<IReadOnlyList<Guid>> ListInactiveAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>What a plan allows. A null limit means unlimited. A plan with a <paramref name="ResellerId"/> is a private offer of that reseller; without one it is of the public catalogue.</summary>
-public sealed record PlanDto(Guid Id, string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive, Guid? ResellerId = null);
+/// <summary>
+/// What a plan allows. A null limit means unlimited. A plan with a <paramref name="ResellerId"/> is a private offer of that reseller; without one it is of the public catalogue. With
+/// <paramref name="AllowsOverage"/> the documents of the month are never refused: the ones over what the price includes are charged one by one (ADR-062).
+/// </summary>
+public sealed record PlanDto(Guid Id, string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive, Guid? ResellerId = null, bool AllowsOverage = false);
 
-public sealed record PlanInput(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive = true, Guid? ResellerId = null);
+/// <summary>The overage mode is chosen when the plan is created (empty is no) and never changes: the prices published for the plan depend on it. Saying it again when editing is allowed only if it is the same.</summary>
+public sealed record PlanInput(string Code, string Name, int? MaxCompanies, int? MaxUsers, int? MaxDocumentsPerMonth, bool IsActive = true, Guid? ResellerId = null, bool? AllowsOverage = null);
 
 /// <summary>The plan catalogue and the plan of each tenant, for platform staff. A tenant reads only its own plan, through <see cref="IPlanLimits"/>: it never sees the other plans.</summary>
 public interface IPlanAdministration
@@ -166,6 +178,9 @@ public interface IResellerAdministration
     /// the platform (<c>SF-TEN-004</c>): suspending for a debt is the reseller's to do, suspending for abuse is not its to undo.
     /// </summary>
     Task<Result<TenantDto>> ChangeTenantStatusAsync(Guid resellerId, TenantId tenantId, TenantStatus target, string reason, CancellationToken cancellationToken);
+
+    /// <summary>How many active accounts a reseller has, for the tier of its commission (ADR-063). Platform scope.</summary>
+    Task<int> CountActiveTenantsAsync(Guid resellerId, CancellationToken cancellationToken);
 }
 
 /// <summary>How the interface presents itself to the users of a reseller (white label). Only what any visitor may see: nothing here is secret.</summary>

@@ -32,6 +32,20 @@ public static class ErrorCodes
 
     public const string ResellerInactive = "SF-RES-003";
 
+    public const string InvalidPrice = "SF-SUB-001";
+
+    public const string InvalidBillingPolicy = "SF-SUB-002";
+
+    public const string ChargeNotFound = "SF-SUB-003";
+
+    public const string InvalidPayment = "SF-SUB-004";
+
+    public const string PaymentNotFound = "SF-SUB-005";
+
+    public const string InvalidCommission = "SF-SUB-006";
+
+    public const string SettlementNotAllowed = "SF-SUB-007";
+
     public const string InvalidBranding = "SF-BRAND-001";
 
     public const string InvalidLogo = "SF-BRAND-002";

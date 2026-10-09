@@ -20,6 +20,12 @@ internal sealed class Tenant
 
     public Guid PlanId { get; private set; }
 
+    /// <summary>When the tenant took its current plan. The price in force that day is the one it keeps (ADR-062).</summary>
+    public DateTimeOffset PlanAssignedAt { get; private set; }
+
+    /// <summary>When the tenant came under its current reseller; null without one. The commission schedule in force that day is the one that applies (ADR-063).</summary>
+    public DateTimeOffset? ResellerAssignedAt { get; private set; }
+
     /// <summary>Who suspended the tenant while it is suspended; null otherwise.</summary>
     public SuspensionSource? SuspendedBy { get; private set; }
 
@@ -34,9 +40,28 @@ internal sealed class Tenant
         SuspendedBy = status == TenantStatus.Suspended ? source ?? SuspensionSource.Platform : null;
     }
 
-    public void ChangePlan(Guid planId) => PlanId = planId;
+    /// <summary>Taking the plan it already has changes nothing, so the price it keeps does not move.</summary>
+    public void ChangePlan(Guid planId, DateTimeOffset now)
+    {
+        if (planId == PlanId)
+        {
+            return;
+        }
 
-    public void AssignReseller(Guid? resellerId) => ResellerId = resellerId;
+        PlanId = planId;
+        PlanAssignedAt = now;
+    }
+
+    public void AssignReseller(Guid? resellerId, DateTimeOffset now)
+    {
+        if (resellerId == ResellerId)
+        {
+            return;
+        }
+
+        ResellerId = resellerId;
+        ResellerAssignedAt = resellerId is null ? null : now;
+    }
 
     public static Tenant Create(Guid id, string name, TenantEnvironment environment, Guid? resellerId, Guid planId, DateTimeOffset now) => new()
     {
@@ -46,6 +71,8 @@ internal sealed class Tenant
         Environment = environment,
         ResellerId = resellerId,
         PlanId = planId,
+        PlanAssignedAt = now,
+        ResellerAssignedAt = resellerId is null ? null : now,
         CreatedAt = now,
     };
 }

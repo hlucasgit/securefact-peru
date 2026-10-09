@@ -38,5 +38,5 @@ Cada cambio es `tenancy.tenant.suspended` o `tenancy.tenant.reactivated` en la c
 ## Límites (P)
 - **Sin aviso al cliente ni al revendedor**: no hay módulo de correos. El cliente se entera al ingresar (`SF-TEN-002`), y la plataforma, en la auditoría. El mensaje de ingreso dice «comuníquese con soporte» aun si quien suspendió fue el revendedor; no distingue a quién escribir.
 - **Sin freno propio contra el abuso**: no hay límite de suspensiones ni aprobación previa. Lo que contiene el abuso es que quede auditado con motivo, que la plataforma pueda reactivar o tomar cualquier suspensión, y que el revendedor solo alcance sus cuentas. Un revendedor que suspenda sin razón se detecta por la auditoría, no se impide.
-- **Sin suspensión programada ni automática** por mora; el revendedor decide y ejecuta.
+- La suspensión por mora **con la plataforma** es automática (ADR-064) y el revendedor no la levanta. La suspensión por una deuda **del cliente con el revendedor** sigue siendo suya, manual.
 - Un revendedor desactivado (ADR-043) no puede actuar; sus suspensiones siguen vigentes hasta que la plataforma las levante.

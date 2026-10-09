@@ -58,7 +58,7 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
             return badReseller;
         }
 
-        var plan = Plan.Create(Guid.CreateVersion7(), code, input.Name.Trim(), input.MaxCompanies, input.MaxUsers, input.MaxDocumentsPerMonth, input.ResellerId, clock.GetUtcNow());
+        var plan = Plan.Create(Guid.CreateVersion7(), code, input.Name.Trim(), input.MaxCompanies, input.MaxUsers, input.MaxDocumentsPerMonth, input.ResellerId, input.AllowsOverage ?? false, clock.GetUtcNow());
         db.Plans.Add(plan);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.PlanCreated, "plan", plan.Id.ToString("D"), null, NewValues: Values(plan)), cancellationToken);
@@ -86,6 +86,11 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
         if (await CheckResellerAsync(input.ResellerId, cancellationToken) is { } badReseller)
         {
             return badReseller;
+        }
+
+        if (input.AllowsOverage is { } overage && overage != plan.AllowsOverage)
+        {
+            return Error.Validation(ErrorCodes.InvalidPlan, "Modo de excedente fijo", "Si el plan cobra el excedente de comprobantes se decide al crearlo y no cambia: los precios publicados dependen de ello.");
         }
 
         var before = Values(plan);
@@ -120,7 +125,7 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
         }
 
         var previous = tenant.PlanId;
-        tenant.ChangePlan(plan.Id);
+        tenant.ChangePlan(plan.Id, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(
             new AuditEvent(
@@ -131,7 +136,7 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
         return TenantAdministration.ToDto(tenant);
     }
 
-    internal static PlanDto ToDto(Plan p) => new(p.Id, p.Code, p.Name, p.MaxCompanies, p.MaxUsers, p.MaxDocumentsPerMonth, p.IsActive, p.ResellerId);
+    internal static PlanDto ToDto(Plan p) => new(p.Id, p.Code, p.Name, p.MaxCompanies, p.MaxUsers, p.MaxDocumentsPerMonth, p.IsActive, p.ResellerId, p.AllowsOverage);
 
     private static Error? Validate(PlanInput input)
     {
@@ -161,6 +166,7 @@ internal sealed partial class PlanAdministration(TenancyDbContext db, IDataScope
         ["maxDocumentsPerMonth"] = p.MaxDocumentsPerMonth,
         ["isActive"] = p.IsActive,
         ["resellerId"] = p.ResellerId,
+        ["allowsOverage"] = p.AllowsOverage,
     };
 
     private async Task<Error?> CheckResellerAsync(Guid? resellerId, CancellationToken cancellationToken) =>

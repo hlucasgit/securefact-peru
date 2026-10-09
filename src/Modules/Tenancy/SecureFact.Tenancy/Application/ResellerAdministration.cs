@@ -27,6 +27,11 @@ internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope sco
 
     // ---------- platform staff ----------
 
+    public async Task<int> CountActiveTenantsAsync(Guid resellerId, CancellationToken cancellationToken) =>
+        scope.Kind == DataScopeKind.Platform
+            ? await db.Tenants.AsNoTracking().CountAsync(t => t.ResellerId == resellerId && t.Status == TenantStatus.Active, cancellationToken)
+            : 0;
+
     public async Task<Result<IReadOnlyList<ResellerDto>>> ListAsync(CancellationToken cancellationToken)
     {
         if (RequirePlatformStaff() is { } denied)
@@ -104,7 +109,7 @@ internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope sco
         }
 
         var previous = tenant.ResellerId;
-        tenant.AssignReseller(resellerId);
+        tenant.AssignReseller(resellerId, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(
             new AuditEvent(
@@ -220,7 +225,7 @@ internal sealed class ResellerAdministration(TenancyDbContext db, IDataScope sco
         }
 
         var previous = tenant.PlanId;
-        tenant.ChangePlan(plan.Value.Id);
+        tenant.ChangePlan(plan.Value.Id, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(
             new AuditEvent(

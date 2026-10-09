@@ -27,12 +27,16 @@ public static class Permissions
     public const string ResellerTenantsManage = "reseller.tenants.manage";
     public const string ResellerBrandingManage = "reseller.branding.manage";
     public const string ResellerTenantsSuspend = "reseller.tenants.suspend";
+    public const string SubscriptionsRead = "subscriptions.read";
+    public const string SubscriptionsManage = "subscriptions.manage";
+    public const string ResellerCommissionsRead = "reseller.commissions.read";
 
     public static IReadOnlyList<string> All { get; } =
     [
         TenantsCreate, TenantsRead, TenantsManage, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
         SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
         CertificatesRead, CertificatesManage, CpeSend, ResellerTenantsRead, ResellerTenantsCreate, ResellerTenantsManage, ResellerBrandingManage, ResellerTenantsSuspend,
+        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead,
     ];
 }
 
@@ -65,8 +69,8 @@ public static class RoleCatalog
     {
         [Roles.PlatformSuperAdmin] = (RoleLevel.Platform, [.. Permissions.All]),
         // Support never reads tenant business data directly: that requires an explicit, audited delegation (future).
-        [Roles.PlatformSupport] = (RoleLevel.Platform, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead]),
-        [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.ResellerTenantsRead, Permissions.ResellerTenantsCreate, Permissions.ResellerTenantsManage, Permissions.ResellerBrandingManage, Permissions.ResellerTenantsSuspend]),
+        [Roles.PlatformSupport] = (RoleLevel.Platform, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead, Permissions.SubscriptionsRead]),
+        [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.ResellerTenantsRead, Permissions.ResellerTenantsCreate, Permissions.ResellerTenantsManage, Permissions.ResellerBrandingManage, Permissions.ResellerTenantsSuspend, Permissions.ResellerCommissionsRead]),
         [Roles.TenantOwner] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,

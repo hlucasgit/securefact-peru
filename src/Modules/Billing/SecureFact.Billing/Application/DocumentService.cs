@@ -338,13 +338,14 @@ internal sealed partial class DocumentService(
 
     /// <summary>
     /// The plan's monthly allowance (Lima calendar month, notes and voided documents included). Takes a transaction-scoped lock per tenant before counting, so concurrent requests cannot both
-    /// take the last place. Null while the plan has no limit, which skips the lock and the count.
+    /// take the last place. Null while the plan has no limit, which skips the lock and the count. A plan that charges the overage (ADR-062) never refuses: the documents over the allowance of its
+    /// price are billed at the end of the month.
     /// </summary>
     private async Task<Error?> CheckMonthlyAllowanceAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         _pendingUsage = null;
         var plan = await plans.OfTenantAsync(new SecureFact.SharedKernel.Domain.TenantId(tenantId), cancellationToken);
-        if (plan?.MaxDocumentsPerMonth is not { } limit)
+        if (plan is { AllowsOverage: true } || plan?.MaxDocumentsPerMonth is not { } limit)
         {
             return null;
         }

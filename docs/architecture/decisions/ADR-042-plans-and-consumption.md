@@ -50,7 +50,7 @@ Auditoría: `tenancy.plan.created`, `tenancy.plan.updated`, `tenancy.tenant.plan
 - 2 recorridos de extremo a extremo (`plans.spec.ts`): crear un plan, asignarlo, agotarlo y ampliarlo con la vista del propietario y la auditoría; accesibilidad (axe) del catálogo y su formulario, y el propietario sin acceso al catálogo.
 
 ## Límites (P)
-- **Sin precios, facturación ni cobro**: un plan no tiene tarifa y la plataforma no emite cargos. Los precios y la facturación de la plataforma a sus cuentas son una decisión comercial aún no tomada.
+- ~~Sin precios, facturación ni cobro~~: resuelto en ADR-062 (precios versionados, cargos mensuales, pagos), ADR-063 (comisiones) y ADR-064 (mora). Un plan con `allows_overage` ya no rechaza comprobantes: los cobra.
 - Solo tres límites. Pendientes: almacenamiento, llamadas a la API, establecimientos, módulos opcionales (GRE, importación masiva).
 - El conteo mensual es por `created_at` en el mes calendario de Lima; un plan con periodo de facturación distinto (por ejemplo desde la fecha de alta) pediría otro cálculo.
 - El conteo de comprobantes de un mes grande recorre el índice de la cuenta en cada emisión mientras el plan tenga límite; con volúmenes muy altos convendría un contador transaccional (se descartó ahora por el riesgo de desfase).

@@ -7,6 +7,7 @@ using SecureFact.CpeEngine.Contracts;
 using SecureFact.Customers;
 using SecureFact.Gre;
 using SecureFact.Gre.Contracts;
+using SecureFact.Subscriptions;
 using SecureFact.Identity;
 using SecureFact.Messaging.RabbitMq;
 using SecureFact.Notifications;
@@ -85,6 +86,7 @@ internal static class WorkerHost
         builder.Services.AddCpeEngineModule();
         builder.Services.AddCpePipeline(appConnection);
         builder.Services.AddGreModule(appConnection);
+        builder.Services.AddSubscriptionsModule(appConnection);
 
         // SUNAT is never reached implicitly: the environment must be named. Without it the worker only prepares summaries.
         switch (builder.Configuration["Sunat:Environment"])
@@ -119,6 +121,7 @@ internal static class WorkerHost
         builder.Services.AddHostedService<OutboxWorker>();
         builder.Services.AddHostedService<CpeWorker>();
         builder.Services.AddHostedService<GreWorker>();
+        builder.Services.AddHostedService<SubscriptionWorker>();
         builder.Services.AddHostedService<DomainWorker>();
         builder.Services.AddHostedService<EmailWorker>();
 

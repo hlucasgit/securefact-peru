@@ -95,7 +95,10 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
         return tenants.Select(ToDto).ToList();
     }
 
-    public async Task<Result<TenantDto>> ChangeStatusAsync(TenantId id, TenantStatus target, string reason, CancellationToken cancellationToken)
+    public Task<Result<TenantDto>> ChangeStatusAsync(TenantId id, TenantStatus target, string reason, CancellationToken cancellationToken) =>
+        ChangeStatusAsync(id, target, reason, SuspensionSource.Platform, cancellationToken);
+
+    public async Task<Result<TenantDto>> ChangeStatusAsync(TenantId id, TenantStatus target, string reason, SuspensionSource source, CancellationToken cancellationToken)
     {
         if (scope.Kind != DataScopeKind.Platform)
         {
@@ -120,7 +123,7 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
         {
             (TenantStatus.Active, TenantStatus.Suspended) => true,
             (TenantStatus.Suspended, TenantStatus.Active) => true,
-            (TenantStatus.Suspended, TenantStatus.Suspended) => tenant.SuspendedBy == SuspensionSource.Reseller,
+            (TenantStatus.Suspended, TenantStatus.Suspended) => tenant.SuspendedBy is SuspensionSource.Reseller or SuspensionSource.NonPayment && source == SuspensionSource.Platform,
             (TenantStatus.Active or TenantStatus.Suspended, TenantStatus.Closed) => true,
             _ => false,
         };
@@ -131,7 +134,7 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
 
         var previous = tenant.Status;
         var previousSource = tenant.SuspendedBy;
-        tenant.ChangeStatus(target, SuspensionSource.Platform);
+        tenant.ChangeStatus(target, source);
         await db.SaveChangesAsync(cancellationToken);
         cache.Remove(TenantStatusReader.Key(tenant.Id));
         var action = target switch { TenantStatus.Suspended => AuditActions.TenantSuspended, TenantStatus.Closed => AuditActions.TenantClosed, _ => AuditActions.TenantReactivated };
@@ -149,5 +152,5 @@ internal sealed class TenantAdministration(TenancyDbContext db, IDataScope scope
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
-    internal static TenantDto ToDto(Tenant t) => new(new TenantId(t.Id), t.Name, t.Status, t.Environment, t.ResellerId, t.CreatedAt, t.PlanId, t.SuspendedBy);
+    internal static TenantDto ToDto(Tenant t) => new(new TenantId(t.Id), t.Name, t.Status, t.Environment, t.ResellerId, t.CreatedAt, t.PlanId, t.SuspendedBy, t.PlanAssignedAt, t.ResellerAssignedAt);
 }

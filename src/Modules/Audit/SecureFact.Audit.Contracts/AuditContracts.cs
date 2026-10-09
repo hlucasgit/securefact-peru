@@ -20,6 +20,14 @@ public static class AuditActions
     public const string TenantReactivated = "tenancy.tenant.reactivated";
     public const string TenantClosed = "tenancy.tenant.closed";
 
+    public const string PricePublished = "subscriptions.price.published";
+    public const string BillingPolicyPublished = "subscriptions.policy.published";
+    public const string ChargeVoided = "subscriptions.charge.voided";
+    public const string PaymentRecorded = "subscriptions.payment.recorded";
+    public const string PaymentReversed = "subscriptions.payment.reversed";
+    public const string CommissionScheduleCreated = "subscriptions.commission_schedule.published";
+    public const string CommissionSettled = "subscriptions.commission.settled";
+
     public const string CompanyCreated = "organizations.company.created";
     public const string CompanyUpdated = "organizations.company.updated";
     public const string CompanyDeactivated = "organizations.company.deactivated";

@@ -30,6 +30,8 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             builder.Property(t => t.Environment).HasColumnName("environment").HasConversion<string>().HasMaxLength(20).IsRequired();
             builder.Property(t => t.ResellerId).HasColumnName("reseller_id");
             builder.Property(t => t.PlanId).HasColumnName("plan_id").IsRequired();
+            builder.Property(t => t.PlanAssignedAt).HasColumnName("plan_assigned_at").IsRequired();
+            builder.Property(t => t.ResellerAssignedAt).HasColumnName("reseller_assigned_at");
             builder.Property(t => t.SuspendedBy).HasColumnName("suspended_by").HasConversion<string>().HasMaxLength(20);
             builder.Property(t => t.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(t => t.Version).IsRowVersion();
@@ -50,6 +52,7 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             builder.Property(p => p.MaxUsers).HasColumnName("max_users");
             builder.Property(p => p.MaxDocumentsPerMonth).HasColumnName("max_documents_per_month");
             builder.Property(p => p.ResellerId).HasColumnName("reseller_id");
+            builder.Property(p => p.AllowsOverage).HasColumnName("allows_overage").IsRequired();
             builder.Property(p => p.IsActive).HasColumnName("is_active").IsRequired();
             builder.Property(p => p.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(p => p.Version).IsRowVersion();

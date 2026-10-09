@@ -47,7 +47,7 @@ Un revendedor **no** cierra cuentas, no lee sus usuarios, documentos ni auditor�
 - 3 recorridos de extremo a extremo (`resellers.spec.ts`): crear un revendedor y su administrador que ingresa y ve solo *Mis cuentas*; abrir una cuenta con un plan propio y el propietario que ingresa y ve su plan, el propietario que no se repite y otro revendedor que no ve la cuenta ni por su dirección; mover una cuenta y apagar al revendedor sin afectar a su cliente. Accesibilidad (axe) de sus pantallas.
 
 ## Límites (P)
-- **Sin facturación ni comisiones**: no hay precios, márgenes, liquidaciones ni cobro entre la plataforma, el revendedor y sus clientes (ADR-042).
+- ~~Sin facturación ni comisiones~~: resuelto en ADR-062 y ADR-063 (la plataforma cobra al cliente final y el revendedor gana una comisión recurrente).
 - La **marca blanca** (nombre, color, logotipo y dominio del portal) es del ADR-044; siguen pendientes los correos y las plantillas por revendedor.
 - Un revendedor no ve los usuarios ni la actividad de sus cuentas, y no entra «como» el cliente. Suspender es del ADR-045.
 - Una cuenta tiene un solo revendedor, y un revendedor desactivado no puede transferir sus cuentas: la plataforma las mueve.

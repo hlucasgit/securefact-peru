@@ -29,6 +29,10 @@ namespace SecureFact.Tenancy.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AllowsOverage")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allows_overage");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -199,9 +203,17 @@ namespace SecureFact.Tenancy.Infrastructure.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
 
+                    b.Property<DateTimeOffset>("PlanAssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("plan_assigned_at");
+
                     b.Property<Guid>("PlanId")
                         .HasColumnType("uuid")
                         .HasColumnName("plan_id");
+
+                    b.Property<DateTimeOffset?>("ResellerAssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reseller_assigned_at");
 
                     b.Property<Guid?>("ResellerId")
                         .HasColumnType("uuid")
