@@ -126,6 +126,9 @@ public sealed class ApiFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Identity__MaxFailedAttempts", "5");
         Environment.SetEnvironmentVariable("Security__LocalDevKek", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         Environment.SetEnvironmentVariable("RateLimiting__AuthPermitPerMinute", "100000");
+        // The suites of the whole API come from one address and one credential at a speed that the production limits (ADR-066) would refuse; the tests of the limit use a host of their own.
+        Environment.SetEnvironmentVariable("RateLimiting__ApiPermitPerMinute", "1000000");
+        Environment.SetEnvironmentVariable("RateLimiting__AddressPermitPerMinute", "1000000");
         // The domains of the resellers (ADR-051): the platform's edge and its own hosts, the secret of the edge and a check that may be repeated after two seconds.
         Environment.SetEnvironmentVariable("Domains__EdgeHost", FakeDomainNameSystem.EdgeHost);
         Environment.SetEnvironmentVariable("Domains__EdgeAddresses__0", FakeDomainNameSystem.EdgeAddress);

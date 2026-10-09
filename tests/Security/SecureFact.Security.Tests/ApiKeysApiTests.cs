@@ -303,4 +303,30 @@ public sealed class ApiKeysApiTests(ApiFixture api)
             Environment.SetEnvironmentVariable("RateLimiting__ApiPermitPerMinute", previous);
         }
     }
+
+    [Fact]
+    public async Task Inventing_credentials_does_not_escape_the_limit_of_the_address()
+    {
+        var previous = Environment.GetEnvironmentVariable("RateLimiting__AddressPermitPerMinute");
+        Environment.SetEnvironmentVariable("RateLimiting__AddressPermitPerMinute", "4");
+        try
+        {
+            await using var limited = new WebApplicationFactory<Program>();
+            var statuses = new List<HttpStatusCode>();
+            for (var i = 0; i < 6; i++)
+            {
+                using var client = limited.CreateClient();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", $"sfk_{i:D32}_inventada"); // a different credential each time
+                statuses.Add((await client.GetAsync("/api/v1/companies")).StatusCode);
+            }
+
+            Assert.Equal([HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests], statuses);
+            using var anonymous = limited.CreateClient();
+            Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/health/live")).StatusCode);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RateLimiting__AddressPermitPerMinute", previous);
+        }
+    }
 }
