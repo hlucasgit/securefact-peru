@@ -156,7 +156,7 @@ jobs:
       - name: Build workers image
         run: docker build -f src/SecureFact.Workers/Dockerfile -t securefact-workers:ci .
       - name: Build web image
-        run: docker build -t securefact-web:ci web
+        run: docker build --build-arg IMAGE_REGISTRY=mirror.gcr.io/ -t securefact-web:ci web
       - name: Scan images (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
