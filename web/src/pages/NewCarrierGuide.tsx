@@ -137,13 +137,25 @@ export function NewCarrierGuide() {
         {!listedBySenderGuide && (
           <div className="card stack">
             <h2>Bienes</h2>
+            <label className="row">
+              <input type="checkbox" checked={form.wholeTransfer} onChange={(event) => set('wholeTransfer', event.target.checked)} /> Se trasladan todos los bienes del comprobante relacionado
+            </label>
+            {form.wholeTransfer && (
+              <>
+                <p className="muted">
+                  Con una factura o liquidación de compra electrónica SUNAT ya tiene los bienes y no se listan. Con una boleta, un ticket, un comprobante de la Ley 29972 o una factura de serie numérica hay que anotar qué
+                  se traslada.
+                </p>
+                <TextAreaField label="Anotación sobre los bienes" maxLength={500} value={form.wholeTransferNote} onChange={(event) => set('wholeTransferNote', event.target.value)} />
+              </>
+            )}
             {form.goods.map((good, index) => (
               <div className="form-grid" key={good.key}>
-                <TextField label={`Descripción del bien ${index + 1}`} required value={good.description} onChange={(event) => set('goods', form.goods.map((item) => (item.key === good.key ? { ...item, description: event.target.value } : item)))} />
+                <TextField label={`Descripción del bien ${index + 1}`} required={!form.wholeTransfer} value={good.description} onChange={(event) => set('goods', form.goods.map((item) => (item.key === good.key ? { ...item, description: event.target.value } : item)))} />
                 <TextField label="Unidad" required maxLength={3} hint="Código de unidad (NIU, KGM, ZZ…)" value={good.unitCode} onChange={(event) => set('goods', form.goods.map((item) => (item.key === good.key ? { ...item, unitCode: event.target.value } : item)))} />
                 <TextField label="Cantidad" required inputMode="decimal" value={good.quantity} onChange={(event) => set('goods', form.goods.map((item) => (item.key === good.key ? { ...item, quantity: event.target.value } : item)))} />
                 <TextField label="Código del bien" value={good.code} onChange={(event) => set('goods', form.goods.map((item) => (item.key === good.key ? { ...item, code: event.target.value } : item)))} />
-                {form.goods.length > 1 && <div><button className="btn small danger" type="button" onClick={() => set('goods', form.goods.filter((item) => item.key !== good.key))}>Quitar bien {index + 1}</button></div>}
+                {(form.goods.length > 1 || form.wholeTransfer) && <div><button className="btn small danger" type="button" onClick={() => set('goods', form.goods.filter((item) => item.key !== good.key))}>Quitar bien {index + 1}</button></div>}
               </div>
             ))}
             <div><button className="btn small" type="button" onClick={() => set('goods', [...form.goods, emptyGood()])}>Agregar bien</button></div>

@@ -162,6 +162,8 @@ public enum GreFreightPayer
 /// <param name="Driver">The principal driver.</param>
 /// <param name="Goods">The goods; none when a guide of the sender (09, series <c>T…</c>) is the related document, because that guide already lists them.</param>
 /// <param name="RelatedDocuments">One related document, or several when one of them is a guide of the sender.</param>
+/// <param name="WholeTransfer">The whole of the goods of the related voucher travel (<c>SUNAT_Envio_IndicadorTrasladoTotal</c>): the goods are not listed again. Needs an invoice, receipt, purchase settlement, ticket or voucher of Law 29972 as the related document (ADR-060).</param>
+/// <param name="WholeTransferNote">The annotation about the goods that a receipt, a ticket, a voucher of Law 29972 or an invoice of numeric series needs with the whole transfer, since SUNAT has no list of their goods: from 3 to 500 characters.</param>
 /// <param name="Subcontractor">The company that the carrier subcontracted; required when <paramref name="Subcontracted"/>.</param>
 /// <param name="FreightPayer">Who pays the freight.</param>
 /// <param name="ThirdPartyPayer">The third party that pays; required when <paramref name="FreightPayer"/> is <see cref="GreFreightPayer.ThirdParty"/>.</param>
@@ -191,7 +193,9 @@ public sealed record CreateGreCarrierRequest(
     GrePartyInput? Subcontractor = null,
     bool PlannedTransshipment = false,
     bool ReturnWithEmptyPackaging = false,
-    bool ReturnEmptyVehicle = false);
+    bool ReturnEmptyVehicle = false,
+    bool WholeTransfer = false,
+    string? WholeTransferNote = null);
 
 public sealed record GreObservation(string Code, string Message);
 

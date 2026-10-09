@@ -47,6 +47,9 @@ export interface CarrierGuideForm {
   plannedTransshipment: boolean
   returnWithEmptyPackaging: boolean
   returnEmptyVehicle: boolean
+  /** All the goods of the related voucher travel, so they are not listed; the note says what they are when SUNAT does not have them. */
+  wholeTransfer: boolean
+  wholeTransferNote: string
 }
 
 let counter = 0
@@ -82,6 +85,8 @@ export const emptyCarrierGuide = (today: string): CarrierGuideForm => ({
   plannedTransshipment: false,
   returnWithEmptyPackaging: false,
   returnEmptyVehicle: false,
+  wholeTransfer: false,
+  wholeTransferNote: '',
 })
 
 const vehicle = (state: VehicleState) => ({ plate: text(state.plate).toUpperCase(), circulationCard: optional(state.circulationCard) })
@@ -121,7 +126,7 @@ export function buildCarrierGuide(form: CarrierGuideForm): CreateCarrierGuideBod
     secondaryVehicles: form.secondaryVehicles.filter((item) => item.plate.trim() !== '').map(vehicle),
     driver: driver(form.driver),
     secondaryDrivers: form.secondaryDrivers.filter((item) => item.documentNumber.trim() !== '').map(driver),
-    goods: senderGuide !== '' ? null : form.goods.map((good) => ({ description: text(good.description), unitCode: text(good.unitCode).toUpperCase(), quantity: toNumber(good.quantity), code: optional(good.code) })),
+    goods: senderGuide !== '' ? null : form.goods.filter((good) => !form.wholeTransfer || good.description.trim() !== '').map((good) => ({ description: text(good.description), unitCode: text(good.unitCode).toUpperCase(), quantity: toNumber(good.quantity), code: optional(good.code) })),
     relatedDocuments: related,
     freightPayer: form.freightPayer,
     thirdPartyPayer: form.freightPayer === 'ThirdParty' ? party(form.thirdPartyPayer) : null,
@@ -130,5 +135,7 @@ export function buildCarrierGuide(form: CarrierGuideForm): CreateCarrierGuideBod
     plannedTransshipment: form.plannedTransshipment,
     returnWithEmptyPackaging: form.returnWithEmptyPackaging,
     returnEmptyVehicle: form.returnEmptyVehicle,
+    wholeTransfer: form.wholeTransfer,
+    wholeTransferNote: form.wholeTransfer ? optional(form.wholeTransferNote) : null,
   }
 }

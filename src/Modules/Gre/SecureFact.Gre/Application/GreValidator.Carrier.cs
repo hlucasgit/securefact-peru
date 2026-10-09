@@ -248,19 +248,52 @@ internal static partial class GreValidator
     private static void CarrierGoods(CreateGreCarrierRequest request, GreValidationContext context, bool hasSenderGuide, Action<string, string> add)
     {
         var goods = request.Goods ?? [];
-        if (hasSenderGuide)
+        var documents = request.RelatedDocuments ?? [];
+        var whole = request.WholeTransfer;
+        var voucher = documents.FirstOrDefault(d => d.TypeCode?.Trim() is "01" or "03" or "04" or "12" or "48");
+        var voucherType = voucher?.TypeCode?.Trim();
+        var numericSeries = voucher?.Number?.Trim() is { Length: > 0 } number && char.IsAsciiDigit(number[0]);
+
+        // With an electronic invoice or purchase settlement SUNAT has the goods; with the other vouchers (or an invoice of numeric series, printed) it has none and the annotation says what travels.
+        var needsNote = whole && voucher is not null && (voucherType is "03" or "12" or "48" || (voucherType is "01" or "04" && numericSeries));
+        var listedBySunat = whole && voucher is not null && voucherType is "01" or "04" && !numericSeries;
+        if (whole && voucher is null)
+        {
+            add("SF", "El traslado total de los bienes necesita como documento relacionado una factura, boleta, liquidación de compra, ticket o comprobante de la Ley 29972.");
+        }
+
+        var note = request.WholeTransferNote?.Trim() ?? string.Empty;
+        if (needsNote)
+        {
+            if (note.Length == 0)
+            {
+                add("4429", "Con el traslado total de este comprobante hay que anotar qué bienes se trasladan (SUNAT no los tiene).");
+            }
+            else if (note.Length is < 3 or > 500)
+            {
+                add("4430", "La anotación sobre los bienes tiene de 3 a 500 caracteres.");
+            }
+        }
+        else if (note.Length > 0)
+        {
+            add("3458", "La anotación sobre los bienes solo existe con el traslado total de una boleta, ticket, comprobante de la Ley 29972, liquidación de compra o factura de serie numérica.");
+        }
+
+        if (hasSenderGuide || listedBySunat)
         {
             if (goods.Count > 0)
             {
-                add("4434", "Con una guía del remitente (09) como documento relacionado los bienes los lista esa guía: no se informan aquí.");
+                add("4434", hasSenderGuide
+                    ? "Con una guía del remitente (09) como documento relacionado los bienes los lista esa guía: no se informan aquí."
+                    : "Con el traslado total de una factura o liquidación de compra electrónica los bienes los tiene SUNAT: no se informan aquí.");
             }
 
             return;
         }
 
-        if (goods.Count == 0)
+        if (goods.Count == 0 && !whole)
         {
-            add("3435", "Hay que informar al menos un bien a transportar, o relacionar una guía del remitente (09) que ya los lista.");
+            add("3435", "Hay que informar al menos un bien a transportar, relacionar una guía del remitente (09) que ya los lista o trasladar todos los bienes de un comprobante.");
         }
 
         Goods(goods, context, add, required: false);

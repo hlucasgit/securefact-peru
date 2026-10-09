@@ -293,12 +293,12 @@ public class GreCarrierTests
     }
 
     [Fact]
-    public void The_guide_of_the_sender_replaces_the_goods_with_an_annotation_and_the_addresses_are_left_out()
+    public void The_guide_of_the_sender_replaces_the_goods_with_a_line_of_form_and_the_addresses_are_left_out()
     {
         var xml = Build(WithSenderGuide());
 
         var line = Assert.Single(xml.Descendants(Cac + "DespatchLine"));
-        Assert.Equal("0", line.Element(Cbc + "ID")!.Value);
+        Assert.Equal("1", line.Element(Cbc + "ID")!.Value);
         Assert.Null(line.Element(Cbc + "DeliveredQuantity"));
         Assert.Contains("T001-45", line.Descendants(Cbc + "Description").Single().Value, StringComparison.Ordinal);
         Assert.Empty(xml.Descendants(Cac + "DeliveryAddress").Descendants(Cac + "AddressLine"));
@@ -324,5 +324,68 @@ public class GreCarrierTests
         Assert.Contains("SUNAT_Envio_IndicadorTrasporteSubcontratado", instructions);
         Assert.Contains("SUNAT_Envio_IndicadorPagadorFlete_Tercero", instructions);
         Assert.DoesNotContain("SUNAT_Envio_IndicadorPagadorFlete_Remitente", instructions);
+    }
+
+    // ---------- whole transfer of the goods of a voucher (ADR-060) ----------
+
+    private static CreateGreCarrierRequest Whole(string type, string number, string? note = null, bool goods = false) => WithGoods() with
+    {
+        WholeTransfer = true,
+        WholeTransferNote = note,
+        Goods = goods ? WithGoods().Goods : null,
+        RelatedDocuments = [new GreRelatedDocumentInput(type, number, SenderGuideIssuer)],
+    };
+
+    [Fact]
+    public void The_whole_transfer_of_an_electronic_invoice_lists_no_goods_and_needs_no_note()
+    {
+        Assert.Empty(Check(Whole("01", "F001-123")));
+        Assert.Empty(Check(Whole("04", "L001-7")));
+        AssertRule("4434", Check(Whole("01", "F001-123", goods: true)));
+        AssertRule("3458", Check(Whole("01", "F001-123", "Cajas de repuestos")));
+    }
+
+    [Fact]
+    public void The_whole_transfer_of_a_receipt_a_ticket_or_a_printed_invoice_needs_the_annotation_of_the_goods()
+    {
+        foreach (var (type, number) in new[] { ("03", "B001-5"), ("12", "TK-77"), ("48", "1-5"), ("01", "0001-5"), ("04", "0001-5") })
+        {
+            AssertRule("4429", Check(Whole(type, number)));
+            Assert.Empty(Check(Whole(type, number, "Cinco cajas de repuestos")));
+        }
+
+        AssertRule("4430", Check(Whole("03", "B001-5", "ab")));
+        AssertRule("4430", Check(Whole("03", "B001-5", new string('x', 501))));
+        Assert.Empty(Check(Whole("03", "B001-5", "Cinco cajas de repuestos", goods: true)));
+    }
+
+    [Fact]
+    public void The_whole_transfer_needs_a_voucher_and_the_annotation_needs_the_whole_transfer()
+    {
+        AssertRule("SF", Check(WithGoods() with { WholeTransfer = true, RelatedDocuments = null }));
+        AssertRule("SF", Check(WithSenderGuide() with { WholeTransfer = true }));
+        AssertRule("3458", Check(WithGoods() with { WholeTransferNote = "Cajas" }));
+        AssertRule("3435", Check(WithGoods() with { Goods = null }));
+    }
+
+    [Fact]
+    public void The_whole_transfer_writes_its_indicator_and_the_annotation_or_a_line_of_form()
+    {
+        var invoice = Build(Whole("01", "F001-123"));
+        AssertValid(invoice);
+        Assert.Contains(invoice.Descendants(Cbc + "SpecialInstructions"), e => e.Value == "SUNAT_Envio_IndicadorTrasladoTotal");
+        var form = Assert.Single(invoice.Descendants(Cac + "DespatchLine"));
+        Assert.Equal("1", form.Element(Cbc + "ID")!.Value);
+        Assert.Null(form.Element(Cbc + "DeliveredQuantity"));
+
+        var receipt = Build(Whole("03", "B001-5", "Cinco cajas de repuestos"));
+        AssertValid(receipt);
+        var note = Assert.Single(receipt.Descendants(Cac + "DespatchLine"));
+        Assert.Equal("0", note.Element(Cbc + "ID")!.Value);
+        Assert.Equal("Cinco cajas de repuestos", note.Descendants(Cbc + "Description").Single().Value);
+
+        var both = Build(Whole("03", "B001-5", "Cinco cajas de repuestos", goods: true));
+        AssertValid(both);
+        Assert.Equal(["1", "0"], both.Descendants(Cac + "DespatchLine").Select(l => l.Element(Cbc + "ID")!.Value).ToArray());
     }
 }

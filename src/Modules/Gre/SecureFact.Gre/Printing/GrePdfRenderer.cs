@@ -232,7 +232,17 @@ internal static class GrePdfRenderer
         {
             flow.Heading("Bienes");
             var senderGuide = request.RelatedDocuments?.FirstOrDefault(d => d.TypeCode == "09");
-            flow.Pair("Bienes", senderGuide is null ? "Según el documento relacionado" : $"Según la guía de remisión remitente {senderGuide.Number}");
+            var voucher = request.RelatedDocuments is { Count: > 0 } documents ? documents[0] : null;
+            flow.Pair(
+                "Bienes",
+                senderGuide is not null ? $"Según la guía de remisión remitente {senderGuide.Number}"
+                : request.WholeTransfer && voucher is not null ? $"Traslado total de los bienes del documento relacionado {voucher.Number}"
+                : "Según el documento relacionado");
+        }
+
+        if (request.WholeTransfer && !string.IsNullOrWhiteSpace(request.WholeTransferNote))
+        {
+            flow.Pair("Anotación sobre los bienes", request.WholeTransferNote);
         }
 
         Related(flow, model, request.RelatedDocuments);

@@ -84,6 +84,27 @@ test.describe('guías de remisión del transportista', () => {
     await expect(app.locator('.alert.ok')).toContainText('ha sido aceptada', { timeout: 30_000 })
   })
 
+  test('el traslado total de los bienes de una boleta va con su anotación y la guía queda aceptada', async ({ app }) => {
+    await fillTransfer(app)
+    await app.getByLabel('Descripción del bien 1').fill('')
+    await app.getByLabel('Se trasladan todos los bienes del comprobante relacionado').check()
+    await app.getByRole('button', { name: 'Agregar documento relacionado' }).click()
+    await app.getByLabel('Tipo del documento 1').selectOption('03')
+    await app.getByLabel('Número del documento relacionado 1').fill('B001-5')
+    await app.getByLabel('RUC del emisor').fill('20100070970')
+    await app.getByLabel('Anotación sobre los bienes').fill('Cinco cajas de repuestos')
+    await app.getByRole('button', { name: 'Preparar guía' }).click()
+
+    await expect(app.getByRole('heading', { name: 'Guía de remisión del transportista V001-1' })).toBeVisible()
+    await app.getByRole('button', { name: 'Enviar a SUNAT' }).click()
+    await expect(app.locator('.alert.ok')).toContainText('ha sido aceptada', { timeout: 30_000 })
+    const xmlDownload = app.waitForEvent('download')
+    await app.getByRole('button', { name: 'Descargar XML' }).click()
+    const xml = readFileSync((await (await xmlDownload).path())!, 'utf8')
+    expect(xml).toContain('SUNAT_Envio_IndicadorTrasladoTotal')
+    expect(xml).toContain('Cinco cajas de repuestos')
+  })
+
   test('el simulador observa la guía que lleva la marca', async ({ app }) => {
     await fillTransfer(app, { note: '[sandbox:observar]' })
     await app.getByRole('button', { name: 'Preparar guía' }).click()

@@ -71,26 +71,38 @@ internal static partial class GreUblGenerator
             root.Add(Line(order++, good));
         }
 
-        if (order == 1)
+        var note = request.WholeTransfer ? request.WholeTransferNote?.Trim() : null;
+        if (!string.IsNullOrEmpty(note))
         {
-            root.Add(AnnotationLine(request));
+            // The optional annotation of the sheet (order number «0», without a quantity) for the whole transfer of a voucher whose goods SUNAT does not have.
+            root.Add(new XElement(
+                Cac + "DespatchLine",
+                new XElement(Cbc + "ID", "0"),
+                new XElement(Cac + "OrderLineReference", new XElement(Cbc + "LineID", "0")),
+                new XElement(Cac + "Item", new XElement(Cbc + "Description", note))));
+        }
+        else if (order == 1)
+        {
+            root.Add(FormLine(request));
         }
 
         return Serialize(root);
     }
 
     /// <summary>
-    /// The schema asks for at least one line. When the goods are those of the guide of the sender that is related, the line is the optional annotation of the sheet (order number «0», without a quantity),
-    /// which says where the goods are listed.
+    /// The schema asks for at least one line. When the goods are those of the guide of the sender that is related, or those of the electronic invoice that travels whole, the line is one of form: order
+    /// number «1» and no quantity, so it is no good with a quantity (rule 4434) and it is not the annotation «0», which the sheet allows only with the whole transfer of some vouchers (rule 3458).
     /// </summary>
-    private static XElement AnnotationLine(CreateGreCarrierRequest request)
+    private static XElement FormLine(CreateGreCarrierRequest request)
     {
-        var related = (request.RelatedDocuments ?? []).FirstOrDefault(d => d.TypeCode.Trim() == "09")?.Number.Trim();
-        var description = related is null ? "Bienes según el documento relacionado" : $"Bienes según la guía de remisión remitente {related}";
+        var documents = request.RelatedDocuments ?? [];
+        var sender = documents.FirstOrDefault(d => d.TypeCode.Trim() == "09")?.Number.Trim();
+        var other = documents.Count > 0 ? documents[0].Number.Trim() : null;
+        var description = sender is not null ? $"Bienes según la guía de remisión remitente {sender}" : other is not null ? $"Bienes según el documento relacionado {other}" : "Bienes según el documento relacionado";
         return new XElement(
             Cac + "DespatchLine",
-            new XElement(Cbc + "ID", "0"),
-            new XElement(Cac + "OrderLineReference", new XElement(Cbc + "LineID", "0")),
+            new XElement(Cbc + "ID", "1"),
+            new XElement(Cac + "OrderLineReference", new XElement(Cbc + "LineID", "1")),
             new XElement(Cac + "Item", new XElement(Cbc + "Description", description)));
     }
 
@@ -159,6 +171,11 @@ internal static partial class GreUblGenerator
         if (request.ReturnEmptyVehicle)
         {
             yield return "SUNAT_Envio_IndicadorRetornoVehiculoVacio";
+        }
+
+        if (request.WholeTransfer)
+        {
+            yield return "SUNAT_Envio_IndicadorTrasladoTotal";
         }
 
         if (request.Subcontracted)

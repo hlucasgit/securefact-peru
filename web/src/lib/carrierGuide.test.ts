@@ -46,6 +46,19 @@ describe('buildCarrierGuide', () => {
     ])
   })
 
+  it('sends the whole transfer with its note and leaves the unfilled goods out', () => {
+    const form = transfer()
+    form.wholeTransfer = true
+    form.wholeTransferNote = ' Cinco cajas '
+    form.goods = [{ ...emptyGood(), description: '' }]
+    form.related = [{ ...emptyRelated(), typeCode: '03', number: 'b001-5', issuerRuc: '20100070970' }]
+
+    const body = buildCarrierGuide(form)
+
+    expect(body).toMatchObject({ wholeTransfer: true, wholeTransferNote: 'Cinco cajas', goods: [] })
+    expect(buildCarrierGuide({ ...form, wholeTransfer: false })).toMatchObject({ wholeTransfer: false, wholeTransferNote: null })
+  })
+
   it('keeps the payer and the subcontractor only when they are chosen, and drops empty secondary vehicles and drivers', () => {
     const form = transfer()
     form.thirdPartyPayer = { documentTypeCode: '6', documentNumber: '20100066603', name: 'PAGADOR SAC' }

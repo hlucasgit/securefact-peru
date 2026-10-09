@@ -615,4 +615,7 @@ export interface CreateCarrierGuideBody {
   plannedTransshipment: boolean
   returnWithEmptyPackaging: boolean
   returnEmptyVehicle: boolean
+  /** All the goods of the related voucher travel: they are not listed again (ADR-060). */
+  wholeTransfer: boolean
+  wholeTransferNote?: string | null
 }

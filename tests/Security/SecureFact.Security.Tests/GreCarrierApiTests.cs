@@ -168,4 +168,42 @@ public sealed partial class GreApiTests
         Assert.Equal("42501", seriesType.SqlState);
         Assert.Equal("23514", prefix.SqlState);
     }
+
+    private static object WholeTransferBody(Setup setup, string type, string number, string? note) => new
+    {
+        companyId = setup.Company.Id,
+        seriesId = setup.CarrierSeries.Id,
+        transferStartDate = Today(),
+        grossWeight = 300m,
+        weightUnit = "KGM",
+        sender = new { documentTypeCode = "6", documentNumber = ShipperRuc, name = "REMITENTE DEMO SAC" },
+        recipient = new { documentTypeCode = "6", documentNumber = "20100066603", name = "CLIENTE DEMO SAC" },
+        origin = new { ubigeoCode = "150101", address = "Av. Argentina 123, Lima" },
+        destination = new { ubigeoCode = "040101", address = "Calle Mercaderes 45, Arequipa" },
+        vehicle = new { plate = "ABC123", circulationCard = "1234567890" },
+        driver = new { documentTypeCode = "1", documentNumber = "12345678", firstNames = "JUAN CARLOS", lastNames = "PEREZ GOMEZ", licenseNumber = "Q12345678" },
+        relatedDocuments = new[] { new { typeCode = type, number, issuerRuc = ShipperRuc } },
+        wholeTransfer = true,
+        wholeTransferNote = note,
+    };
+
+    [Fact]
+    public async Task The_whole_transfer_of_an_electronic_invoice_needs_no_goods_and_the_one_of_a_receipt_needs_its_annotation()
+    {
+        var setup = await NewTenantAsync("gre-carrier-whole");
+
+        var invoice = await CreateCarrierOkAsync(setup, WholeTransferBody(setup, "01", "F001-123", null));
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/gre/guides/{invoice.Id}/xml");
+        Assert.Contains("SUNAT_Envio_IndicadorTrasladoTotal", xml, StringComparison.Ordinal);
+        Assert.Equal(GreState.Accepted, (await (await setup.Owner.PostAsync($"/api/v1/gre/guides/{invoice.Id}/submit", null)).Content.ReadFromJsonAsync<GreDto>(ApiFixture.JsonOptions))!.State);
+        Assert.Contains("Traslado total de los bienes del documento relacionado F001-123", PdfText(await PdfOkAsync(setup, invoice.Id)), StringComparison.Ordinal);
+
+        var withoutNote = await setup.Owner.PostAsJsonAsync("/api/v1/gre/guides/carrier", WholeTransferBody(setup, "03", "B001-5", null));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, withoutNote.StatusCode);
+        Assert.Contains("4429", await withoutNote.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        var receipt = await CreateCarrierOkAsync(setup, WholeTransferBody(setup, "03", "B001-5", "Cinco cajas de repuestos"));
+        Assert.Contains("Cinco cajas de repuestos", await setup.Owner.GetStringAsync($"/api/v1/gre/guides/{receipt.Id}/xml"), StringComparison.Ordinal);
+        Assert.Contains("Cinco cajas de repuestos", PdfText(await PdfOkAsync(setup, receipt.Id)), StringComparison.Ordinal);
+    }
 }
