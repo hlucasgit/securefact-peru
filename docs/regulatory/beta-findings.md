@@ -43,6 +43,8 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 - **Detracción en la nota de débito** (R-061, 2026-10-06): factura con detracción (037, 12 %) aceptada y nota de débito sobre ella (motivo 02) con su propia detracción de su importe: aceptada, código 0, sin observaciones.
 
+- **Regresión del 2026-10-09** (con la plataforma ya facturando lo que cobra, ADR-065; `tools/SecureFact.BetaSmoke`, un solo envío por escenario, sin carga): factura al contado, factura al crédito (cuotas) y boleta de venta aceptadas, código 0. Las formas que usa la factura de la plataforma (servicio `ZZ`, gravado, crédito, boleta a un DNI) siguen aceptadas. **La guía de remisión no se pudo probar**: el usuario `<RUC>MODDATOS` es del beta SOAP de facturas; la API REST de la GRE pide además un `client_id` y un `client_secret` que se crean en Clave SOL con el RUC real, y SUNAT no documenta un beta de la GRE (R-067). Sigue **P** hasta tener esas credenciales.
+
 ## Errores que el beta destapó (y se corrigieron)
 | Código | Causa | Corrección |
 |--------|-------|-----------|
