@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAssignPlan, useCreatePlan, useMyPlan, usePlans, useResellers, useTenantUsage, useUpdatePlan } from '../api/queries'
 import type { PlanInput, PlanRow, TenantUsage, UsageItem } from '../api/types'
 import { useSession } from '../auth/session'
+import { MyCharges } from './Billing'
 import { Badge, Empty, ErrorAlert, Loading, Modal, PageHeader, SelectField, TextField, useToast } from '../components/ui'
 
 const limitText = (limit: number | null) => (limit === null ? 'Ilimitado' : limit.toLocaleString('es-PE'))
@@ -48,6 +49,7 @@ export function MyPlan() {
         <ErrorAlert error={error} />
         {isPending ? <Loading /> : data && <UsagePanel usage={data} />}
       </div>
+      <MyCharges />
     </>
   )
 }
@@ -124,6 +126,7 @@ export function Plans() {
                   <th className="right">Empresas</th>
                   <th className="right">Usuarios</th>
                   <th className="right">Comprobantes por mes</th>
+                  <th>Excedente</th>
                   <th>Oferta</th>
                   <th>Estado</th>
                   <th />
@@ -137,6 +140,7 @@ export function Plans() {
                     <td className="right">{limitText(plan.maxCompanies)}</td>
                     <td className="right">{limitText(plan.maxUsers)}</td>
                     <td className="right">{limitText(plan.maxDocumentsPerMonth)}</td>
+                    <td>{plan.allowsOverage ? 'Se cobra' : 'Se rechaza'}</td>
                     <td>{plan.resellerId ? `Privada de ${(resellers.data ?? []).find((reseller) => reseller.id === plan.resellerId)?.name ?? 'un revendedor'}` : 'Pública'}</td>
                     <td>
                       <Badge tone={plan.isActive ? 'ok' : 'neutral'}>{plan.isActive ? 'Disponible' : 'Retirado'}</Badge>
@@ -176,6 +180,7 @@ function PlanModal({ plan, onClose }: { plan: PlanRow | null; onClose: () => voi
     maxDocumentsPerMonth: plan?.maxDocumentsPerMonth?.toString() ?? '',
     isActive: plan?.isActive ?? true,
     resellerId: plan?.resellerId ?? '',
+    allowsOverage: plan?.allowsOverage ?? false,
   })
   const resellers = useResellers()
   const mutation = plan ? update : create
@@ -189,6 +194,7 @@ function PlanModal({ plan, onClose }: { plan: PlanRow | null; onClose: () => voi
       maxDocumentsPerMonth: toLimit(value.maxDocumentsPerMonth),
       isActive: value.isActive,
       resellerId: value.resellerId || null,
+      ...(plan ? {} : { allowsOverage: value.allowsOverage }),
     }
     mutation.mutate(input, { onSuccess: () => { toast.ok(plan ? 'Plan actualizado.' : 'Plan creado.'); onClose() } })
   }
@@ -216,6 +222,13 @@ function PlanModal({ plan, onClose }: { plan: PlanRow | null; onClose: () => voi
             </option>
           ))}
         </SelectField>
+        {plan ? (
+          <p className="hint">{plan.allowsOverage ? 'Este plan cobra los comprobantes que pasan de lo incluido en su precio.' : 'Este plan rechaza los comprobantes que pasan de su tope.'} No cambia después de crear el plan.</p>
+        ) : (
+          <label className="checkbox">
+            <input type="checkbox" checked={value.allowsOverage} onChange={(event) => setValue({ ...value, allowsOverage: event.target.checked })} /> Cobrar los comprobantes que pasan de lo incluido, en lugar de rechazarlos
+          </label>
+        )}
         {plan && (
           <label className="checkbox">
             <input type="checkbox" checked={value.isActive} onChange={(event) => setValue({ ...value, isActive: event.target.checked })} /> Disponible para asignar a cuentas nuevas

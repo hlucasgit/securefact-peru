@@ -21,6 +21,7 @@ import { NewCarrierGuide } from './pages/NewCarrierGuide'
 import { NewGuide } from './pages/NewGuide'
 import { NewNote } from './pages/NewNote'
 import { ResellerBrand } from './pages/Brand'
+import { Collections, Pricing, ResellerCommissions } from './pages/Billing'
 import { MyPlan, Plans } from './pages/Plans'
 import { ResellerAccountDetail, ResellerAccounts, Resellers } from './pages/Resellers'
 import { TenantDetail, Tenants } from './pages/Platform'
@@ -52,10 +53,13 @@ export function App() {
         <Route path="plataforma/inquilinos" element={<Tenants />} />
         <Route path="plataforma/inquilinos/:id" element={<TenantDetail />} />
         <Route path="plataforma/planes" element={<Plans />} />
+        <Route path="plataforma/precios" element={<Pricing />} />
+        <Route path="plataforma/cobranza" element={<Collections />} />
         <Route path="plataforma/revendedores" element={<Resellers />} />
         <Route path="plataforma/correos" element={<DeadEmails />} />
         <Route path="revendedor/cuentas" element={<ResellerAccounts />} />
         <Route path="revendedor/marca" element={<ResellerBrand />} />
+        <Route path="revendedor/comisiones" element={<ResellerCommissions />} />
         <Route path="revendedor/cuentas/:id" element={<ResellerAccountDetail />} />
         <Route path="plan" element={<MyPlan />} />
         <Route path="auditoria" element={<Audit />} />

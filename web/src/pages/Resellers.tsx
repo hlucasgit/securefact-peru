@@ -21,6 +21,7 @@ import { useSession } from '../auth/session'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextAreaField, TextField, useToast } from '../components/ui'
 import { dateTime } from '../lib/format'
 import { BrandEditor } from './Brand'
+import { CommissionsModal } from './Billing'
 import { UsagePanel } from './Plans'
 import { TenantStatusBadge } from './Platform'
 
@@ -35,6 +36,7 @@ export function Resellers() {
   const [editing, setEditing] = useState<ResellerRow | 'new' | null>(null)
   const [adding, setAdding] = useState<ResellerRow | null>(null)
   const [branding, setBranding] = useState<ResellerRow | null>(null)
+  const [commissions, setCommissions] = useState<ResellerRow | null>(null)
   const canManage = hasRole('PlatformSuperAdmin')
 
   return (
@@ -82,6 +84,9 @@ export function Resellers() {
                           </button>{' '}
                         </>
                       )}
+                      <button className="btn small" type="button" aria-label={`Comisiones de ${reseller.name}`} onClick={() => setCommissions(reseller)}>
+                        Comisiones
+                      </button>{' '}
                       <button className="btn small" type="button" aria-label={`Marca de ${reseller.name}`} onClick={() => setBranding(reseller)}>
                         Marca
                       </button>
@@ -97,6 +102,7 @@ export function Resellers() {
       </div>
       {editing && <ResellerModal reseller={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
       {adding && <ResellerUserModal reseller={adding} onClose={() => setAdding(null)} />}
+      {commissions && <CommissionsModal reseller={commissions} onClose={() => setCommissions(null)} />}
       {branding && (
         <Modal title={`Marca de ${branding.name}`} onClose={() => setBranding(null)}>
           <BrandEditor scope={{ kind: 'platform', resellerId: branding.id }} canSetHost={canManage} />

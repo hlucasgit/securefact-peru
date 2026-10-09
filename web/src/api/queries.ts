@@ -5,6 +5,22 @@ import type {
   ArchivedFile,
   AuditRecord,
   AuditVerification,
+  BillingPolicy,
+  BillingPolicyInput,
+  Charge,
+  ChargeDetail,
+  ChargeStatus,
+  CollectionPassResult,
+  CommissionOverview,
+  CommissionSchedule,
+  CommissionScheduleInput,
+  CommissionSettlement,
+  CommissionStatement,
+  Payment,
+  PaymentInput,
+  PlanPrice,
+  PlanPriceInput,
+  TenantTerms,
   DeadEmail,
   DeadMessage,
   BrandInput,
@@ -74,6 +90,17 @@ export const keys = {
   resellerUsage: (id: string) => ['reseller', 'tenant', id, 'usage'] as const,
   resellerPlans: ['reseller', 'plans'] as const,
   myPlan: ['plan'] as const,
+  prices: (planId: string) => ['platform', 'plans', planId, 'prices'] as const,
+  policies: ['platform', 'billing-policies'] as const,
+  schedules: ['platform', 'commission-schedules'] as const,
+  charges: (filter: string) => ['charges', filter] as const,
+  charge: (id: string) => ['charges', 'one', id] as const,
+  terms: (tenantId: string) => ['platform', 'tenant', tenantId, 'terms'] as const,
+  myTerms: ['subscription'] as const,
+  resellerCommissions: (id: string) => ['platform', 'reseller', id, 'commissions'] as const,
+  commissionStatement: (id: string, month: string) => ['platform', 'reseller', id, 'commissions', month] as const,
+  myCommissions: ['reseller', 'commissions'] as const,
+  myCommissionStatement: (month: string) => ['reseller', 'commissions', month] as const,
   audit: (filters: string) => ['audit', filters] as const,
   dead: ['outbox', 'dead'] as const,
   deadEmails: ['emails', 'dead'] as const,
@@ -301,3 +328,55 @@ export const useCreateGuide = () => useAction((body: CreateGuideBody) => post<Gu
 export const useCreateCarrierGuide = () => useAction((body: CreateCarrierGuideBody) => post<Guide>('/api/v1/gre/guides/carrier', body), [['gre', 'guides']])
 export const useSubmitGuide = (id: string) => useAction(() => post<Guide>(`/api/v1/gre/guides/${id}/submit`), [keys.guide(id), ['gre', 'guides']])
 export const useRefreshGuide = (id: string) => useAction(() => post<Guide>(`/api/v1/gre/guides/${id}/refresh`), [keys.guide(id), ['gre', 'guides']])
+
+// Prices, billing policy, charges, payments and commissions (ADR-062 to ADR-064)
+export const usePlanPrices = (planId: string) => useQuery({ queryKey: keys.prices(planId), queryFn: () => get<PlanPrice[]>(`/api/v1/platform/plans/${planId}/prices`), enabled: !!planId })
+export const usePublishPrice = (planId: string) =>
+  useAction((input: PlanPriceInput) => post<PlanPrice>(`/api/v1/platform/plans/${planId}/prices`, input), [keys.prices(planId), ['audit']])
+export const useBillingPolicies = () => useQuery({ queryKey: keys.policies, queryFn: () => get<BillingPolicy[]>('/api/v1/platform/billing-policies') })
+export const usePublishPolicy = () => useAction((input: BillingPolicyInput) => post<BillingPolicy>('/api/v1/platform/billing-policies', input), [keys.policies, ['audit']])
+export const useCommissionSchedules = () => useQuery({ queryKey: keys.schedules, queryFn: () => get<CommissionSchedule[]>('/api/v1/platform/commission-schedules') })
+export const usePublishSchedule = () => useAction((input: CommissionScheduleInput) => post<CommissionSchedule>('/api/v1/platform/commission-schedules', input), [keys.schedules, ['audit']])
+export const useTenantTerms = (tenantId: string) => useQuery({ queryKey: keys.terms(tenantId), queryFn: () => get<TenantTerms>(`/api/v1/platform/tenants/${tenantId}/terms`) })
+export const useMyTerms = () => useQuery({ queryKey: keys.myTerms, queryFn: () => get<TenantTerms>('/api/v1/subscription') })
+
+export interface ChargeFilters {
+  tenantId?: string
+  status?: ChargeStatus | ''
+  period?: string
+}
+
+const chargeQuery = ({ tenantId, status, period }: ChargeFilters) =>
+  [tenantId ? `tenantId=${tenantId}` : '', status ? `status=${status}` : '', period ? `period=${period}` : ''].filter(Boolean).join('&')
+
+/** Charges of any account for platform staff, or of the own account when `own` is set. */
+export const useCharges = (filters: ChargeFilters, own = false) => {
+  const query = chargeQuery(filters)
+  return useQuery({
+    queryKey: keys.charges(`${own ? 'own' : 'all'}:${query}`),
+    queryFn: () => get<Charge[]>(`${own ? '/api/v1/charges' : '/api/v1/platform/charges'}?${page(0, 100)}${query ? `&${query}` : ''}`),
+  })
+}
+export const useChargeDetail = (id: string | null, own = false) =>
+  useQuery({ queryKey: keys.charge(`${own ? 'own:' : ''}${id}`), queryFn: () => get<ChargeDetail>(`${own ? '/api/v1/charges' : '/api/v1/platform/charges'}/${id}`), enabled: !!id })
+export const useRecordPayment = (chargeId: string) =>
+  useAction((input: PaymentInput) => post<Payment>(`/api/v1/platform/charges/${chargeId}/payments`, input), [['charges'], ['platform', 'tenants'], ['platform', 'tenant'], ['audit']])
+export const useReversePayment = () =>
+  useAction((input: { id: string; reason: string }) => post<Payment>(`/api/v1/platform/payments/${input.id}/reverse`, { reason: input.reason }), [['charges'], ['platform', 'tenant'], ['audit']])
+export const useVoidCharge = (chargeId: string) =>
+  useAction((reason: string) => post<Charge>(`/api/v1/platform/charges/${chargeId}/void`, { reason }), [['charges'], ['platform', 'tenant'], ['audit']])
+export const useRunCollection = () => useAction(() => post<CollectionPassResult>('/api/v1/platform/subscriptions/run'), [['charges'], ['platform', 'tenants'], ['platform', 'tenant']])
+
+export const useResellerCommissions = (resellerId: string) =>
+  useQuery({ queryKey: keys.resellerCommissions(resellerId), queryFn: () => get<CommissionOverview>(`/api/v1/platform/resellers/${resellerId}/commissions`) })
+export const useCommissionStatement = (resellerId: string, month: string | null) =>
+  useQuery({ queryKey: keys.commissionStatement(resellerId, month ?? ''), queryFn: () => get<CommissionStatement>(`/api/v1/platform/resellers/${resellerId}/commissions/${month}`), enabled: !!month })
+export const useSettleCommission = (resellerId: string) =>
+  useAction(
+    (input: { month: string; settledOn: string; reference: string | null; note: string | null }) =>
+      post<CommissionSettlement>(`/api/v1/platform/resellers/${resellerId}/commissions/${input.month}/settle`, { settledOn: input.settledOn, reference: input.reference, note: input.note }),
+    [keys.resellerCommissions(resellerId), ['platform', 'reseller', resellerId, 'commissions'], ['audit']],
+  )
+export const useMyCommissions = () => useQuery({ queryKey: keys.myCommissions, queryFn: () => get<CommissionOverview>('/api/v1/reseller/commissions') })
+export const useMyCommissionStatement = (month: string | null) =>
+  useQuery({ queryKey: keys.myCommissionStatement(month ?? ''), queryFn: () => get<CommissionStatement>(`/api/v1/reseller/commissions/${month}`), enabled: !!month })

@@ -359,6 +359,8 @@ export interface PlanRow {
   isActive: boolean
   /** Set for a private offer of one reseller. */
   resellerId: string | null
+  /** The documents over what the price includes are charged, not refused (ADR-062). Fixed when the plan is created. */
+  allowsOverage: boolean
 }
 
 /** The brand of a reseller as its editor sees it; every field but the id and the name can be empty. */
@@ -414,6 +416,8 @@ export interface PlanInput {
   maxDocumentsPerMonth: number | null
   isActive: boolean
   resellerId: string | null
+  /** Only when creating; it never changes afterwards. */
+  allowsOverage?: boolean
 }
 
 export interface UsageItem {
@@ -618,4 +622,179 @@ export interface CreateCarrierGuideBody {
   /** All the goods of the related voucher travel: they are not listed again (ADR-060). */
   wholeTransfer: boolean
   wholeTransferNote?: string | null
+}
+
+// ---------- prices, charges and commissions (ADR-062 to ADR-064) ----------
+
+export interface PlanPrice {
+  id: string
+  planId: string
+  version: number
+  effectiveFrom: string
+  monthlyFee: number
+  includedDocuments: number | null
+  overageUnitPrice: number | null
+  note: string | null
+}
+
+export interface PlanPriceInput {
+  effectiveFrom: string
+  monthlyFee: number
+  includedDocuments: number | null
+  overageUnitPrice: number | null
+  note: string | null
+}
+
+export interface BillingPolicy {
+  id: string
+  version: number
+  effectiveFrom: string
+  dueDays: number
+  suspendAfterDays: number | null
+  note: string | null
+}
+
+export interface BillingPolicyInput {
+  effectiveFrom: string
+  dueDays: number
+  suspendAfterDays: number | null
+  note: string | null
+}
+
+/** What a tenant pays: the version of the price of its plan that it keeps, and the first month it is charged. */
+export interface TenantTerms {
+  tenantId: string
+  planId: string
+  planCode: string
+  planName: string
+  allowsOverage: boolean
+  planAssignedAt: string
+  price: PlanPrice | null
+  firstChargePeriod: string | null
+}
+
+export type ChargeStatus = 'Pending' | 'Partial' | 'Overdue' | 'Paid' | 'Void'
+
+export type PaymentMethod = 'Transfer' | 'Deposit' | 'Cash' | 'Card' | 'Other'
+
+export interface Charge {
+  id: string
+  tenantId: string
+  tenantName: string
+  period: string
+  planCode: string
+  planName: string
+  monthlyFee: number
+  includedDocuments: number | null
+  documentsIssued: number
+  overageDocuments: number
+  overageUnitPrice: number | null
+  overageAmount: number
+  netAmount: number
+  taxRate: number
+  taxAmount: number
+  totalAmount: number
+  currency: string
+  issuedOn: string
+  dueOn: string
+  suspendOn: string | null
+  paidAmount: number
+  balance: number
+  status: ChargeStatus
+  voidReason: string | null
+  createdAt: string
+}
+
+export interface Payment {
+  id: string
+  chargeId: string
+  amount: number
+  method: PaymentMethod
+  reference: string | null
+  paidOn: string
+  note: string | null
+  reversesPaymentId: string | null
+  recordedAt: string
+}
+
+export interface ChargeDetail {
+  charge: Charge
+  payments: Payment[]
+}
+
+export interface PaymentInput {
+  amount: number
+  method: PaymentMethod
+  paidOn: string
+  reference: string | null
+  note: string | null
+}
+
+export interface CollectionPassResult {
+  chargesCreated: number
+  tenantsSuspended: number
+  tenantsReactivated: number
+}
+
+export interface CommissionTier {
+  minAccounts: number
+  rate: number
+}
+
+export interface CommissionSchedule {
+  id: string
+  version: number
+  effectiveFrom: string
+  tiers: CommissionTier[]
+  note: string | null
+}
+
+export interface CommissionScheduleInput {
+  effectiveFrom: string
+  tiers: CommissionTier[]
+  note: string | null
+}
+
+export interface CommissionEntry {
+  id: string
+  tenantId: string
+  tenantName: string
+  chargePeriod: string
+  paymentId: string
+  month: string
+  baseAmount: number
+  rate: number
+  amount: number
+}
+
+export interface CommissionSettlement {
+  id: string
+  resellerId: string
+  month: string
+  total: number
+  entries: number
+  settledOn: string
+  reference: string | null
+  note: string | null
+}
+
+export interface CommissionMonth {
+  month: string
+  total: number
+  entries: number
+  settlement: CommissionSettlement | null
+}
+
+export interface CommissionStatement {
+  resellerId: string
+  month: CommissionMonth
+  items: CommissionEntry[]
+}
+
+export interface CommissionOverview {
+  resellerId: string
+  activeAccounts: number
+  scheduleForNewAccounts: CommissionSchedule | null
+  currentRate: number | null
+  months: CommissionMonth[]
 }

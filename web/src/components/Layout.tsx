@@ -11,12 +11,12 @@ interface Item {
 }
 
 const PLATFORM_GROUPS: { title: string; items: Item[] }[] = [
-  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/plataforma/planes', label: 'Planes' }, { to: '/plataforma/revendedores', label: 'Revendedores' }, { to: '/plataforma/correos', label: 'Correos fallidos' }, { to: '/auditoria', label: 'Auditoría' }] },
+  { title: 'Plataforma', items: [{ to: '/plataforma/inquilinos', label: 'Inquilinos' }, { to: '/plataforma/planes', label: 'Planes' }, { to: '/plataforma/precios', label: 'Precios y comisiones' }, { to: '/plataforma/cobranza', label: 'Cobranza' }, { to: '/plataforma/revendedores', label: 'Revendedores' }, { to: '/plataforma/correos', label: 'Correos fallidos' }, { to: '/auditoria', label: 'Auditoría' }] },
   { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
 ]
 
 const RESELLER_GROUPS: { title: string; items: Item[] }[] = [
-  { title: 'Revendedor', items: [{ to: '/revendedor/cuentas', label: 'Mis cuentas' }, { to: '/revendedor/marca', label: 'Marca' }] },
+  { title: 'Revendedor', items: [{ to: '/revendedor/cuentas', label: 'Mis cuentas' }, { to: '/revendedor/comisiones', label: 'Comisiones' }, { to: '/revendedor/marca', label: 'Marca' }] },
   { title: 'Cuenta', items: [{ to: '/seguridad', label: 'Seguridad' }] },
 ]
 

@@ -16,6 +16,7 @@ import type { TenantRow, TenantStatus } from '../api/types'
 import { useSession } from '../auth/session'
 import { Badge, ConfirmButton, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, TextAreaField, TextField, useToast } from '../components/ui'
 import { ROLE_LABELS, TENANT_ROLES, dateTime } from '../lib/format'
+import { TenantBillingCard } from './Billing'
 import { TenantPlanCard } from './Plans'
 import { TenantResellerCard } from './Resellers'
 import type { Tone } from '../lib/format'
@@ -219,6 +220,7 @@ export function TenantDetail() {
       </div>
 
       <TenantPlanCard tenantId={t.id} canManage={canManage} closed={t.status === 'Closed'} />
+      <TenantBillingCard tenantId={t.id} />
       <TenantResellerCard tenant={t} canManage={canManage} />
 
       <div className="card">
