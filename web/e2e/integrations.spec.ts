@@ -39,7 +39,7 @@ test.describe('integraciones', () => {
     expect(await seriousViolations(app)).toEqual([])
     await dialog.getByRole('button', { name: 'Crear llave' }).click()
 
-    const secret = (await app.getByLabel('Secreto').textContent())?.trim() ?? ''
+    const secret = (await app.getByLabel('Secreto', { exact: true }).textContent())?.trim() ?? ''
     expect(secret).toMatch(/^sfk_[0-9a-f]{32}_/)
     await expect(app.getByText(/no se vuelve a mostrar/)).toBeVisible()
     await app.getByRole('button', { name: 'Ya la guardé' }).click()
@@ -57,7 +57,7 @@ test.describe('integraciones', () => {
     // Revoking it ends its use at once.
     app.once('dialog', (confirm) => void confirm.accept())
     await app.getByRole('button', { name: 'Revocar Tienda en línea' }).click()
-    await expect(app.getByText('Revocada')).toBeVisible()
+    await expect(app.getByText('Revocada', { exact: true })).toBeVisible()
     expect((await asProgram('/api/v1/companies')).status).toBe(401)
     expect(await seriousViolations(app)).toEqual([])
   })
@@ -76,7 +76,7 @@ test.describe('integraciones', () => {
       expect(await seriousViolations(app)).toEqual([])
       await dialog.getByRole('button', { name: 'Crear webhook' }).click()
 
-      const secret = (await app.getByLabel('Secreto').textContent())?.trim() ?? ''
+      const secret = (await app.getByLabel('Secreto', { exact: true }).textContent())?.trim() ?? ''
       expect(secret).toMatch(/^whsec_/)
       await app.getByRole('button', { name: 'Ya la guardé' }).click()
       await expect(app.getByText('Servidor de pruebas')).toBeVisible()
@@ -100,7 +100,7 @@ test.describe('integraciones', () => {
       await app.keyboard.press('Escape')
       app.once('dialog', (confirm) => void confirm.accept())
       await app.getByRole('button', { name: `Rotar el secreto de ${receiver.url}` }).click()
-      const rotated = (await app.getByLabel('Secreto').textContent())?.trim() ?? ''
+      const rotated = (await app.getByLabel('Secreto', { exact: true }).textContent())?.trim() ?? ''
       expect(rotated).not.toBe(secret)
       await app.getByRole('button', { name: 'Ya la guardé' }).click()
     } finally {

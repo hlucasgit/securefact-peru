@@ -39,7 +39,7 @@ describe('API keys', () => {
     const user = userEvent.setup()
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = String(input)
-      if (init?.method === 'POST') return Promise.resolve(json(201, { key: { ...KEY, id: 'k2', name: 'Tienda web', prefix: 'Zz9' }, secret: 'sfk_0123_SECRETO-QUE-SE-VE-UNA-VEZ' }))
+      if (init?.method === 'POST') return Promise.resolve(json(201, { key: { ...KEY, id: 'k2', name: 'Tienda web', prefix: 'Zz9' }, secret: 'sfk_prueba' }))
       if (url.endsWith('/roles')) return Promise.resolve(json(200, ['BillingAdmin', 'Sales', 'Accountant', 'Auditor', 'ReadOnly']))
       return Promise.resolve(json(200, [KEY]))
     })
@@ -55,7 +55,7 @@ describe('API keys', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Crear llave' }))
 
     const secret = await screen.findByLabelText('Secreto')
-    expect(secret).toHaveTextContent('sfk_0123_SECRETO-QUE-SE-VE-UNA-VEZ')
+    expect(secret).toHaveTextContent('sfk_prueba')
     expect(screen.getByText(/no se vuelve a mostrar/)).toBeVisible()
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')
     expect(post?.[0]).toBe('/api/v1/api-keys')
@@ -103,7 +103,7 @@ describe('Webhooks', () => {
     const user = userEvent.setup()
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = String(input)
-      if (init?.method === 'POST') return Promise.resolve(json(201, { endpoint: HOOK, secret: 'whsec_SECRETO-DE-FIRMA' }))
+      if (init?.method === 'POST') return Promise.resolve(json(201, { endpoint: HOOK, secret: 'whsec_prueba' }))
       if (url.endsWith('/events')) return Promise.resolve(json(200, ['document.issued', 'document.accepted', 'document.rejected']))
       return Promise.resolve(json(200, url.includes('webhooks') ? [] : [KEY]))
     })
@@ -118,7 +118,7 @@ describe('Webhooks', () => {
     await user.click(within(dialog).getByLabelText(/Rechazado por SUNAT/)) // off
     await user.click(within(dialog).getByRole('button', { name: 'Crear webhook' }))
 
-    expect(await screen.findByLabelText('Secreto')).toHaveTextContent('whsec_SECRETO-DE-FIRMA')
+    expect(await screen.findByLabelText('Secreto')).toHaveTextContent('whsec_prueba')
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')
     expect(post?.[0]).toBe('/api/v1/webhooks')
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ url: 'https://hooks.cliente.pe/securefact', description: null, events: ['document.accepted', 'document.issued'], isActive: true })
@@ -180,7 +180,7 @@ describe('Webhooks', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = String(input)
-      if (init?.method === 'POST') return Promise.resolve(json(200, { endpoint: HOOK, secret: 'whsec_NUEVO' }))
+      if (init?.method === 'POST') return Promise.resolve(json(200, { endpoint: HOOK, secret: 'whsec_nuevo' }))
       if (init?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }))
       return Promise.resolve(json(200, url.endsWith('/api/v1/webhooks') ? [HOOK] : []))
     })
@@ -188,7 +188,7 @@ describe('Webhooks', () => {
     await openWebhooks(user)
 
     await user.click(await screen.findByRole('button', { name: /^Rotar el secreto de / }))
-    expect(await screen.findByLabelText('Secreto')).toHaveTextContent('whsec_NUEVO')
+    expect(await screen.findByLabelText('Secreto')).toHaveTextContent('whsec_nuevo')
     await user.click(screen.getByRole('button', { name: 'Ya la guardé' }))
     await user.click(screen.getByRole('button', { name: /^Eliminar https/ }))
 
