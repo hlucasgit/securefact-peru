@@ -22,7 +22,7 @@ jobs:
       SF_IMAGE_REGISTRY: mirror.gcr.io/
       TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -70,7 +70,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -96,7 +96,7 @@ jobs:
       # Same mirror as in build-test (anonymous pull limit of Docker Hub).
       SF_IMAGE_REGISTRY: mirror.gcr.io/
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -137,7 +137,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # Third-party actions are pinned to a commit: a tag can be moved (aquasecurity/trivy-action tags were rewritten in the March 2026 supply chain attack).
@@ -150,7 +150,7 @@ jobs:
     timeout-minutes: 30
     needs: [build-test, web]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build API image
         run: docker build -f src/SecureFact.Api/Dockerfile -t securefact-api:ci .
       - name: Build workers image
