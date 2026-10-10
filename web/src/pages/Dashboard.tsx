@@ -6,7 +6,7 @@ import { useSession } from '../auth/session'
 import { BILLING_ROLES, date } from '../lib/format'
 
 export function Dashboard() {
-  const { hasRole } = useSession()
+  const { hasRole, support } = useSession()
   const companies = useCompanies()
   const documents = useDocuments(null, 0, 10)
   const expiring = useExpiringCertificates()
@@ -27,7 +27,13 @@ export function Dashboard() {
       <ErrorAlert error={error} />
       {companies.data && activeCompanies.length === 0 && (
         <div className="alert info">
-          Aún no tiene empresas. <Link to="/empresas">Registre la primera</Link> para configurar su certificado digital, sus credenciales SOL y sus series.
+          {support ? (
+            'La cuenta aún no tiene empresas.'
+          ) : (
+            <>
+              Aún no tiene empresas. <Link to="/empresas">Registre la primera</Link> para configurar su certificado digital, sus credenciales SOL y sus series.
+            </>
+          )}
         </div>
       )}
       {expiring.data && expiring.data.length > 0 && (
