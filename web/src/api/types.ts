@@ -915,3 +915,33 @@ export interface WebhookDelivery {
   createdAt: string
   deliveredAt: string | null
 }
+
+// Acceso de soporte (ADR-069)
+export type SupportGrantStatus = 'Active' | 'Expired' | 'Revoked'
+
+export interface SupportGrant {
+  id: string
+  createdAt: string
+  expiresAt: string
+  revokedAt: string | null
+  note: string | null
+  status: SupportGrantStatus
+  entries: number
+  lastEntryAt: string | null
+}
+
+export interface SupportAvailable {
+  tenantId: string
+  tenantName: string
+  grantId: string
+  expiresAt: string
+}
+
+export interface SupportSession {
+  accessToken: string
+  expiresInSeconds: number
+  tenantId: string
+  tenantName: string
+  expiresAt: string
+  readOnly: boolean
+}

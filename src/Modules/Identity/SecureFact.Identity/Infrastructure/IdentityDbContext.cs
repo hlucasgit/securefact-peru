@@ -20,6 +20,8 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
 
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
+    public DbSet<SupportAccessGrant> SupportGrants => Set<SupportAccessGrant>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -67,6 +69,22 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
             ConfigureTenantOwned(b);
         });
 
+        modelBuilder.Entity<SupportAccessGrant>(b =>
+        {
+            b.ToTable("support_access_grant");
+            b.HasKey(g => g.Id);
+            b.Property(g => g.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(g => g.GrantedBy).HasColumnName("granted_by");
+            b.Property(g => g.CreatedAt).HasColumnName("created_at");
+            b.Property(g => g.ExpiresAt).HasColumnName("expires_at");
+            b.Property(g => g.RevokedAt).HasColumnName("revoked_at");
+            b.Property(g => g.RevokedBy).HasColumnName("revoked_by");
+            b.Property(g => g.Note).HasColumnName("note").HasMaxLength(200);
+            b.Property(g => g.Version).IsRowVersion();
+            b.HasIndex(g => g.TenantId);
+            ConfigureTenantOwned(b);
+        });
+
         modelBuilder.Entity<UserRole>(b =>
         {
             b.ToTable("user_role");
@@ -94,6 +112,8 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
             b.Property(s => s.ReplacedBy).HasColumnName("replaced_by");
             b.Property(s => s.IpAddress).HasColumnName("ip_address").HasMaxLength(64);
             b.Property(s => s.UserAgent).HasColumnName("user_agent").HasMaxLength(300);
+            b.Property(s => s.SupportGrantId).HasColumnName("support_grant_id");
+            b.HasIndex(s => s.SupportGrantId);
             b.HasIndex(s => s.RefreshHash).IsUnique();
             b.HasIndex(s => s.FamilyId);
             b.HasIndex(s => s.UserId);

@@ -14,6 +14,9 @@ internal sealed class TokenService(IOptions<IdentityOptions> options, TimeProvid
     public const string ResellerClaim = "rid";
     public const string RoleClaim = "role";
 
+    /// <summary>Present only in the token of a person of the service provider who entered an account (ADR-069); its value is the authorization of the account.</summary>
+    public const string SupportClaim = "sup";
+
     private readonly JsonWebTokenHandler _handler = new();
 
     public static byte[] HashRefreshToken(string token) => SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
@@ -56,6 +59,37 @@ internal sealed class TokenService(IOptions<IdentityOptions> options, TimeProvid
         };
 
         return (_handler.CreateToken(descriptor), (int)lifetime.TotalSeconds);
+    }
+
+    /// <summary>
+    /// The token of a person of the service provider inside an account (ADR-069): they are the subject (the audit names them), the account is the tenant, the role is the one that only reads,
+    /// and it ends when the session does. It carries the authorization it came from.
+    /// </summary>
+    public string IssueSupportToken(Guid staffUserId, Guid tenantId, Guid sessionId, Guid grantId, DateTimeOffset expiresAt)
+    {
+        var opts = options.Value;
+        var now = clock.GetUtcNow();
+        var claims = new Dictionary<string, object>
+        {
+            [JwtRegisteredClaimNames.Sub] = staffUserId.ToString("D"),
+            [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString("N"),
+            [SessionClaim] = sessionId.ToString("D"),
+            [TenantClaim] = tenantId.ToString("D"),
+            [RoleClaim] = new[] { Contracts.Roles.SupportViewer },
+            [SupportClaim] = grantId.ToString("D"),
+        };
+        var key = new SymmetricSecurityKey(Convert.FromBase64String(opts.SigningKey)) { KeyId = opts.SigningKeyId };
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = opts.Issuer,
+            Audience = opts.Audience,
+            IssuedAt = now.UtcDateTime,
+            NotBefore = now.UtcDateTime,
+            Expires = expiresAt.UtcDateTime,
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
+        };
+        return _handler.CreateToken(descriptor);
     }
 
     /// <summary>Validation parameters shared with the API host so issuer and verifier can never diverge.</summary>

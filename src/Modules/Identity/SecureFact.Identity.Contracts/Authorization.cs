@@ -33,13 +33,15 @@ public static class Permissions
     public const string AccountBillingManage = "account.billing.manage";
     public const string ApiKeysManage = "apikeys.manage";
     public const string WebhooksManage = "webhooks.manage";
+    public const string SupportGrant = "support.grant";
+    public const string SupportAccess = "support.access";
 
     public static IReadOnlyList<string> All { get; } =
     [
         TenantsCreate, TenantsRead, TenantsManage, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
         SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
         CertificatesRead, CertificatesManage, CpeSend, ResellerTenantsRead, ResellerTenantsCreate, ResellerTenantsManage, ResellerBrandingManage, ResellerTenantsSuspend,
-        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead, AccountBillingManage, ApiKeysManage, WebhooksManage,
+        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead, AccountBillingManage, ApiKeysManage, WebhooksManage, SupportGrant, SupportAccess,
     ];
 }
 
@@ -56,6 +58,9 @@ public static class Roles
     public const string Developer = nameof(Developer);
     public const string Auditor = nameof(Auditor);
     public const string ReadOnly = nameof(ReadOnly);
+
+    /// <summary>What a person of the service provider holds while inside an account that allowed it (ADR-069): the permissions to read, none to change. It is never given to a user.</summary>
+    public const string SupportViewer = nameof(SupportViewer);
 }
 
 public enum RoleLevel
@@ -71,14 +76,14 @@ public static class RoleCatalog
     private static readonly Dictionary<string, (RoleLevel Level, string[] Permissions)> Definitions = new(StringComparer.Ordinal)
     {
         [Roles.PlatformSuperAdmin] = (RoleLevel.Platform, [.. Permissions.All]),
-        // Support never reads tenant business data directly: that requires an explicit, audited delegation (future).
-        [Roles.PlatformSupport] = (RoleLevel.Platform, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead, Permissions.SubscriptionsRead]),
-        [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.ResellerTenantsRead, Permissions.ResellerTenantsCreate, Permissions.ResellerTenantsManage, Permissions.ResellerBrandingManage, Permissions.ResellerTenantsSuspend, Permissions.ResellerCommissionsRead]),
+        // Support never reads tenant business data directly: that takes the delegation of the account, time-boxed and audited (ADR-069), and then it is the SupportViewer role.
+        [Roles.PlatformSupport] = (RoleLevel.Platform, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead, Permissions.SubscriptionsRead, Permissions.SupportAccess]),
+        [Roles.ResellerAdmin] = (RoleLevel.Reseller, [Permissions.ResellerTenantsRead, Permissions.ResellerTenantsCreate, Permissions.ResellerTenantsManage, Permissions.ResellerBrandingManage, Permissions.ResellerTenantsSuspend, Permissions.ResellerCommissionsRead, Permissions.SupportAccess]),
         [Roles.TenantOwner] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
              Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage,
-             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage, Permissions.ApiKeysManage, Permissions.WebhooksManage]),
+             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage, Permissions.ApiKeysManage, Permissions.WebhooksManage, Permissions.SupportGrant]),
         [Roles.TenantAdmin] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
@@ -90,6 +95,7 @@ public static class RoleCatalog
         [Roles.Developer] = (RoleLevel.Tenant, [Permissions.CompaniesRead]),
         [Roles.Auditor] = (RoleLevel.Tenant, [Permissions.AuditRead, Permissions.UsersRead, Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead, Permissions.CertificatesRead]),
         [Roles.ReadOnly] = (RoleLevel.Tenant, [Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead]),
+        [Roles.SupportViewer] = (RoleLevel.Tenant, [Permissions.TenantsRead, Permissions.UsersRead, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.DocumentsRead, Permissions.CustomersRead, Permissions.ProductsRead, Permissions.CertificatesRead]),
     };
 
     public static IReadOnlyCollection<string> AllRoles => Definitions.Keys;
@@ -118,7 +124,7 @@ public static class RoleCatalog
     /// </summary>
     public static bool CanAssign(IEnumerable<string> actorRoles, bool actorIsPlatform, string targetRole)
     {
-        if (!Exists(targetRole))
+        if (!Exists(targetRole) || targetRole == Roles.SupportViewer)
         {
             return false;
         }

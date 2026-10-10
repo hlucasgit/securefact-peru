@@ -32,6 +32,8 @@ public sealed class HttpCurrentUser(Func<ClaimsPrincipal?> principal) : ICurrent
 
     public bool HasPermission(string permission) => Permissions.Contains(permission);
 
+    public bool IsSupportAccess => Principal?.FindFirst(IdentityModule.SupportClaim) is not null;
+
     private Guid? ParseGuid(string claim) =>
         Guid.TryParse(Principal?.FindFirst(claim)?.Value, out var value) ? value : null;
 }

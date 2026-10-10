@@ -60,6 +60,14 @@ public static class ErrorCodes
 
     public const string ApiKeyLimit = "SF-KEY-003";
 
+    public const string SupportAccessNotGranted = "SF-SUP-001";
+
+    public const string InvalidSupportAccess = "SF-SUP-002";
+
+    public const string SupportGrantNotFound = "SF-SUP-003";
+
+    public const string SupportReadOnly = "SF-SUP-004";
+
     public const string InvalidWebhook = "SF-WHK-001";
 
     public const string WebhookNotFound = "SF-WHK-002";

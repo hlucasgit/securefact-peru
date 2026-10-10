@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useSession } from '../auth/session'
 import { BrandMark, useBrand } from '../branding/BrandingProvider'
 import { ADMIN_ROLES, AUDIT_ROLES, BILLING_ROLES, PLAN_ROLES, PLATFORM_ROLES, QUEUE_ROLES, RESELLER_ROLES, ROLE_LABELS } from '../lib/format'
@@ -23,14 +24,35 @@ const RESELLER_GROUPS: { title: string; items: Item[] }[] = [
 const GROUPS: { title: string; items: Item[] }[] = [
   { title: 'Operación', items: [{ to: '/', label: 'Panel' }, { to: '/documentos', label: 'Documentos' }, { to: '/documentos/nuevo', label: 'Emitir', roles: BILLING_ROLES }, { to: '/resumenes', label: 'Resumen diario', roles: BILLING_ROLES }, { to: '/guias', label: 'Guías de remisión' }] },
   { title: 'Datos', items: [{ to: '/clientes', label: 'Clientes' }, { to: '/productos', label: 'Productos' }, { to: '/empresas', label: 'Empresas' }] },
-  { title: 'Cuenta', items: [{ to: '/usuarios', label: 'Usuarios', roles: ADMIN_ROLES }, { to: '/integraciones', label: 'Integraciones', roles: ['TenantOwner', 'TenantAdmin'] }, { to: '/plan', label: 'Plan y consumo', roles: PLAN_ROLES }, { to: '/auditoria', label: 'Auditoría', roles: AUDIT_ROLES }, { to: '/mensajes', label: 'Mensajes fallidos', roles: QUEUE_ROLES }, { to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
+  { title: 'Cuenta', items: [{ to: '/usuarios', label: 'Usuarios', roles: ADMIN_ROLES }, { to: '/integraciones', label: 'Integraciones', roles: ['TenantOwner', 'TenantAdmin'] }, { to: '/soporte', label: 'Acceso de soporte', roles: ['TenantOwner'] }, { to: '/plan', label: 'Plan y consumo', roles: PLAN_ROLES }, { to: '/auditoria', label: 'Auditoría', roles: AUDIT_ROLES }, { to: '/mensajes', label: 'Mensajes fallidos', roles: QUEUE_ROLES }, { to: '/seguridad', label: 'Seguridad' }, { to: '/reglas', label: 'Reglas' }] },
 ]
 
 export function Layout() {
-  const { principal, hasRole, logout } = useSession()
+  const { principal, hasRole, logout, support, exitSupport } = useSession()
+  const navigate = useNavigate()
+  const client = useQueryClient()
+  const wasSupporting = useRef(false)
   const [open, setOpen] = useState(false)
   const role = principal?.roles[0]
   const brand = useBrand()
+
+  // The session inside an account ends by itself: when it does (or when the owner takes the authorization back), the person is back with their own.
+  useEffect(() => {
+    if (!support) return
+    const left = support.endsAt - Date.now()
+    const timer = window.setTimeout(() => {
+      void exitSupport().then(() => client.clear())
+    }, Math.max(left, 0))
+    return () => window.clearTimeout(timer)
+  }, [support, exitSupport, client])
+
+  useEffect(() => {
+    if (wasSupporting.current && !support) {
+      client.clear()
+      navigate('/', { replace: true })
+    }
+    wasSupporting.current = support !== null
+  }, [support, navigate, client])
 
   return (
     <div className="shell">
@@ -64,6 +86,14 @@ export function Layout() {
         </div>
       </aside>
       <main className="main">
+        {support && (
+          <div className="alert warn" role="status">
+            <strong>Modo soporte.</strong> Está viendo «{support.tenantName}» en solo lectura; la sesión termina a las {new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit' }).format(new Date(support.endsAt))}.{' '}
+            <button className="btn small" type="button" onClick={() => void exitSupport().then(() => client.clear())}>
+              Salir del modo soporte
+            </button>
+          </div>
+        )}
         <button className="btn menu-toggle" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           Menú
         </button>

@@ -19,6 +19,7 @@ import { ROLE_LABELS, TENANT_ROLES, dateTime } from '../lib/format'
 import { TenantBillingCard } from './Billing'
 import { TenantPlanCard } from './Plans'
 import { TenantResellerCard } from './Resellers'
+import { EnterSupportCard } from './SupportAccess'
 import type { Tone } from '../lib/format'
 
 const STATUS_LABELS: Record<TenantStatus, string> = { Active: 'Activo', Suspended: 'Suspendido', Closed: 'Cerrado' }
@@ -222,6 +223,7 @@ export function TenantDetail() {
       <TenantPlanCard tenantId={t.id} canManage={canManage} closed={t.status === 'Closed'} />
       <TenantBillingCard tenantId={t.id} />
       <TenantResellerCard tenant={t} canManage={canManage} />
+      {t.status === 'Active' && <EnterSupportCard tenantId={t.id} />}
 
       <div className="card">
         <div className="row spread" style={{ marginBottom: 8 }}>

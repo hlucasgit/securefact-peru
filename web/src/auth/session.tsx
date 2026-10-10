@@ -1,10 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, setTokenSource } from '../api/http'
+import type { SupportSession } from '../api/types'
 
 /** What the API returns in the cookie mode: the access token only. The refresh token is in an HttpOnly cookie that the page cannot read. */
 interface LoginResponse {
   accessToken: string
   expiresInSeconds: number
+}
+
+/** A person of the service provider inside an account that allowed it (ADR-069): the session reads only and ends by itself. */
+export interface SupportMode {
+  tenantName: string
+  endsAt: number
 }
 
 export interface Principal {
@@ -19,6 +26,11 @@ interface SessionValue {
   login(email: string, password: string, totpCode?: string): Promise<void>
   logout(): Promise<void>
   hasRole(...roles: string[]): boolean
+  /** Set while the person is inside an account as support. */
+  support: SupportMode | null
+  enterSupport(session: SupportSession): void
+  /** Ends the session inside the account and goes back to the own one. */
+  exitSupport(): Promise<void>
 }
 
 /** A hint, not a secret: it says that this browser had a session, so the page tries to restore it. Without it a visitor is not asked for a refresh that the server would refuse. */
@@ -68,14 +80,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const pending = useRef<Promise<boolean> | null>(null)
   const [principal, setPrincipal] = useState<Principal | null>(null)
   const [restoring, setRestoring] = useState(hasSessionHint)
+  // What the person had before entering an account as support: they go back to it when they leave, or when the session inside ends.
+  const own = useRef<{ token: string | null; principal: Principal | null } | null>(null)
+  const [support, setSupport] = useState<SupportMode | null>(null)
 
   const accept = useCallback((tokens: LoginResponse) => {
+    // A new session of the person (a login, or the renewal that follows the end of the one inside an account) leaves the support mode.
+    own.current = null
+    setSupport(null)
     access.current = tokens.accessToken
     setSessionHint(true)
     setPrincipal(decodeToken(tokens.accessToken))
   }, [])
 
   const clear = useCallback(() => {
+    own.current = null
+    setSupport(null)
     access.current = null
     setSessionHint(false)
     setPrincipal(null)
@@ -127,8 +147,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         clear()
       },
       hasRole: (...roles) => principal?.roles.some((r) => roles.includes(r)) ?? false,
+      support,
+      enterSupport(session) {
+        // The token inside the account has nothing to renew it: when it ends, the first refusal renews the own session of the person (see accept).
+        own.current ??= { token: access.current, principal }
+        access.current = session.accessToken
+        setPrincipal(decodeToken(session.accessToken))
+        setSupport({ tenantName: session.tenantName, endsAt: Date.parse(session.expiresAt) })
+      },
+      async exitSupport() {
+        const back = own.current
+        try {
+          await api('POST', '/api/v1/auth/logout')
+        } catch {
+          // the session inside ends by itself; the person goes back in any case
+        }
+        // The call can find the session over and renew the own one (accept), or give up (clear): then there is nothing to restore.
+        if (own.current === null) return
+        own.current = null
+        setSupport(null)
+        access.current = back?.token ?? null
+        setPrincipal(back?.principal ?? null)
+      },
     }),
-    [principal, restoring, accept, clear],
+    [principal, restoring, support, accept, clear],
   )
 
   return <Session.Provider value={value}>{children}</Session.Provider>

@@ -70,6 +70,7 @@ export const ROLE_LABELS: Record<string, string> = {
   Developer: 'Desarrollador',
   Auditor: 'Auditor',
   ReadOnly: 'Solo lectura',
+  SupportViewer: 'Soporte (solo lectura)',
 }
 
 export const TENANT_ROLES = ['TenantAdmin', 'BillingAdmin', 'Accountant', 'Sales', 'Developer', 'Auditor', 'ReadOnly'] as const

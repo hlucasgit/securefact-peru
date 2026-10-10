@@ -226,6 +226,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<SupportAccessGuard>();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = c => c.Tags.Contains("live") }).AllowAnonymous();
@@ -238,6 +239,7 @@ app.MapAuthEndpoints();
 app.MapUserAndTenantEndpoints();
 app.MapPlanEndpoints();
 app.MapApiKeyEndpoints();
+app.MapSupportAccessEndpoints();
 app.MapWebhookEndpoints();
 app.MapResellerEndpoints();
 app.MapBrandingEndpoints();

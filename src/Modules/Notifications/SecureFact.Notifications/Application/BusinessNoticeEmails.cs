@@ -51,6 +51,21 @@ internal sealed partial class BusinessNoticeEmails(IAccountDirectory directory, 
             cancellationToken);
     }
 
+    public async Task SupportAccessAsync(SupportAccessNotice notice, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        await SendToOwnersAsync(
+            notice.TenantId, $"support-access:{notice.SessionId:N}", "support access",
+            (to, brand, portal) => NoticeEmail.Compose(
+                to, brand, "Alguien de soporte entró a su cuenta",
+                [
+                    $"{notice.Who} entró a su cuenta con la autorización que usted dio. Solo puede mirar: no cambia nada. Motivo que indicó: {notice.Reason}",
+                    $"Su sesión termina a las {notice.EndsAt.ToOffset(TimeSpan.FromHours(-5)).ToString("HH:mm 'del' dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)} (hora de Lima). Si usted no lo esperaba, quite la autorización ahora.",
+                ],
+                "Ver y quitar el acceso de soporte", $"{portal}/soporte"),
+            cancellationToken);
+    }
+
     private async Task SendToOwnersAsync(Guid tenantId, string dedupeKey, string kind, Func<string, EmailBrand, string, EmailMessage> compose, CancellationToken cancellationToken)
     {
         try

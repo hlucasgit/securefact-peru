@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\..\SecureFact.SharedKernel\SecureFact.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\SecureFact.Platform\SecureFact.Platform.csproj" />
     <ProjectReference Include="..\..\Audit\SecureFact.Audit.Contracts\SecureFact.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Notifications\SecureFact.Notifications.Contracts\SecureFact.Notifications.Contracts.csproj" />
     <ProjectReference Include="..\SecureFact.Identity.Contracts\SecureFact.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\SecureFact.Tenancy.Contracts\SecureFact.Tenancy.Contracts.csproj" />
   </ItemGroup>

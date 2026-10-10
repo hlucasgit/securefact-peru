@@ -26,4 +26,7 @@ public interface ICurrentUser
     IReadOnlySet<string> Permissions { get; }
 
     bool HasPermission(string permission);
+
+    /// <summary>True for a person of the service provider who entered an account with its authorization (ADR-069): they read and change nothing, and what they do is audited as support.</summary>
+    bool IsSupportAccess => false;
 }

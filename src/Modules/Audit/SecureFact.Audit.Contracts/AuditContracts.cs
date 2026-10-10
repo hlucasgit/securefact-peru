@@ -22,6 +22,9 @@ public static class AuditActions
 
     public const string ApiKeyCreated = "identity.api_key.created";
     public const string ApiKeyRevoked = "identity.api_key.revoked";
+    public const string SupportAccessGranted = "identity.support_access.granted";
+    public const string SupportAccessRevoked = "identity.support_access.revoked";
+    public const string SupportAccessEntered = "identity.support_access.entered";
     public const string WebhookCreated = "webhooks.webhook.created";
     public const string WebhookUpdated = "webhooks.webhook.updated";
     public const string WebhookDeleted = "webhooks.webhook.deleted";

@@ -800,6 +800,95 @@
         }
       }
     },
+    "/api/v1/support-access": {
+      "get": {
+        "tags": [
+          "Support access"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Support access"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/support-access/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Support access"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/support-sessions/available": {
+      "get": {
+        "tags": [
+          "Support access"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/support-sessions": {
+      "post": {
+        "tags": [
+          "Support access"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnterBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/webhooks": {
       "get": {
         "tags": [
@@ -5526,6 +5615,22 @@
           }
         }
       },
+      "EnterBody": {
+        "required": [
+          "tenantId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "EstablishmentDetails": {
         "required": [
           "name",
@@ -5629,6 +5734,30 @@
             ],
             "format": "double",
             "default": 0
+          }
+        }
+      },
+      "GrantBody": {
+        "required": [
+          "hours",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "hours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -7062,6 +7191,9 @@
     },
     {
       "name": "API keys"
+    },
+    {
+      "name": "Support access"
     },
     {
       "name": "Webhooks"

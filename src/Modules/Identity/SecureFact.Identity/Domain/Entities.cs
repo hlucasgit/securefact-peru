@@ -179,6 +179,9 @@ internal sealed class UserSession : IOptionalTenantOwned
 
     public string? UserAgent { get; private set; }
 
+    /// <summary>The authorization of the account under which a person of the service provider entered it (ADR-069); null for every other session.</summary>
+    public Guid? SupportGrantId { get; private set; }
+
     public static UserSession Start(Guid id, Guid userId, Guid? tenantId, Guid familyId, byte[] refreshHash, DateTimeOffset now, DateTimeOffset expiresAt, DateTimeOffset absoluteExpiresAt, string? ip, string? userAgent) => new()
     {
         Id = id,
@@ -192,6 +195,14 @@ internal sealed class UserSession : IOptionalTenantOwned
         IpAddress = Truncate(ip, 64),
         UserAgent = Truncate(userAgent, 300),
     };
+
+    /// <summary>The session of a person of the service provider inside an account. Nobody knows its refresh secret (it is random and discarded), so it cannot be renewed: it ends at <paramref name="expiresAt"/>.</summary>
+    public static UserSession StartSupport(Guid id, Guid staffUserId, Guid tenantId, Guid grantId, byte[] unusableRefreshHash, DateTimeOffset now, DateTimeOffset expiresAt, string? ip, string? userAgent)
+    {
+        var session = Start(id, staffUserId, tenantId, Guid.CreateVersion7(), unusableRefreshHash, now, expiresAt, expiresAt, ip, userAgent);
+        session.SupportGrantId = grantId;
+        return session;
+    }
 
     public bool IsActive(DateTimeOffset now) => RevokedAt is null && ExpiresAt > now && AbsoluteExpiresAt > now;
 

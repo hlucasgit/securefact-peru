@@ -8,6 +8,9 @@ public sealed class IdentityOptions
 
     public string Audience { get; set; } = "securefact-api";
 
+    /// <summary>How long a session inside an account lasts at most (ADR-069); it also ends when the authorization of the account does.</summary>
+    public int SupportSessionMinutes { get; set; } = 30;
+
     /// <summary>Id of the current signing key, written to the <c>kid</c> header so keys can be rotated.</summary>
     public string SigningKeyId { get; set; } = "k1";
 

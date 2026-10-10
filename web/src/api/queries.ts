@@ -67,6 +67,9 @@ import type {
   Series,
   SolCredential,
   SummaryResult,
+  SupportAvailable,
+  SupportGrant,
+  SupportSession,
   Tenant,
 } from './types'
 
@@ -111,6 +114,8 @@ export const keys = {
   myProfile: ['billing-profile'] as const,
   apiKeys: ['api-keys'] as const,
   webhooks: ['webhooks'] as const,
+  supportGrants: ['support-grants'] as const,
+  supportAvailable: ['support-available'] as const,
   webhookDeliveries: (id: string, state: string) => ['webhooks', id, 'deliveries', state] as const,
   tenantProfile: (id: string) => ['platform', 'tenant', id, 'billing-profile'] as const,
   invoicing: ['platform', 'invoicing'] as const,
@@ -461,3 +466,11 @@ export const useTestWebhook = () => useAction((id: string) => post<WebhookDelive
 export const useWebhookDeliveries = (id: string, state: WebhookDeliveryState | '') =>
   useQuery({ queryKey: keys.webhookDeliveries(id, state), queryFn: () => get<WebhookDelivery[]>(`/api/v1/webhooks/${id}/deliveries${state ? `?state=${state}` : ''}`) })
 export const useRedeliver = () => useAction((id: string) => post<WebhookDelivery>(`/api/v1/webhooks/deliveries/${id}/redeliver`), [keys.webhooks])
+
+// Support access (ADR-069): the owner authorizes, the person who supports enters.
+export const useSupportGrants = () => useQuery({ queryKey: keys.supportGrants, queryFn: () => get<SupportGrant[]>('/api/v1/support-access') })
+export const useGrantSupport = () =>
+  useAction((input: { hours: number; note: string | null }) => post<SupportGrant>('/api/v1/support-access', input), [keys.supportGrants, ['audit']])
+export const useRevokeSupport = () => useAction((id: string) => post<SupportGrant>(`/api/v1/support-access/${id}/revoke`), [keys.supportGrants, ['audit']])
+export const useSupportAvailable = () => useQuery({ queryKey: keys.supportAvailable, queryFn: () => get<SupportAvailable[]>('/api/v1/support-sessions/available') })
+export const useEnterSupport = () => useAction((input: { tenantId: string; reason: string }) => post<SupportSession>('/api/v1/support-sessions', input), [])

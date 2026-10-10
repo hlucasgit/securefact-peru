@@ -78,4 +78,32 @@ public class RoleCatalogTests
     [InlineData(Roles.TenantOwner, false, "NoSuchRole", false)]
     public void Assignment_never_escalates_privileges(string actorRole, bool actorIsPlatform, string target, bool expected) =>
         Assert.Equal(expected, RoleCatalog.CanAssign([actorRole], actorIsPlatform, target));
+
+    [Fact]
+    public void The_role_of_the_person_who_supports_only_reads_and_nobody_can_be_given_it()
+    {
+        var permissions = RoleCatalog.PermissionsOf(Roles.SupportViewer);
+
+        Assert.All(permissions, p => Assert.EndsWith(".read", p));
+        Assert.DoesNotContain(Permissions.UsersManage, permissions);
+        Assert.DoesNotContain(Permissions.ApiKeysManage, permissions);
+        Assert.DoesNotContain(Permissions.WebhooksManage, permissions);
+        Assert.DoesNotContain(Permissions.SupportGrant, permissions);
+        Assert.DoesNotContain(Permissions.CertificatesManage, permissions);
+        Assert.DoesNotContain(Permissions.CpeSend, permissions);
+        foreach (var actor in new[] { Roles.PlatformSuperAdmin, Roles.TenantOwner })
+        {
+            Assert.False(RoleCatalog.CanAssign([actor], actor == Roles.PlatformSuperAdmin, Roles.SupportViewer));
+        }
+    }
+
+    [Theory]
+    [InlineData(Roles.PlatformSupport, Permissions.SupportAccess, true)]
+    [InlineData(Roles.ResellerAdmin, Permissions.SupportAccess, true)]
+    [InlineData(Roles.TenantOwner, Permissions.SupportAccess, false)]
+    [InlineData(Roles.TenantOwner, Permissions.SupportGrant, true)]
+    [InlineData(Roles.TenantAdmin, Permissions.SupportGrant, false)]
+    [InlineData(Roles.PlatformSupport, Permissions.SupportGrant, false)]
+    public void Only_the_owner_authorizes_and_only_the_service_provider_enters(string role, string permission, bool expected) =>
+        Assert.Equal(expected, RoleCatalog.PermissionsOf(role).Contains(permission));
 }

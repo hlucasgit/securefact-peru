@@ -12,7 +12,7 @@
 - **Recuperación**: token de un solo uso (hash), 30 min, revoca todas las sesiones; el token solo viaja por `IPasswordResetNotifier` y nunca por logs ni respuestas.
 - **RBAC**: permisos explícitos (`Permissions`) agrupados en roles definidos en código (`RoleCatalog`, versionados con el despliegue). Un rol no implica permisos. Regla anti-escalada: solo se puede otorgar un rol cuyos permisos ya se poseen; roles de plataforma solo los otorga plataforma; no se mezclan roles de plataforma y de tenant; el último `TenantOwner` no se puede quitar. Autenticación obligatoria por defecto (fallback policy).
 - **Ámbito de datos**: derivado exclusivamente del token firmado (tenant → `UseTenant`; personal de plataforma → `UsePlatform`). El login, el refresh y la recuperación usan `Elevate("identity:…")`, un ámbito de plataforma acotado y restaurado al terminar.
-- El personal de plataforma **no** lee datos de negocio de los tenants (RLS `TenantOnly`); el soporte requerirá una delegación explícita y auditada (futuro).
+- El personal de plataforma **no** lee datos de negocio de los tenants (RLS `TenantOnly`); el soporte entra solo con la delegación explícita, temporal y auditada de la cuenta (ADR-069).
 
 ## Consecuencias
 + Revocación inmediata y detección de robo de refresh tokens (el navegador lo guarda en una cookie `HttpOnly`: ADR-050). − Una lectura por request para validar la sesión. − Roles personalizados por tenant no existen todavía (se añadirán con tablas cuando haya demanda).

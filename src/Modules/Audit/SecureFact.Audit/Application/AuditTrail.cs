@@ -44,7 +44,7 @@ internal sealed class AuditTrail(
             (last?.Sequence ?? 0) + 1,
             last?.Hash ?? GenesisHash,
             clock.GetUtcNow(),
-            actorId is null ? "system" : "user",
+            actorId is null ? "system" : currentUser.IsSupportAccess ? "support" : "user",
             actorId,
             auditEvent.Action,
             auditEvent.EntityType,

@@ -23,6 +23,7 @@ import { dateTime } from '../lib/format'
 import { BrandEditor } from './Brand'
 import { CommissionsModal } from './Billing'
 import { UsagePanel } from './Plans'
+import { EnterSupportCard } from './SupportAccess'
 import { TenantStatusBadge } from './Platform'
 
 const ENVIRONMENTS = { Sandbox: 'Pruebas', Production: 'Producción' } as const
@@ -393,6 +394,7 @@ export function ResellerAccountDetail() {
         )}
       </div>
 
+      {t.status === 'Active' && <EnterSupportCard tenantId={t.id} />}
       <div className="card">
         <h2>Plan y consumo</h2>
         <ErrorAlert error={usage.error ?? change.error ?? plans.error} />

@@ -373,6 +373,7 @@
           "Microsoft.IdentityModel.JsonWebTokens": "[8.23.0, )",
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Identity.Contracts": "[1.0.0, )",
+          "SecureFact.Notifications.Contracts": "[1.0.0, )",
           "SecureFact.Platform": "[1.0.0, )",
           "SecureFact.SharedKernel": "[1.0.0, )",
           "SecureFact.Tenancy.Contracts": "[1.0.0, )"

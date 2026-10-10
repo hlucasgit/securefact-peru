@@ -31,6 +31,8 @@ public static class IdentityModule
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserAdministration, UserAdministration>();
         services.AddScoped<IApiKeys, ApiKeyService>();
+        services.AddScoped<ISupportAccess, SupportAccessService>();
+        services.TryAddScoped<SecureFact.Notifications.Contracts.IBusinessNotices, SecureFact.Notifications.Contracts.NullBusinessNotices>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IPlatformBootstrapper, PlatformBootstrapper>();
         services.AddScoped<IAccountDirectory, AccountDirectory>();
@@ -61,6 +63,8 @@ public static class IdentityModule
     public static string ResellerClaim => TokenService.ResellerClaim;
 
     public static string RoleClaim => TokenService.RoleClaim;
+
+    public static string SupportClaim => TokenService.SupportClaim;
 
     /// <summary>Applies pending migrations. Must run with the schema-owner connection, never the runtime role.</summary>
     public static async Task MigrateAsync(string ownerConnectionString, CancellationToken cancellationToken = default)
