@@ -94,17 +94,36 @@ public enum BillingNoticeKind
 public sealed record BillingNotice(
     BillingNoticeKind Kind, Guid TenantId, Guid ChargeId, string Period, decimal Total, decimal Balance, string Currency, DateOnly DueOn, DateOnly? SuspendOn, Guid? PaymentId = null, decimal? PaymentAmount = null);
 
+/// <summary>One customer of a reseller whose owners were told today about a charge that is overdue or about to suspend the account (ADR-070). <paramref name="Kind"/> is <see cref="BillingNoticeKind.Overdue"/> or <see cref="BillingNoticeKind.SuspensionNear"/>.</summary>
+public sealed record ResellerCollectionLine(string TenantName, string Period, decimal Balance, string Currency, DateOnly DueOn, DateOnly? SuspendOn, BillingNoticeKind Kind);
+
+/// <summary>What happened today to the customers of a reseller in the collection (ADR-070): the ones that were told and the ones whose account was suspended for non-payment.</summary>
+public sealed record ResellerCollectionDigest(Guid ResellerId, DateOnly Day, IReadOnlyList<ResellerCollectionLine> Lines, IReadOnlyList<string> SuspendedTenants);
+
+/// <summary>The platform settled a month of commissions with a reseller (ADR-070).</summary>
+public sealed record CommissionSettledNotice(Guid ResellerId, Guid SettlementId, string Month, decimal Total, int Entries, DateOnly SettledOn, string? Reference);
+
 /// <summary>Tells the owners of an account about what it owes and what it paid. A failed notice never undoes the charge or the payment that it announces.</summary>
 public interface IBillingNotices
 {
     /// <returns>True when the notice was queued for at least one owner; false when nobody was to receive it, it was already told, or no e-mail channel is configured.</returns>
     Task<bool> SendAsync(BillingNotice notice, CancellationToken cancellationToken);
+
+    /// <summary>Tells the administrators of a reseller, once a day, which of its customers are late (ADR-070). True when it was queued for at least one of them.</summary>
+    Task<bool> ResellerDigestAsync(ResellerCollectionDigest digest, CancellationToken cancellationToken);
+
+    /// <summary>Tells the administrators of a reseller that a month of its commissions was settled.</summary>
+    Task<bool> CommissionSettledAsync(CommissionSettledNotice notice, CancellationToken cancellationToken);
 }
 
 /// <summary>The default when nobody listens (a host without the notices): the work goes on and nothing is sent.</summary>
 public sealed class NullBillingNotices : IBillingNotices
 {
     public Task<bool> SendAsync(BillingNotice notice, CancellationToken cancellationToken) => Task.FromResult(false);
+
+    public Task<bool> ResellerDigestAsync(ResellerCollectionDigest digest, CancellationToken cancellationToken) => Task.FromResult(false);
+
+    public Task<bool> CommissionSettledAsync(CommissionSettledNotice notice, CancellationToken cancellationToken) => Task.FromResult(false);
 }
 
 /// <summary>Sends an e-mail through the channel that the operator configured. Throws <see cref="EmailDeliveryException"/> when it cannot.</summary>

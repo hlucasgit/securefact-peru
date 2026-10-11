@@ -99,13 +99,14 @@ internal sealed partial class CollectionPass(
 
         var invoiced = await invoicing.IssuePendingAsync(today, null, MaxInvoicesPerPass, cancellationToken);
         var late = await enforcement.TenantsPastGraceAsync(today, cancellationToken);
-        var (suspended, reactivated) = await EnforceAsync(live, late, today, cancellationToken);
-        notified += await RemindAsync(live, late, policies, today, cancellationToken);
+        var (suspended, reactivated, suspendedTenants) = await EnforceAsync(live, late, today, cancellationToken);
+        var reminded = await RemindAsync(live, late, policies, today, cancellationToken);
+        notified += reminded.Queued + await TellResellersAsync(reminded.ForResellers, suspendedTenants, today, cancellationToken);
         return new CollectionPassResult(created, suspended, reactivated, invoiced, notified);
     }
 
     /// <summary>The notices for the charges that are still unpaid. Only the accounts that are active are told, and not the ones about to be suspended in this very pass: their change of status tells them.</summary>
-    private async Task<int> RemindAsync(List<TenantDto> live, IReadOnlySet<Guid> late, List<BillingPolicy> policies, DateOnly today, CancellationToken cancellationToken)
+    private async Task<BillingReminders.Outcome> RemindAsync(List<TenantDto> live, IReadOnlySet<Guid> late, List<BillingPolicy> policies, DateOnly today, CancellationToken cancellationToken)
     {
         try
         {
@@ -121,8 +122,34 @@ internal sealed partial class CollectionPass(
         {
             // A notice that cannot be queued must not undo the charges and the suspensions of the pass.
             LogRemindFailed(logger, exception);
-            return 0;
+            return new BillingReminders.Outcome(0, []);
         }
+    }
+
+    /// <summary>One e-mail a day to the administrators of each reseller whose customers were told that they are late, or were suspended, in this pass (ADR-070).</summary>
+    private async Task<int> TellResellersAsync(IReadOnlyList<(Guid ResellerId, ResellerCollectionLine Line)> lines, IReadOnlyList<TenantDto> suspendedTenants, DateOnly today, CancellationToken cancellationToken)
+    {
+        var told = 0;
+        var resellers = lines.Select(l => l.ResellerId).Concat(suspendedTenants.Where(t => t.ResellerId is not null).Select(t => t.ResellerId!.Value)).Distinct().ToList();
+        foreach (var reseller in resellers)
+        {
+            var digest = new ResellerCollectionDigest(
+                reseller, today, lines.Where(l => l.ResellerId == reseller).Select(l => l.Line).ToList(), suspendedTenants.Where(t => t.ResellerId == reseller).Select(t => t.Name).ToList());
+            try
+            {
+                told += await notices.ResellerDigestAsync(digest, cancellationToken) ? 1 : 0;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                LogRemindFailed(logger, exception);
+            }
+        }
+
+        return told;
     }
 
     private async Task<(int Made, int Notified)> ChargeAsync(
@@ -206,9 +233,10 @@ internal sealed partial class CollectionPass(
         return true;
     }
 
-    private async Task<(int Suspended, int Reactivated)> EnforceAsync(IReadOnlyList<TenantDto> live, IReadOnlySet<Guid> late, DateOnly today, CancellationToken cancellationToken)
+    private async Task<(int Suspended, int Reactivated, IReadOnlyList<TenantDto> SuspendedTenants)> EnforceAsync(IReadOnlyList<TenantDto> live, IReadOnlySet<Guid> late, DateOnly today, CancellationToken cancellationToken)
     {
         var suspended = 0;
+        var suspendedTenants = new List<TenantDto>();
         var reactivated = 0;
         foreach (var tenant in live)
         {
@@ -218,6 +246,10 @@ internal sealed partial class CollectionPass(
                 {
                     var result = await tenants.ChangeStatusAsync(tenant.Id, TenantStatus.Suspended, "Cargo vencido sin pagar: suspensión por falta de pago", SuspensionSource.NonPayment, cancellationToken);
                     suspended += result.IsSuccess ? 1 : 0;
+                    if (result.IsSuccess)
+                    {
+                        suspendedTenants.Add(tenant);
+                    }
                 }
                 else if (!late.Contains(tenant.Id.Value) && tenant is { Status: TenantStatus.Suspended, SuspendedBy: SuspensionSource.NonPayment })
                 {
@@ -234,7 +266,7 @@ internal sealed partial class CollectionPass(
             }
         }
 
-        return (suspended, reactivated);
+        return (suspended, reactivated, suspendedTenants);
     }
 
     private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);

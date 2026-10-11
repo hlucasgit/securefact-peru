@@ -11,6 +11,8 @@ namespace SecureFact.Notifications.Application;
 /// </summary>
 internal sealed partial class BillingNoticeEmails(IAccountDirectory directory, NoticeContext context, IEmailOutbox queue, ILogger<BillingNoticeEmails> logger) : IBillingNotices
 {
+    private const int MaxLines = 30;
+
     private static readonly string[] Months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
     public async Task<bool> SendAsync(BillingNotice notice, CancellationToken cancellationToken)
@@ -42,6 +44,79 @@ internal sealed partial class BillingNoticeEmails(IAccountDirectory directory, N
         catch (Exception failure) when (failure is not OperationCanceledException)
         {
             LogNotQueued(logger, notice.Kind.ToString(), failure.GetType().Name);
+            return false;
+        }
+    }
+
+    public async Task<bool> ResellerDigestAsync(ResellerCollectionDigest digest, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(digest);
+        if (digest.Lines.Count == 0 && digest.SuspendedTenants.Count == 0)
+        {
+            return false;
+        }
+
+        return await SendToResellerAsync(
+            digest.ResellerId, $"billing:reseller-digest:{digest.ResellerId:N}:{digest.Day:yyyyMMdd}", "reseller digest",
+            (to, brand, portal) =>
+            {
+                var paragraphs = new List<string> { "Estos clientes suyos tienen cobros atrasados con la plataforma. Cada uno ya recibió el aviso por correo; usted puede ayudarlo a regularizar antes de que se suspenda su cuenta." };
+                paragraphs.AddRange(digest.Lines.Take(MaxLines).Select(line =>
+                    $"• {line.TenantName}: cargo de {MonthName(line.Period)} vencido el {Date(line.DueOn)}, saldo {Money(line.Currency, line.Balance)}"
+                    + (line.SuspendOn is { } on ? (line.Kind == BillingNoticeKind.SuspensionNear ? $". Se suspende el {Date(on)}." : $". Se suspende el {Date(on)} si no paga.") : ".")));
+                if (digest.Lines.Count > MaxLines)
+                {
+                    paragraphs.Add($"… y {digest.Lines.Count - MaxLines} más: véalos en su lista de cuentas.");
+                }
+
+                if (digest.SuspendedTenants.Count > 0)
+                {
+                    paragraphs.Add($"Se suspendieron hoy por falta de pago: {string.Join(", ", digest.SuspendedTenants.Take(MaxLines))}{(digest.SuspendedTenants.Count > MaxLines ? " y otros" : string.Empty)}. Se reactivan solas cuando regularizan.");
+                }
+
+                var count = digest.Lines.Count + digest.SuspendedTenants.Count;
+                return NoticeEmail.Compose(to, brand, count == 1 ? "Un cliente suyo tiene un cobro atrasado" : $"{count} clientes suyos tienen cobros atrasados", paragraphs, "Ver mis cuentas", $"{portal}/revendedor/cuentas");
+            },
+            cancellationToken);
+    }
+
+    public async Task<bool> CommissionSettledAsync(CommissionSettledNotice notice, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        return await SendToResellerAsync(
+            notice.ResellerId, $"billing:settlement:{notice.SettlementId:N}", "commission settlement",
+            (to, brand, portal) => NoticeEmail.Compose(
+                to, brand, $"Liquidaron sus comisiones de {MonthName(notice.Month)}",
+                [
+                    $"La plataforma liquidó sus comisiones de {MonthName(notice.Month)}: {Money("PEN", notice.Total)} por {notice.Entries} {(notice.Entries == 1 ? "pago" : "pagos")} de sus clientes, con fecha {Date(notice.SettledOn)}.",
+                    notice.Reference is { Length: > 0 } reference ? $"Referencia: {reference}" : string.Empty,
+                ],
+                "Ver mis comisiones", $"{portal}/revendedor/comisiones"),
+            cancellationToken);
+    }
+
+    private async Task<bool> SendToResellerAsync(Guid resellerId, string dedupeKey, string kind, Func<string, EmailBrand, string, EmailMessage> compose, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var admins = await directory.ResellerAdminEmailsAsync(resellerId, cancellationToken);
+            if (admins.Count == 0)
+            {
+                return false;
+            }
+
+            var (brand, portal, _) = await context.ForAsync(null, resellerId, cancellationToken);
+            var queued = false;
+            foreach (var admin in admins)
+            {
+                queued |= await queue.EnqueueAsync(compose(admin, brand, portal), dedupeKey, cancellationToken);
+            }
+
+            return queued;
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException)
+        {
+            LogNotQueued(logger, kind, failure.GetType().Name);
             return false;
         }
     }

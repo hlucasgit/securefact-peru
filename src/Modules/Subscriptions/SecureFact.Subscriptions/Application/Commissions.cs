@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecureFact.Audit.Contracts;
+using SecureFact.Notifications.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Results;
@@ -11,7 +12,7 @@ using SecureFact.Tenancy.Contracts;
 
 namespace SecureFact.Subscriptions.Application;
 
-internal sealed class Commissions(SubscriptionsDbContext db, IDataScope scope, ICurrentUser actor, TimeProvider clock, IAuditTrail audit, IResellerAdministration resellers) : ICommissions
+internal sealed class Commissions(SubscriptionsDbContext db, IDataScope scope, ICurrentUser actor, TimeProvider clock, IAuditTrail audit, IResellerAdministration resellers, IBillingNotices notices) : ICommissions
 {
     private const int MaxTiers = 10;
     private const int MaxMinAccounts = 100_000;
@@ -185,6 +186,8 @@ internal sealed class Commissions(SubscriptionsDbContext db, IDataScope scope, I
                     ["reference"] = settlement.Reference,
                 }),
             cancellationToken);
+        await notices.CommissionSettledAsync(
+            new CommissionSettledNotice(resellerId, settlement.Id, LimaCalendar.PeriodName(first), settlement.Total, settlement.Entries, settlement.SettledOn, settlement.Reference), cancellationToken);
         return ToDto(settlement);
     }
 

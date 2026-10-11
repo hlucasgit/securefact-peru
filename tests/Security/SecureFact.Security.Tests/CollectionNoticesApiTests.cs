@@ -177,6 +177,59 @@ public sealed class CollectionNoticesApiTests(ApiFixture api)
         }
     }
 
+    [Fact]
+    public async Task The_administrators_of_a_reseller_get_one_e_mail_a_day_with_their_late_customers_and_then_the_suspended_ones()
+    {
+        using var admin = await api.AdminClientAsync();
+        var plan = (await (await admin.PostAsJsonAsync("/api/v1/platform/plans", new { code = $"rs-{Guid.NewGuid():N}"[..16], name = "Plan del canal" })).Content.ReadFromJsonAsync<PlanRow>(ApiFixture.JsonOptions))!;
+        Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync($"/api/v1/platform/plans/{plan.Id}/prices", new { effectiveFrom = NextMonth(), monthlyFee = 100m })).StatusCode);
+        var created = await admin.PostAsJsonAsync("/api/v1/platform/resellers", new { name = $"Canal {Guid.NewGuid():N}"[..18] });
+        var resellerId = (await created.Content.ReadFromJsonAsync<CreatedRow>(ApiFixture.JsonOptions))!.Id;
+        var resellerEmail = $"{Guid.NewGuid():N}@canal.test";
+        Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync("/api/v1/users", new { email = resellerEmail, displayName = "Canal", password = ApiFixture.StrongPassword, roles = new[] { Roles.ResellerAdmin }, resellerId })).StatusCode);
+        using var reseller = api.ClientFor(await api.LoginOkAsync(resellerEmail, ApiFixture.StrongPassword));
+        var customerName = $"Cliente {Guid.NewGuid():N}"[..16];
+        var opened = await reseller.PostAsJsonAsync("/api/v1/reseller/tenants", new { name = customerName, environment = "Sandbox", planId = plan.Id });
+        Assert.Equal(HttpStatusCode.Created, opened.StatusCode);
+        var tenantId = (await opened.Content.ReadFromJsonAsync<CreatedRow>(ApiFixture.JsonOptions))!.Id;
+        await ApiFixture.CreateUserAsync(admin, Roles.TenantOwner, tenantId);
+        await RunAsync(At(2, 2));
+        var charge = (await admin.GetFromJsonAsync<List<ChargeRow>>($"/api/v1/platform/charges?tenantId={tenantId}", ApiFixture.JsonOptions))!.Single();
+
+        async Task<List<SecureFact.Notifications.Contracts.EmailMessage>> DigestsAsync()
+        {
+            await api.DrainMailAsync();
+            return api.Mail.To(resellerEmail).Where(m => m.Subject.Contains("cobro atrasado", StringComparison.Ordinal) || m.Subject.Contains("cobros atrasados", StringComparison.Ordinal)).ToList();
+        }
+
+        Assert.Empty(await DigestsAsync()); // the charge was just issued: nobody is late
+        await RunAsync(NoonOf(charge.DueOn.AddDays(1)));
+        var first = Assert.Single(await DigestsAsync());
+        Assert.Equal("Un cliente suyo tiene un cobro atrasado", first.Subject);
+        Assert.Contains($"{customerName}: cargo de {Month(charge.Period)} vencido el {Day(charge.DueOn)}, saldo S/ 118.00", first.Text, StringComparison.Ordinal);
+        Assert.Contains($"Se suspende el {Day(charge.SuspendOn!.Value)} si no paga", first.Text, StringComparison.Ordinal);
+        Assert.Contains($"{ApiFixture.PublicUrl}/revendedor/cuentas", first.Text, StringComparison.Ordinal);
+
+        // Nothing new the next day: the customer was already told, so the reseller is not told again.
+        await RunAsync(NoonOf(charge.DueOn.AddDays(2)));
+        Assert.Single(await DigestsAsync());
+
+        await RunAsync(NoonOf(charge.SuspendOn.Value.AddDays(-3)));
+        Assert.Equal(2, (await DigestsAsync()).Count);
+        Assert.Contains($"Se suspende el {Day(charge.SuspendOn.Value)}.", (await DigestsAsync())[1].Text, StringComparison.Ordinal);
+
+        await RunAsync(NoonOf(charge.SuspendOn.Value));
+        var digests = await DigestsAsync();
+        Assert.Equal(3, digests.Count);
+        Assert.Contains($"Se suspendieron hoy por falta de pago: {customerName}", digests[2].Text, StringComparison.Ordinal);
+
+        // The same pass again, the same day, changes nothing.
+        await RunAsync(NoonOf(charge.SuspendOn.Value).AddHours(1));
+        Assert.Equal(3, (await DigestsAsync()).Count);
+    }
+
+    private sealed record CreatedRow(Guid Id);
+
     private static readonly string[] MonthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
     private static string Month(DateOnly period) => $"{MonthNames[period.Month - 1]} de {period.Year.ToString(CultureInfo.InvariantCulture)}";

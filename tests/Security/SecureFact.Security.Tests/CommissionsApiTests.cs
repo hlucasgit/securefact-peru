@@ -40,7 +40,7 @@ public sealed class CommissionsApiTests(ApiFixture api)
 
     private sealed record TenantRow(Guid Id, string Status, string? SuspendedBy);
 
-    private sealed record Reseller(Guid Id, HttpClient Client);
+    private sealed record Reseller(Guid Id, HttpClient Client, string Email = "");
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
@@ -115,7 +115,7 @@ public sealed class CommissionsApiTests(ApiFixture api)
         var id = (await created.Content.ReadFromJsonAsync<Created>(ApiFixture.JsonOptions))!.Id;
         var email = $"{Guid.NewGuid():N}@canal.test";
         Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync("/api/v1/users", new { email, displayName = "Canal", password = ApiFixture.StrongPassword, roles = new[] { Roles.ResellerAdmin }, resellerId = id })).StatusCode);
-        return new Reseller(id, api.ClientFor(await api.LoginOkAsync(email, ApiFixture.StrongPassword)));
+        return new Reseller(id, api.ClientFor(await api.LoginOkAsync(email, ApiFixture.StrongPassword)), email);
     }
 
     private static async Task<Guid> OpenTenantAsync(Reseller reseller, PlanRow? plan)
@@ -295,6 +295,13 @@ public sealed class CommissionsApiTests(ApiFixture api)
         Assert.Equal((20m, 1, "Transferencia 889"), (settled.Total, settled.Entries, settled.Reference));
         var again = await closed.Commissions.SettleAsync(reseller.Id, month, request, CancellationToken.None);
         Assert.Equal(SecureFact.SharedKernel.Results.ErrorKind.Conflict, again.Error.Kind);
+
+        // The administrators of the reseller are told once (ADR-070); a refused second settlement tells nothing.
+        await api.DrainMailAsync();
+        var notice = Assert.Single(api.Mail.To(reseller.Email), m => m.Subject.StartsWith("Liquidaron sus comisiones de ", StringComparison.Ordinal));
+        Assert.Contains("S/ 20.00", notice.Text, StringComparison.Ordinal);
+        Assert.Contains("Referencia: Transferencia 889", notice.Text, StringComparison.Ordinal);
+        Assert.Contains($"{ApiFixture.PublicUrl}/revendedor/comisiones", notice.Text, StringComparison.Ordinal);
 
         var statement = (await reseller.Client.GetFromJsonAsync<StatementRow>($"/api/v1/reseller/commissions/{month:yyyy-MM}", ApiFixture.JsonOptions))!;
         Assert.Equal(settled.Id, statement.Month.Settlement!.Id);

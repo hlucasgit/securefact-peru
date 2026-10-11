@@ -34,8 +34,11 @@ internal sealed class BillingReminders(SubscriptionsDbContext db, IBillingNotice
         return reminderDays > 0 && today >= dueOn.AddDays(-reminderDays) ? BillingNoticeKind.DueSoon : null;
     }
 
-    /// <returns>The number of notices that were queued.</returns>
-    public async Task<int> RunAsync(IReadOnlySet<Guid> notifiable, int reminderDays, DateOnly today, CancellationToken cancellationToken)
+    /// <summary>The notices queued by a pass, and which of them the reseller of the account is to hear about (ADR-070).</summary>
+    internal sealed record Outcome(int Queued, IReadOnlyList<(Guid ResellerId, ResellerCollectionLine Line)> ForResellers);
+
+    /// <returns>The notices that were queued.</returns>
+    public async Task<Outcome> RunAsync(IReadOnlySet<Guid> notifiable, int reminderDays, DateOnly today, CancellationToken cancellationToken)
     {
         var candidates = await db.Charges.AsNoTracking()
             .Where(c => c.VoidedAt == null && c.IssuedOn < today && (c.SuspendOn == null || c.SuspendOn > today))
@@ -47,15 +50,20 @@ internal sealed class BillingReminders(SubscriptionsDbContext db, IBillingNotice
             .ToListAsync(cancellationToken);
 
         var queued = 0;
+        var forResellers = new List<(Guid, ResellerCollectionLine)>();
         foreach (var row in candidates.Where(r => notifiable.Contains(r.Charge.TenantId)))
         {
             if (KindFor(row.Charge.DueOn, row.Charge.SuspendOn, today, reminderDays) is { } kind && await notices.SendAsync(Notice(kind, row.Charge, row.Paid), cancellationToken))
             {
                 queued++;
+                if (row.Charge.ResellerId is { } reseller && kind is BillingNoticeKind.Overdue or BillingNoticeKind.SuspensionNear)
+                {
+                    forResellers.Add((reseller, new ResellerCollectionLine(row.Charge.TenantName, LimaCalendar.PeriodName(row.Charge.Period), row.Charge.TotalAmount - row.Paid, row.Charge.Currency, row.Charge.DueOn, row.Charge.SuspendOn, kind)));
+                }
             }
         }
 
-        return queued;
+        return new Outcome(queued, forResellers);
     }
 
     internal static BillingNotice Notice(BillingNoticeKind kind, Charge charge, decimal paid) =>

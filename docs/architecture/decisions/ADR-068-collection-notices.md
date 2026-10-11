@@ -26,7 +26,7 @@ La cuenta se enteraba de lo que debe solo entrando a su pantalla de plan, y de l
 `BillingRemindersTests` (unitarias): el calendario día por día para una gracia normal, con anticipación 0, sin suspensión y con gracia corta. `CollectionNoticesApiTests`: el aviso de cargo con importe, fechas y enlace, y que solo llegue al propietario de esa cuenta; la secuencia emitido → vence pronto → vencido → suspensión cercana, cada uno una vez aunque se repitan los pases, y nada más tras la suspensión (solo el aviso de estado); pagos parcial y total con su saldo, sin recordatorios para el cargo pagado y sin aviso por la reversa. `SubscriptionsApiTests`: la política acepta y valida `reminderDays` (0 a 30; la inicial es 3). Contrato OpenAPI actualizado (campo opcional: compatible con `v1`).
 
 ## Límites (P)
-- Solo correo, solo a los propietarios de la cuenta: sin SMS ni WhatsApp, sin copia al revendedor (que hoy no ve la mora de sus cuentas por correo) ni a un contacto de facturación aparte.
+- Solo correo, solo a los propietarios de la cuenta: sin SMS ni WhatsApp ni un contacto de facturación aparte. El revendedor recibe su propio resumen (ADR-070).
 - El texto está en español y no se personaliza por revendedor más allá de la marca y el soporte (ADR-055).
 - No hay aviso por la factura que la plataforma emite por el cobro (ADR-065) ni por el cambio de datos de facturación; el cliente la descarga de su pantalla de plan.
 - No hay pasarela de pago: el aviso dice cuánto se debe y a quién escribir si ya se pagó, no incluye un enlace de pago.
