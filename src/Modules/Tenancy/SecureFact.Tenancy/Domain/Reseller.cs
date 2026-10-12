@@ -25,6 +25,12 @@ internal sealed class Reseller
 
     public string? SupportEmail { get; private set; }
 
+    /// <summary>A sentence that opens the e-mails of the brand to its customers (ADR-072).</summary>
+    public string? EmailGreeting { get; private set; }
+
+    /// <summary>A sentence that closes them, before the signature (ADR-072).</summary>
+    public string? EmailClosing { get; private set; }
+
     /// <summary>Host name (lower case, no port) at which the reseller's portal is served, so the sign-in page can show its brand before anyone signs in. Only the platform sets it.</summary>
     public string? Host { get; private set; }
 
@@ -61,11 +67,13 @@ internal sealed class Reseller
         IsActive = isActive;
     }
 
-    public void SetBrand(string? brandName, string? primaryColor, string? supportEmail)
+    public void SetBrand(string? brandName, string? primaryColor, string? supportEmail, string? emailGreeting = null, string? emailClosing = null)
     {
         BrandName = brandName;
         PrimaryColor = primaryColor;
         SupportEmail = supportEmail;
+        EmailGreeting = emailGreeting;
+        EmailClosing = emailClosing;
     }
 
     public void SetHost(string? host, string? token)

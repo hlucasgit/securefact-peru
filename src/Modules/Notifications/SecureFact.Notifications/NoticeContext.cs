@@ -25,6 +25,7 @@ public sealed class NoticeContext(IBranding branding, WebOptions web)
         var portal = brand is not null && await branding.PortalHostAsync(brand.ResellerId, cancellationToken) is { } host
             ? $"https://{host}"
             : (web.PublicUrl ?? WebOptions.DevelopmentUrl).TrimEnd('/');
-        return (brand is null ? EmailBrand.Platform : new EmailBrand(brand.BrandName, brand.SupportEmail), portal, brand?.ResellerId);
+        var texts = brand is null ? null : await branding.EmailTextsAsync(brand.ResellerId, cancellationToken);
+        return (brand is null ? EmailBrand.Platform : new EmailBrand(brand.BrandName, brand.SupportEmail, texts?.Greeting, texts?.Closing), portal, brand?.ResellerId);
     }
 }

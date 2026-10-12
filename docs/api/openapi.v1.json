@@ -4557,6 +4557,18 @@
               "null",
               "string"
             ]
+          },
+          "emailGreeting": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "emailClosing": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

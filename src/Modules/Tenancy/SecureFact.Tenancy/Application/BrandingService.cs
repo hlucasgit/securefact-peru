@@ -23,6 +23,8 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
     public const double MinContrast = 4.5;
 
     private const int MinNameLength = 2;
+    private const int MaxGreetingLength = 200;
+    private const int MaxClosingLength = 400;
     private const int MaxNameLength = 60;
 
     private static readonly Error ResellerMissing = Error.NotFound(ErrorCodes.ResellerNotFound, "Revendedor no encontrado", "El revendedor no existe.");
@@ -66,6 +68,13 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
         return reseller is { IsActive: true, HostStatus: DomainStatus.Verified } ? reseller.Host : null;
     }
 
+    public async Task<EmailTexts?> EmailTextsAsync(Guid resellerId, CancellationToken cancellationToken)
+    {
+        using var elevated = scope.Elevate("branding: e-mail texts of a reseller");
+        var reseller = await db.Resellers.AsNoTracking().SingleOrDefaultAsync(r => r.Id == resellerId, cancellationToken);
+        return reseller is { IsActive: true, BrandName: not null } && (reseller.EmailGreeting is not null || reseller.EmailClosing is not null) ? new EmailTexts(reseller.EmailGreeting, reseller.EmailClosing) : null;
+    }
+
     public async Task<BrandLogo?> LogoAsync(Guid resellerId, CancellationToken cancellationToken)
     {
         using var elevated = scope.Elevate("branding: logo of a reseller");
@@ -99,14 +108,18 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
         var name = input.BrandName?.Trim();
         var color = input.PrimaryColor?.Trim().ToLowerInvariant();
         var email = input.SupportEmail?.Trim();
+        var greeting = Clean(input.EmailGreeting);
+        var closing = Clean(input.EmailClosing);
         if (string.IsNullOrEmpty(name))
         {
             // Removing the brand removes its colour and contact too: a colour without a name would never be shown.
             name = null;
             color = null;
             email = null;
+            greeting = null;
+            closing = null;
         }
-        else if (Validate(name, color, email) is { } invalid)
+        else if ((Validate(name, color, email) ?? ValidateTexts(greeting, closing)) is { } invalid)
         {
             return invalid;
         }
@@ -118,7 +131,7 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
         }
 
         var before = Values(reseller);
-        reseller.SetBrand(name, color, string.IsNullOrEmpty(email) ? null : email);
+        reseller.SetBrand(name, color, string.IsNullOrEmpty(email) ? null : email, greeting, closing);
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(new AuditEvent(AuditActions.ResellerBrandingUpdated, "reseller", reseller.Id.ToString("D"), null, OldValues: before, NewValues: Values(reseller)), cancellationToken);
         return ToSettings(reseller);
@@ -213,6 +226,38 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
         return null;
     }
 
+    private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    /// <summary>
+    /// The sentences that a reseller adds to the e-mails of its brand (ADR-072) are plain text of one line: no web address, no e-mail address and no markup, so that a brand cannot use the e-mails of the
+    /// platform to send its customers somewhere else. The contact is the support e-mail of the brand, which every e-mail already shows.
+    /// </summary>
+    private static Error? ValidateTexts(string? greeting, string? closing)
+    {
+        foreach (var (text, max, what) in new[] { (greeting, MaxGreetingLength, "El saludo"), (closing, MaxClosingLength, "El cierre") })
+        {
+            if (text is null)
+            {
+                continue;
+            }
+
+            if (text.Length > max || text.Any(char.IsControl))
+            {
+                return Error.Validation(ErrorCodes.InvalidBranding, "Texto de correo inválido", $"{what} tiene hasta {max} caracteres, en una sola línea.");
+            }
+
+            if (text.AsSpan().IndexOfAny("<>@") >= 0 || WebAddress().IsMatch(text))
+            {
+                return Error.Validation(ErrorCodes.InvalidBranding, "Texto de correo inválido", $"{what} no lleva direcciones web, correos ni marcas: el contacto es el correo de soporte de su marca.");
+            }
+        }
+
+        return null;
+    }
+
+    [GeneratedRegex(@"(://|www\.|\b[a-z0-9-]+\.(com|pe|net|org|io|app|link|info|biz|co|me|xyz|top|site|online)\b)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex WebAddress();
+
     /// <summary>The contrast ratio of the colour against white, as WCAG 2.x defines it: (1.05) / (L + 0.05), with L the relative luminance.</summary>
     public static double ContrastAgainstWhite(string hex)
     {
@@ -253,12 +298,14 @@ internal sealed partial class BrandingService(TenancyDbContext db, DataScope sco
             ? new BrandingDto(r.Id, name, color, r.SupportEmail, r.LogoVersion)
             : null;
 
-    private static BrandingSettings ToSettings(Reseller r) => new(r.Id, r.Name, r.BrandName, r.PrimaryColor, r.SupportEmail, r.Host, r.LogoVersion, r.HostStatus);
+    private static BrandingSettings ToSettings(Reseller r) => new(r.Id, r.Name, r.BrandName, r.PrimaryColor, r.SupportEmail, r.Host, r.LogoVersion, r.HostStatus, r.EmailGreeting, r.EmailClosing);
 
     private static Dictionary<string, object?> Values(Reseller r) => new()
     {
         ["brandName"] = r.BrandName,
         ["primaryColor"] = r.PrimaryColor,
         ["supportEmail"] = r.SupportEmail,
+        ["emailGreeting"] = r.EmailGreeting,
+        ["emailClosing"] = r.EmailClosing,
     };
 }

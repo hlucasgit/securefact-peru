@@ -370,6 +370,8 @@ export interface BrandSettings {
   brandName: string | null
   primaryColor: string | null
   supportEmail: string | null
+  emailGreeting: string | null
+  emailClosing: string | null
   host: string | null
   hostStatus: DomainStatus
   logoUrl: string | null
@@ -395,6 +397,8 @@ export interface BrandInput {
   brandName: string | null
   primaryColor: string | null
   supportEmail: string | null
+  emailGreeting: string | null
+  emailClosing: string | null
 }
 
 /** The reseller edits its own brand; platform staff edit one by its id. */

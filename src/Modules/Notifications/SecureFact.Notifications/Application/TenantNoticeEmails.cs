@@ -50,7 +50,8 @@ internal sealed partial class TenantNoticeEmails(IAccountDirectory directory, No
                 return;
             }
 
-            var (brand, portal, _) = await context.ForAsync(null, notice.ResellerId, cancellationToken);
+            var (resellerBrand, portal, _) = await context.ForAsync(null, notice.ResellerId, cancellationToken);
+            var brand = resellerBrand.WithoutTexts();
             foreach (var admin in admins)
             {
                 await queue.EnqueueAsync(Domain(admin, brand, portal, notice), cancellationToken: cancellationToken);

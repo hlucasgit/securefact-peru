@@ -12,9 +12,9 @@ internal static class BrandingEndpoints
     /// <summary>What anyone may see of a brand. Nothing here is secret: it is what the sign-in page shows.</summary>
     public sealed record BrandingResponse(string BrandName, string PrimaryColor, string? SupportEmail, string? LogoUrl);
 
-    public sealed record SettingsResponse(Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, DomainStatus HostStatus, string? LogoUrl);
+    public sealed record SettingsResponse(Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, DomainStatus HostStatus, string? LogoUrl, string? EmailGreeting = null, string? EmailClosing = null);
 
-    public sealed record BrandBody(string? BrandName, string? PrimaryColor, string? SupportEmail);
+    public sealed record BrandBody(string? BrandName, string? PrimaryColor, string? SupportEmail, string? EmailGreeting = null, string? EmailClosing = null);
 
     public sealed record LogoBody(string DataBase64);
 
@@ -22,7 +22,7 @@ internal static class BrandingEndpoints
 
     private static BrandingResponse? ToResponse(BrandingDto? brand) => brand is null ? null : new(brand.BrandName, brand.PrimaryColor, brand.SupportEmail, LogoUrl(brand.ResellerId, brand.LogoVersion));
 
-    private static SettingsResponse ToResponse(BrandingSettings s) => new(s.ResellerId, s.ResellerName, s.BrandName, s.PrimaryColor, s.SupportEmail, s.Host, s.HostStatus, LogoUrl(s.ResellerId, s.LogoVersion));
+    private static SettingsResponse ToResponse(BrandingSettings s) => new(s.ResellerId, s.ResellerName, s.BrandName, s.PrimaryColor, s.SupportEmail, s.Host, s.HostStatus, LogoUrl(s.ResellerId, s.LogoVersion), s.EmailGreeting, s.EmailClosing);
 
     private static IResult Brand(BrandingDto? brand) => brand is null ? Results.NoContent() : Results.Ok(ToResponse(brand));
 
@@ -72,7 +72,7 @@ internal static class BrandingEndpoints
             user.ResellerId is { } reseller ? ToLogoResult(await branding.GetAsync(reseller, ct), http) : Results.Forbid());
 
         own.MapPut(string.Empty, async (BrandBody body, ICurrentUser user, IBranding branding, HttpContext http, CancellationToken ct) =>
-            user.ResellerId is { } reseller ? ToLogoResult(await branding.UpdateAsync(reseller, new BrandingInput(body.BrandName, body.PrimaryColor, body.SupportEmail), ct), http) : Results.Forbid());
+            user.ResellerId is { } reseller ? ToLogoResult(await branding.UpdateAsync(reseller, new BrandingInput(body.BrandName, body.PrimaryColor, body.SupportEmail, body.EmailGreeting, body.EmailClosing), ct), http) : Results.Forbid());
 
         own.MapPut("/logo", async (LogoBody body, ICurrentUser user, IBranding branding, HttpContext http, CancellationToken ct) =>
         {
@@ -94,7 +94,7 @@ internal static class BrandingEndpoints
             ToLogoResult(await branding.GetAsync(id, ct), http)).RequireAuthorization(Permissions.TenantsRead);
 
         api.MapPut("/platform/resellers/{id:guid}/branding", async (Guid id, BrandBody body, IBranding branding, HttpContext http, CancellationToken ct) =>
-            ToLogoResult(await branding.UpdateAsync(id, new BrandingInput(body.BrandName, body.PrimaryColor, body.SupportEmail), ct), http)).RequireAuthorization(Permissions.TenantsManage);
+            ToLogoResult(await branding.UpdateAsync(id, new BrandingInput(body.BrandName, body.PrimaryColor, body.SupportEmail, body.EmailGreeting, body.EmailClosing), ct), http)).RequireAuthorization(Permissions.TenantsManage);
 
         api.MapPut("/platform/resellers/{id:guid}/branding/logo", async (Guid id, LogoBody body, IBranding branding, HttpContext http, CancellationToken ct) =>
         {

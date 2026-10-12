@@ -16,7 +16,9 @@ public static class NoticeEmail
 
         var text = new StringBuilder();
         var html = new StringBuilder("<!doctype html>\n<html lang=\"es\"><body style=\"font-family:Arial,Helvetica,sans-serif;color:#1a1a1a\">\n");
-        foreach (var paragraph in paragraphs.Append(brand.SupportEmail is { Length: > 0 } support ? $"Si necesita ayuda, escriba a {support}." : string.Empty).Where(p => p.Length > 0))
+        // The sentences of the reseller (ADR-072) open and close what the notice says; the facts of the notice are never replaced.
+        var body = new[] { brand.Greeting ?? string.Empty }.Concat(paragraphs).Append(brand.Closing ?? string.Empty).Append(brand.SupportEmail is { Length: > 0 } support ? $"Si necesita ayuda, escriba a {support}." : string.Empty);
+        foreach (var paragraph in body.Where(p => p.Length > 0))
         {
             text.Append(paragraph).Append("\n\n");
             html.Append("<p>").Append(WebUtility.HtmlEncode(paragraph)).Append("</p>\n");

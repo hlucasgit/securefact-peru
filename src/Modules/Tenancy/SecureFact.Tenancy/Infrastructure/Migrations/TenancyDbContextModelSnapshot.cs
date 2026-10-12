@@ -98,6 +98,16 @@ namespace SecureFact.Tenancy.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("EmailClosing")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("email_closing");
+
+                    b.Property<string>("EmailGreeting")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email_greeting");
+
                     b.Property<string>("Host")
                         .HasMaxLength(253)
                         .HasColumnType("character varying(253)")

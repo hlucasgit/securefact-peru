@@ -19,7 +19,7 @@ function BrandForm({ scope, settings, canSetHost }: { scope: BrandScope; setting
   const setLogo = useSetLogo(scope)
   const removeLogo = useRemoveLogo(scope)
   const toast = useToast()
-  const [value, setValue] = useState({ brandName: settings.brandName ?? '', primaryColor: settings.primaryColor ?? DEFAULT_COLOR, supportEmail: settings.supportEmail ?? '' })
+  const [value, setValue] = useState({ brandName: settings.brandName ?? '', primaryColor: settings.primaryColor ?? DEFAULT_COLOR, supportEmail: settings.supportEmail ?? '', emailGreeting: settings.emailGreeting ?? '', emailClosing: settings.emailClosing ?? '' })
   const [logoError, setLogoError] = useState<string | null>(null)
 
   async function pickLogo(event: ChangeEvent<HTMLInputElement>) {
@@ -42,7 +42,7 @@ function BrandForm({ scope, settings, canSetHost }: { scope: BrandScope; setting
         className="card stack"
         onSubmit={(event) => {
           event.preventDefault()
-          save.mutate({ brandName: value.brandName.trim() || null, primaryColor: value.primaryColor, supportEmail: value.supportEmail.trim() || null }, { onSuccess: () => toast.ok('Marca guardada.') })
+          save.mutate({ brandName: value.brandName.trim() || null, primaryColor: value.primaryColor, supportEmail: value.supportEmail.trim() || null, emailGreeting: value.emailGreeting.trim() || null, emailClosing: value.emailClosing.trim() || null }, { onSuccess: () => toast.ok('Marca guardada.') })
         }}
       >
         <h2>Marca</h2>
@@ -64,6 +64,23 @@ function BrandForm({ scope, settings, canSetHost }: { scope: BrandScope; setting
           </div>
         </div>
         <TextField label="Correo de soporte" type="email" hint="se muestra en el ingreso" maxLength={254} value={value.supportEmail} onChange={(event) => setValue({ ...value, supportEmail: event.target.value })} />
+        <h3>Correos a sus clientes</h3>
+        <p className="hint">
+          Los avisos por correo que reciben los usuarios de sus cuentas (alta de cuenta, suspensión, cobros, plan, certificados) salen con su marca. Puede abrirlos con un saludo y cerrarlos con una frase, en una línea cada uno. No lleva
+          direcciones web ni correos: el contacto es el correo de soporte. Los avisos de seguridad (recuperar la contraseña) no los llevan, ni los que le llegan a usted.
+        </p>
+        <TextField label="Saludo" maxLength={200} hint="opcional, hasta 200 caracteres" value={value.emailGreeting} onChange={(event) => setValue({ ...value, emailGreeting: event.target.value })} />
+        <TextField label="Cierre" maxLength={400} hint="opcional, hasta 400 caracteres" value={value.emailClosing} onChange={(event) => setValue({ ...value, emailClosing: event.target.value })} />
+        <div className="card" aria-label="Vista previa del correo">
+          <p className="hint" style={{ marginTop: 0 }}>
+            Vista previa
+          </p>
+          {value.emailGreeting.trim() && <p>{value.emailGreeting.trim()}</p>}
+          <p>Aquí va lo que dice el aviso: la cuenta, las fechas o los importes.</p>
+          {value.emailClosing.trim() && <p>{value.emailClosing.trim()}</p>}
+          {value.supportEmail.trim() && <p>Si necesita ayuda, escriba a {value.supportEmail.trim()}.</p>}
+          <p className="muted">{value.brandName.trim() || 'Su marca'} · Con tecnología SecureFact</p>
+        </div>
         <div className="actions">
           <button className="btn primary" type="submit" disabled={save.isPending}>
             Guardar marca

@@ -71,6 +71,8 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             builder.Property(r => r.BrandName).HasColumnName("brand_name").HasMaxLength(60);
             builder.Property(r => r.PrimaryColor).HasColumnName("primary_color").HasMaxLength(7);
             builder.Property(r => r.SupportEmail).HasColumnName("support_email").HasMaxLength(254);
+            builder.Property(r => r.EmailGreeting).HasColumnName("email_greeting").HasMaxLength(200);
+            builder.Property(r => r.EmailClosing).HasColumnName("email_closing").HasMaxLength(400);
             builder.Property(r => r.Host).HasColumnName("host").HasMaxLength(253);
             builder.Property(r => r.HostStatus).HasColumnName("host_status").HasConversion<string>().HasMaxLength(20).IsRequired();
             builder.Property(r => r.HostToken).HasColumnName("host_token").HasMaxLength(64);

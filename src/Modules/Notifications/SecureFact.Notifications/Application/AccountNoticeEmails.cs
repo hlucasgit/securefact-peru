@@ -12,7 +12,8 @@ internal sealed partial class AccountNoticeEmails(NoticeContext context, IEmailO
         ArgumentNullException.ThrowIfNull(notice);
         try
         {
-            var (brand, portal, _) = await context.ForAsync(notice.TenantId, notice.ResellerId, cancellationToken);
+            var (branded, portal, _) = await context.ForAsync(notice.TenantId, notice.ResellerId, cancellationToken);
+            var brand = notice.TenantId is null ? branded.WithoutTexts() : branded; // the people of the reseller itself are not its customers (ADR-072)
             await queue.EnqueueAsync(
                 NoticeEmail.Compose(
                     notice.Email, brand, $"Se creó su cuenta en {brand.Name}",

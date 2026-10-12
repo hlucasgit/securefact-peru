@@ -187,9 +187,15 @@ public interface IResellerAdministration
 public sealed record BrandingDto(Guid ResellerId, string BrandName, string PrimaryColor, string? SupportEmail, string? LogoVersion);
 
 /// <summary>What a reseller or the platform edits. <paramref name="Host"/> is the host name at which the portal of the reseller is served; only the platform sets it.</summary>
-public sealed record BrandingSettings(Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, string? LogoVersion, DomainStatus HostStatus = DomainStatus.None);
+public sealed record BrandingSettings(
+    Guid ResellerId, string ResellerName, string? BrandName, string? PrimaryColor, string? SupportEmail, string? Host, string? LogoVersion, DomainStatus HostStatus = DomainStatus.None, string? EmailGreeting = null, string? EmailClosing = null);
 
-public sealed record BrandingInput(string? BrandName, string? PrimaryColor, string? SupportEmail);
+/// <param name="EmailGreeting">One short sentence that opens every e-mail that the reseller's brand sends to its customers (ADR-072); empty for none.</param>
+/// <param name="EmailClosing">One short sentence that closes them, before the signature; empty for none.</param>
+public sealed record BrandingInput(string? BrandName, string? PrimaryColor, string? SupportEmail, string? EmailGreeting = null, string? EmailClosing = null);
+
+/// <summary>The two sentences of a reseller in its e-mails (ADR-072).</summary>
+public sealed record EmailTexts(string? Greeting, string? Closing);
 
 public sealed record BrandLogo(byte[] Data, string ContentType, string Version);
 
@@ -209,6 +215,9 @@ public interface IBranding
 
     /// <summary>The verified domain at which the portal of a reseller is served, or null when it has none, it is not verified or the reseller is off. For the links in the e-mails (ADR-052).</summary>
     Task<string?> PortalHostAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    /// <summary>The greeting and the closing that a reseller added to its e-mails, or null when it has none, has no brand or is off.</summary>
+    Task<EmailTexts?> EmailTextsAsync(Guid resellerId, CancellationToken cancellationToken);
 
     Task<BrandLogo?> LogoAsync(Guid resellerId, CancellationToken cancellationToken);
 

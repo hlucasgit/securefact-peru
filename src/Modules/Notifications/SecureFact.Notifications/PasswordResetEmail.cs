@@ -4,9 +4,12 @@ using SecureFact.Notifications.Contracts;
 namespace SecureFact.Notifications;
 
 /// <summary>The brand an e-mail is signed with: the one of the reseller of the account, or the platform's own when there is none (ADR-044, ADR-052).</summary>
-public sealed record EmailBrand(string Name, string? SupportEmail)
+public sealed record EmailBrand(string Name, string? SupportEmail, string? Greeting = null, string? Closing = null)
 {
     public static EmailBrand Platform { get; } = new("SecureFact Perú", null);
+
+    /// <summary>The same brand without the sentences that a reseller adds for its customers (ADR-072): for the e-mails that go to the reseller itself.</summary>
+    public EmailBrand WithoutTexts() => this with { Greeting = null, Closing = null };
 }
 
 /// <summary>

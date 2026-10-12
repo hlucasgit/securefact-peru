@@ -105,7 +105,8 @@ internal sealed partial class BillingNoticeEmails(IAccountDirectory directory, N
                 return false;
             }
 
-            var (brand, portal, _) = await context.ForAsync(null, resellerId, cancellationToken);
+            var (resellerBrand, portal, _) = await context.ForAsync(null, resellerId, cancellationToken);
+            var brand = resellerBrand.WithoutTexts();
             var queued = false;
             foreach (var admin in admins)
             {

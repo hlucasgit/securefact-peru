@@ -13,6 +13,7 @@ Cuatro datos del revendedor (`tenancy.reseller`): **nombre de marca** (2 a 60 ca
 - **Sin nombre de marca no hay marca**: quitar el nombre quita también el color y el correo, y vuelve la apariencia de la plataforma.
 - **Solo se muestra la marca de un revendedor activo**. Si la plataforma lo desactiva, sus clientes siguen trabajando (ADR-043) y ven la apariencia por defecto, y su logotipo deja de servirse.
 
+- **Frases en los correos**: además, un saludo y un cierre de una línea para los correos a sus clientes (ADR-072).
 ### Reglas que no se dejan al formulario
 - **Contraste**: el color lleva texto blanco encima (botones, pestañas activas). El servicio calcula el contraste **WCAG 2.x** contra el blanco y **rechaza** el color por debajo de **4.5:1** (nivel AA para texto normal), con un mensaje que dice el contraste obtenido. Así un revendedor no puede dejar ilegible el botón de ingreso de sus clientes. Se guarda en minúsculas.
 - **Logotipo**: hasta **200 KB**, y su tipo se decide **por el contenido** (los primeros bytes), no por lo que diga el cliente. **El SVG no se admite**: puede llevar script y se serviría desde el origen de la aplicación. Se sirve con el tipo detectado, `nosniff` y una versión (huella SHA-256 truncada) en la dirección, de modo que un logotipo cambiado nunca se ve en caché.
