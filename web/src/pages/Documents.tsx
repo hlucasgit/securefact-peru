@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useCompanies, useDocuments } from '../api/queries'
 import { useSession } from '../auth/session'
 import { DocumentsTable } from '../components/DocumentsTable'
+import { ExportModal } from '../components/ExportModal'
 import { ErrorAlert, Loading, PageHeader, SelectField } from '../components/ui'
 import { BILLING_ROLES } from '../lib/format'
 
@@ -13,11 +14,17 @@ export function Documents() {
   const companies = useCompanies()
   const [companyId, setCompanyId] = useState('')
   const [page, setPage] = useState(0)
+  const [exporting, setExporting] = useState(false)
   const documents = useDocuments(companyId || null, page * PAGE, PAGE)
 
   return (
     <>
       <PageHeader title="Documentos" subtitle="Comprobantes emitidos, del más reciente al más antiguo">
+        {(companies.data?.length ?? 0) > 0 && (
+          <button className="btn" type="button" onClick={() => setExporting(true)}>
+            Exportar
+          </button>
+        )}
         {hasRole(...BILLING_ROLES) && (
           <Link className="btn primary" to="/documentos/nuevo">
             Emitir comprobante
@@ -56,6 +63,7 @@ export function Documents() {
           </button>
         </div>
       </div>
+      {exporting && companies.data && <ExportModal companies={companies.data} onClose={() => setExporting(false)} />}
     </>
   )
 }

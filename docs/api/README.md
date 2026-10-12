@@ -54,6 +54,10 @@ Las listas reciben `skip` y `take` (hasta 100 por página).
 2. La plataforma lo prepara (XML, firma) y lo envía a SUNAT por su cuenta. Entérese de una de dos maneras: **webhook** (recomendado) o consultando `GET /api/v1/documents/{id}/electronic` hasta que `state` sea `Accepted`, `AcceptedWithObservations` o `Rejected`.
 3. Descargue el XML firmado, el CDR y el PDF desde `/api/v1/electronic-documents/{id}/xml|cdr|pdf`.
 
+## Exportar un período (ADR-071)
+
+`GET /api/v1/electronic-documents/export?companyId=…&from=2026-09-01&to=2026-09-30[&documentTypeCode=01]` devuelve un ZIP con el XML firmado (`xml/`) y el CDR (`cdr/`) de cada comprobante del período, tal como se guardan, y un `indice.csv` con su estado, comprador y total. Pide el permiso de leer documentos. Hasta 500 comprobantes y 366 días por llamada (`SF-CPE-013` si se pasa: pida el período por partes).
+
 ## Webhooks (ADR-067)
 Para que la plataforma avise en vez de consultarla.
 

@@ -161,3 +161,26 @@ public interface IElectronicDocumentService
     /// <summary>The CDR ZIP exactly as SUNAT returned it; not found until a CDR arrives.</summary>
     Task<Result<byte[]>> GetCdrZipAsync(Guid electronicDocumentId, CancellationToken cancellationToken);
 }
+
+/// <param name="From">First issue date included.</param>
+/// <param name="To">Last issue date included.</param>
+/// <param name="DocumentTypeCode">Only this type (catalogue 01); empty for every one.</param>
+public sealed record DocumentExportRequest(Guid CompanyId, DateOnly From, DateOnly To, string? DocumentTypeCode);
+
+/// <param name="Content">The ZIP: <c>xml/</c> with each signed XML as it was sent, <c>cdr/</c> with each CDR as SUNAT returned it, and <c>indice.csv</c>.</param>
+public sealed record DocumentExportResult(byte[] Content, string FileName, int Documents, int WithCdr);
+
+/// <summary>
+/// A period of a company's electronic documents in one file, for the accountant and for the company's own records (ADR-071): the signed XML and the CDR exactly as they are kept, and an index with
+/// the data to find each one. It reads what exists and changes nothing.
+/// </summary>
+public interface IDocumentExport
+{
+    /// <summary>The most documents of one export: more than that is asked in several periods.</summary>
+    const int MaxDocuments = 500;
+
+    /// <summary>The longest period of one export.</summary>
+    const int MaxDays = 366;
+
+    Task<Result<DocumentExportResult>> ExportAsync(DocumentExportRequest request, CancellationToken cancellationToken);
+}

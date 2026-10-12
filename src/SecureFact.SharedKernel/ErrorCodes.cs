@@ -114,6 +114,8 @@ public static class ErrorCodes
     public const string CpeNothingToSummarize = "SF-CPE-009";
     public const string CpeReferenceNotAccepted = "SF-CPE-010";
     public const string CpeNotVoidable = "SF-CPE-011";
+    public const string InvalidExport = "SF-CPE-012";
+    public const string ExportTooLarge = "SF-CPE-013";
 
     public const string InvalidCertificate = "SF-CRT-001";
     public const string CertificateNotFound = "SF-CRT-002";

@@ -16,6 +16,14 @@ internal static class CpeEndpoints
 
         var group = app.MapGroup("/api/v1/electronic-documents").WithTags("CPE");
 
+        // A period of a company's documents in one ZIP (ADR-071): the signed XML and the CDR as they are kept, and an index.
+        group.MapGet("/export", async (Guid companyId, DateOnly from, DateOnly to, string? documentTypeCode, IDocumentExport export, HttpContext http, CancellationToken ct) =>
+            (await export.ExportAsync(new DocumentExportRequest(companyId, from, to, documentTypeCode), ct)).ToHttp(http, result =>
+            {
+                http.Response.Headers["X-SecureFact-Documents"] = result.Documents.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return Results.File(result.Content, "application/zip", result.FileName);
+            })).RequireAuthorization(Permissions.DocumentsRead);
+
         group.MapGet("/{id:guid}", async (Guid id, IElectronicDocumentService service, HttpContext http, CancellationToken ct) =>
             (await service.GetAsync(id, ct)).ToHttp(http)).RequireAuthorization(Permissions.DocumentsRead);
 
