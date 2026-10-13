@@ -80,6 +80,15 @@ public class RoleCatalogTests
         Assert.Equal(expected, RoleCatalog.CanAssign([actorRole], actorIsPlatform, target));
 
     [Fact]
+    public void Only_the_owner_of_an_account_can_take_all_its_data_with_it()
+    {
+        var holders = RoleCatalog.AllRoles.Where(role => RoleCatalog.PermissionsOf(role).Contains(Permissions.AccountExport)).Order(StringComparer.Ordinal).ToList();
+
+        Assert.Equal([Roles.PlatformSuperAdmin, Roles.TenantOwner], holders);
+        Assert.Contains(Permissions.AccountExport, Permissions.All);
+    }
+
+    [Fact]
     public void The_role_of_the_person_who_supports_only_reads_and_nobody_can_be_given_it()
     {
         var permissions = RoleCatalog.PermissionsOf(Roles.SupportViewer);

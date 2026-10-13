@@ -240,6 +240,7 @@ app.MapUserAndTenantEndpoints();
 app.MapPlanEndpoints();
 app.MapApiKeyEndpoints();
 app.MapSupportAccessEndpoints();
+app.MapAccountEndpoints();
 app.MapWebhookEndpoints();
 app.MapResellerEndpoints();
 app.MapBrandingEndpoints();

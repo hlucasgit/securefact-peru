@@ -32,6 +32,7 @@ public static class IdentityModule
         services.AddScoped<IUserAdministration, UserAdministration>();
         services.AddScoped<IApiKeys, ApiKeyService>();
         services.AddScoped<ISupportAccess, SupportAccessService>();
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, IdentityAccountData>();
         services.TryAddScoped<SecureFact.Notifications.Contracts.IBusinessNotices, SecureFact.Notifications.Contracts.NullBusinessNotices>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IPlatformBootstrapper, PlatformBootstrapper>();

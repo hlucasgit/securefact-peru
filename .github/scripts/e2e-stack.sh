@@ -39,6 +39,7 @@ export Webhooks__AllowLocalTargets=true
 export Payments__AllowSandbox=true
 # The tests sign in many times from one address; the limit of the sign-in endpoint is raised for them only.
 export RateLimiting__AuthPermitPerMinute=1000
+export RateLimiting__ExportPermitPerHour=1000
 # The workers look for work every 3 seconds instead of every 15.
 export Cpe__WorkerIntervalSeconds=3
 

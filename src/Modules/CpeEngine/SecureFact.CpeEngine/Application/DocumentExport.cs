@@ -9,6 +9,7 @@ using SecureFact.CpeEngine.Infrastructure;
 using SecureFact.Organizations.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
+using SecureFact.SharedKernel.Export;
 using SecureFact.SharedKernel.Results;
 
 namespace SecureFact.CpeEngine.Application;
@@ -108,12 +109,5 @@ internal sealed class DocumentExport(CpeDbContext db, IDataScope scope, IDocumen
         await stream.WriteAsync(content, cancellationToken);
     }
 
-    /// <summary>The cells of one CSV row. A text that a spreadsheet would take for a formula (it starts with =, +, - or @) is written as text, so an index opened in Excel never runs what a buyer typed.</summary>
-    private static IEnumerable<string> Cells(params string[] values) => values.Select(Cell);
-
-    private static string Cell(string value)
-    {
-        var text = value.Length > 0 && value[0] is '=' or '+' or '-' or '@' or '\t' or '\r' ? "'" + value : value;
-        return text.AsSpan().IndexOfAny(",\"\r\n") >= 0 ? "\"" + text.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : text;
-    }
+    private static IEnumerable<string> Cells(params string[] values) => values.Select(AccountCsv.Cell);
 }

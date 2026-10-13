@@ -33,6 +33,7 @@ public static class Permissions
     public const string AccountBillingManage = "account.billing.manage";
     public const string ApiKeysManage = "apikeys.manage";
     public const string WebhooksManage = "webhooks.manage";
+    public const string AccountExport = "account.export";
     public const string SupportGrant = "support.grant";
     public const string SupportAccess = "support.access";
 
@@ -41,7 +42,7 @@ public static class Permissions
         TenantsCreate, TenantsRead, TenantsManage, UsersRead, UsersManage, SessionsRevoke, AuditRead, CompaniesRead, CompaniesManage,
         SeriesManage, DocumentsRead, DocumentsCreate, CustomersRead, CustomersManage, ProductsRead, ProductsManage,
         CertificatesRead, CertificatesManage, CpeSend, ResellerTenantsRead, ResellerTenantsCreate, ResellerTenantsManage, ResellerBrandingManage, ResellerTenantsSuspend,
-        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead, AccountBillingManage, ApiKeysManage, WebhooksManage, SupportGrant, SupportAccess,
+        SubscriptionsRead, SubscriptionsManage, ResellerCommissionsRead, AccountBillingManage, ApiKeysManage, WebhooksManage, AccountExport, SupportGrant, SupportAccess,
     ];
 }
 
@@ -83,7 +84,7 @@ public static class RoleCatalog
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.AuditRead, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,
              Permissions.CustomersRead, Permissions.CustomersManage, Permissions.ProductsRead, Permissions.ProductsManage,
-             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage, Permissions.ApiKeysManage, Permissions.WebhooksManage, Permissions.SupportGrant]),
+             Permissions.CertificatesRead, Permissions.CertificatesManage, Permissions.CpeSend, Permissions.AccountBillingManage, Permissions.ApiKeysManage, Permissions.WebhooksManage, Permissions.AccountExport, Permissions.SupportGrant]),
         [Roles.TenantAdmin] = (RoleLevel.Tenant,
             [Permissions.TenantsRead, Permissions.UsersRead, Permissions.UsersManage, Permissions.SessionsRevoke, Permissions.CompaniesRead, Permissions.CompaniesManage,
              Permissions.SeriesManage, Permissions.DocumentsRead, Permissions.DocumentsCreate,

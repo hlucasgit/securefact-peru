@@ -6,6 +6,7 @@ using SecureFact.Customers.Contracts;
 using SecureFact.Customers.Infrastructure;
 using SecureFact.Platform.Persistence;
 using SecureFact.Platform.Tenancy;
+using SecureFact.SharedKernel.Export;
 
 namespace SecureFact.Customers;
 
@@ -19,6 +20,7 @@ public static class CustomersModule
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ICustomerAdministration, CustomerAdministration>();
+        services.AddScoped<IAccountDataContributor, CustomersAccountData>();
         return services;
     }
 

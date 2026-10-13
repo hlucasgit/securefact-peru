@@ -6,6 +6,7 @@ using SecureFact.Organizations.Contracts;
 using SecureFact.Organizations.Infrastructure;
 using SecureFact.Platform.Persistence;
 using SecureFact.Platform.Tenancy;
+using SecureFact.SharedKernel.Export;
 
 namespace SecureFact.Organizations;
 
@@ -19,6 +20,7 @@ public static class OrganizationsModule
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ICompanyAdministration, CompanyAdministration>();
+        services.AddScoped<IAccountDataContributor, OrganizationsAccountData>();
         return services;
     }
 

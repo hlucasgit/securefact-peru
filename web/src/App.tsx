@@ -27,6 +27,7 @@ import { MyPlan, Plans } from './pages/Plans'
 import { ResellerAccountDetail, ResellerAccounts, Resellers } from './pages/Resellers'
 import { TenantDetail, Tenants } from './pages/Platform'
 import { Summaries } from './pages/Summaries'
+import { AccountData } from './pages/AccountData'
 import { SupportAccess } from './pages/SupportAccess'
 
 /** The home of a user: platform staff administer tenants and have no companies or documents of their own. */
@@ -82,6 +83,7 @@ export function App() {
         <Route path="usuarios" element={<Users />} />
         <Route path="integraciones" element={<Integrations />} />
         <Route path="soporte" element={<SupportAccess />} />
+        <Route path="datos" element={<AccountData />} />
         <Route path="seguridad" element={<Security />} />
         <Route path="reglas" element={<Rules />} />
         <Route path="*" element={<Navigate to="/" replace />} />

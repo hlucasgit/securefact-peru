@@ -37,6 +37,7 @@ public static class CpeEngineModule
         services.TryAddScoped<SecureFact.Notifications.Contracts.IBusinessNotices, SecureFact.Notifications.Contracts.NullBusinessNotices>();
         services.AddScoped<IElectronicDocumentService, ElectronicDocumentService>();
         services.AddScoped<IDocumentExport, DocumentExport>();
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, CpeAccountData>();
         services.AddScoped<ISummaryService, SummaryService>();
         services.AddScoped<IVoidService, VoidService>();
         services.AddScoped<SecureFact.Billing.Contracts.IVoidStatusProvider, VoidStatusProvider>();

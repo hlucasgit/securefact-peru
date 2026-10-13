@@ -12,6 +12,9 @@ internal static class RateLimiting
     /// <summary>Public reads that a page makes on every visit (the brand of the portal): looser than the credential endpoints.</summary>
     public const string PublicPolicy = "public";
 
+    /// <summary>The package of an account (ADR-074): the heaviest read there is, a few times an hour per credential.</summary>
+    public const string ExportPolicy = "export";
+
     /// <summary>A short, non-reversible name of what the caller presented (an API key or an access token), or null when it presented nothing.</summary>
     private static string? CredentialOf(HttpContext context)
     {
@@ -62,6 +65,9 @@ internal static class RateLimiting
             options.AddPolicy(AuthPolicy, httpContext => RateLimitPartition.GetFixedWindowLimiter(
                 httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = configuration.GetValue("RateLimiting:AuthPermitPerMinute", 20), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ExportPolicy, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                CredentialOf(httpContext) ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = configuration.GetValue("RateLimiting:ExportPermitPerHour", 6), Window = TimeSpan.FromHours(1), QueueLimit = 0 }));
             options.AddPolicy(PublicPolicy, httpContext => RateLimitPartition.GetFixedWindowLimiter(
                 httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = configuration.GetValue("RateLimiting:PublicPermitPerMinute", 240), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));

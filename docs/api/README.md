@@ -58,6 +58,10 @@ Las listas reciben `skip` y `take` (hasta 100 por página).
 
 `GET /api/v1/electronic-documents/export?companyId=…&from=2026-09-01&to=2026-09-30[&documentTypeCode=01]` devuelve un ZIP con el XML firmado (`xml/`) y el CDR (`cdr/`) de cada comprobante del período, tal como se guardan, y un `indice.csv` con su estado, comprador y total. Pide el permiso de leer documentos. Hasta 500 comprobantes y 366 días por llamada (`SF-CPE-013` si se pasa: pida el período por partes).
 
+## Los datos de la cuenta (ADR-074)
+
+`GET /api/v1/account/export` devuelve un ZIP con todo lo que la cuenta tiene: `datos/*.csv` (empresas, series, comprobantes y sus líneas, guías, clientes, productos, usuarios, cargos, pagos, auditoría…), `xml/` y `cdr/` con los comprobantes tal como se guardan, `guias/` con las guías, un `LEEME.txt` y `datos/contenido.csv` con las filas y la huella SHA-256 de cada tabla. Solo el propietario de la cuenta (permiso `account.export`); una llave de API no lo tiene. No trae contraseñas, certificados, credenciales de SUNAT, llaves de API ni secretos de webhooks. Está limitado a 6 por hora por credencial (`429` con `Retry-After`). Una cuenta grande puede tardar: use un tiempo de espera largo.
+
 ## Webhooks (ADR-067)
 Para que la plataforma avise en vez de consultarla.
 

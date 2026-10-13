@@ -23,6 +23,7 @@ public static class CertificatesModule
         services.AddScoped<ICertificateProvider>(sp => sp.GetRequiredService<CertificateService>());
         services.AddScoped<SolCredentialService>();
         services.AddScoped<ISolCredentialAdministration>(sp => sp.GetRequiredService<SolCredentialService>());
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, CertificatesAccountData>();
         services.AddScoped<ISolCredentialProvider>(sp => sp.GetRequiredService<SolCredentialService>());
         return services;
     }

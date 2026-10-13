@@ -24,4 +24,4 @@ El contador de una empresa pide «los XML y los CDR de septiembre». Hasta hoy c
 - Sin PDF, sin comprobantes de GRE, ni resúmenes diarios y comunicaciones de baja como archivos propios del ZIP (el índice no los lista).
 - El índice no dice si el comprobante fue dado de baja o anulado con una nota de crédito: lo que tiene es el estado del envío a SUNAT.
 - Tope de 500 comprobantes por exportación; una empresa con más movimiento los pide por partes. Si hiciera falta uno mayor, sería un trabajo en segundo plano que deja el ZIP en el almacén y avisa por correo.
-- No es todavía la exportación de los datos de una cuenta (clientes, productos, usuarios, auditoría) ni su baja definitiva.
+- La exportación de los demás datos de la cuenta (clientes, productos, usuarios, auditoría) es de ADR-074; la baja definitiva sigue pendiente.

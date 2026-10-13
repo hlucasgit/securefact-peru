@@ -129,6 +129,7 @@ public sealed class ApiFixture : IAsyncLifetime
         // The suites of the whole API come from one address and one credential at a speed that the production limits (ADR-066) would refuse; the tests of the limit use a host of their own.
         Environment.SetEnvironmentVariable("RateLimiting__ApiPermitPerMinute", "1000000");
         Environment.SetEnvironmentVariable("RateLimiting__AddressPermitPerMinute", "1000000");
+        Environment.SetEnvironmentVariable("RateLimiting__ExportPermitPerHour", "100000");
         // The simulator of the payment gateway (ADR-073) is allowed for the tests only.
         Environment.SetEnvironmentVariable("Payments__AllowSandbox", "true");
         // The domains of the resellers (ADR-051): the platform's edge and its own hosts, the secret of the edge and a check that may be repeated after two seconds.

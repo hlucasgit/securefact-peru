@@ -32,6 +32,7 @@ public static class WebhooksModule
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IWebhooks, WebhookService>();
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, WebhooksAccountData>();
         services.AddScoped<DeliveryAttempt>();
         foreach (var eventType in WebhookFanOut.Handled)
         {

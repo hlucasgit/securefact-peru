@@ -24,6 +24,7 @@ public static class GreModule
         services.TryAddSingleton<IGreChannel, UnconfiguredGreChannel>();
         services.AddScoped<IGreService, GreService>();
         services.AddScoped<IGreSeriesAdministration, GreSeriesAdministration>();
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, GreAccountData>();
         services.AddSingleton<IGreWorkProcessor, GreWorkProcessor>();
         return services;
     }

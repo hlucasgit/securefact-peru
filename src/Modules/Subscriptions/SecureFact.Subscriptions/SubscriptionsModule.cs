@@ -31,6 +31,7 @@ public static class SubscriptionsModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IPricing, Pricing>();
         services.AddScoped<ICollections, Collections>();
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, SubscriptionsAccountData>();
         services.AddScoped<Commissions>();
         services.AddScoped<ICommissions>(sp => sp.GetRequiredService<Commissions>());
         services.AddScoped<Enforcement>();

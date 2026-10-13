@@ -58,7 +58,7 @@ describe('the navigation follows the role', () => {
   it('shows a tenant owner the operation, the audit and the failed messages, and no platform', () => {
     const owner = links(['TenantOwner'])
 
-    expect(owner).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Emitir', 'Usuarios', 'Plan y consumo', 'Auditoría', 'Mensajes fallidos', 'Acceso de soporte']))
+    expect(owner).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Emitir', 'Usuarios', 'Plan y consumo', 'Auditoría', 'Mensajes fallidos', 'Acceso de soporte', 'Datos de la cuenta']))
     expect(owner).not.toContain('Inquilinos')
   })
 
@@ -66,7 +66,7 @@ describe('the navigation follows the role', () => {
     const reader = links(['ReadOnly'])
 
     expect(reader).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Clientes']))
-    for (const hidden of ['Emitir', 'Resumen diario', 'Usuarios', 'Plan y consumo', 'Auditoría', 'Mensajes fallidos', 'Inquilinos', 'Acceso de soporte']) expect(reader).not.toContain(hidden)
+    for (const hidden of ['Emitir', 'Resumen diario', 'Usuarios', 'Plan y consumo', 'Auditoría', 'Mensajes fallidos', 'Inquilinos', 'Acceso de soporte', 'Datos de la cuenta']) expect(reader).not.toContain(hidden)
   })
 
   it('shows an auditor the audit and nothing to issue', () => {
@@ -81,7 +81,7 @@ describe('the navigation follows the role', () => {
     const inside = links(['SupportViewer'])
 
     expect(inside).toEqual(expect.arrayContaining(['Panel', 'Documentos', 'Clientes']))
-    for (const hidden of ['Emitir', 'Usuarios', 'Integraciones', 'Acceso de soporte', 'Inquilinos']) expect(inside).not.toContain(hidden)
+    for (const hidden of ['Emitir', 'Usuarios', 'Integraciones', 'Acceso de soporte', 'Datos de la cuenta', 'Inquilinos']) expect(inside).not.toContain(hidden)
   })
 })
 

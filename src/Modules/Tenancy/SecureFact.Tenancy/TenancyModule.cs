@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SecureFact.Platform.Persistence;
 using SecureFact.Platform.Tenancy;
+using SecureFact.SharedKernel.Export;
 using SecureFact.Tenancy.Application;
 using SecureFact.Tenancy.Contracts;
 using SecureFact.Tenancy.Infrastructure;
@@ -24,6 +25,8 @@ public static class TenancyModule
         services.AddScoped<IPlanLimits, PlanLimitsReader>();
         services.AddScoped<IResellerAdministration, ResellerAdministration>();
         services.AddScoped<IBranding, BrandingService>();
+        services.AddScoped<IAccountExport, AccountExport>();
+        services.AddScoped<IAccountDataContributor, TenancyAccountData>();
         services.TryAddScoped<ITenantNotices, NullTenantNotices>();
         return services;
     }

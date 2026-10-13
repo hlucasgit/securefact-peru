@@ -889,6 +889,18 @@
         }
       }
     },
+    "/api/v1/account/export": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/webhooks": {
       "get": {
         "tags": [
@@ -7437,6 +7449,9 @@
     },
     {
       "name": "Support access"
+    },
+    {
+      "name": "Account"
     },
     {
       "name": "Webhooks"

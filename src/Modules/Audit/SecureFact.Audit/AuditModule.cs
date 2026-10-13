@@ -20,6 +20,7 @@ public static class AuditModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IAuditQuery, AuditQuery>();
+        services.AddScoped<SecureFact.SharedKernel.Export.IAccountDataContributor, AuditAccountData>();
         return services;
     }
 

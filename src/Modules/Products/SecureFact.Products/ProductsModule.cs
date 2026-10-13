@@ -6,6 +6,7 @@ using SecureFact.Products.Contracts;
 using SecureFact.Products.Infrastructure;
 using SecureFact.Platform.Persistence;
 using SecureFact.Platform.Tenancy;
+using SecureFact.SharedKernel.Export;
 
 namespace SecureFact.Products;
 
@@ -19,6 +20,7 @@ public static class ProductsModule
             .AddInterceptors(new RlsConnectionInterceptor(sp.GetRequiredService<IDataScope>())));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IProductAdministration, ProductAdministration>();
+        services.AddScoped<IAccountDataContributor, ProductsAccountData>();
         return services;
     }
 
