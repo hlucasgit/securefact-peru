@@ -21,7 +21,8 @@ namespace SecureFact.Security.Tests;
 public sealed class AccountExportApiTests(ApiFixture api)
 {
     private const string Path = "/api/v1/account/export";
-    private const string SolPassword = "Sol-Clave-cuenta-1";
+    // Generated for each run, so there is no password written in the source.
+    private static readonly string SolPassword = "Sol-" + Guid.NewGuid().ToString("N")[..16];
 
     private static int _rucCounter = 60_000_000;
 
