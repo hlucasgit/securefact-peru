@@ -49,7 +49,7 @@ describe('paying a charge with a card', () => {
 
   it('with Culqi: its checkout gives the token, with the amount in céntimos, and only the token goes to the platform', async () => {
     const user = userEvent.setup()
-    culqi.ask.mockResolvedValue('tkn_test_AbCdEf0123456789')
+    culqi.ask.mockResolvedValue('tkn_test_ABCDABCDABCDABCD')
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(200, { status: 'Paid', message: 'Pago recibido. Gracias.', payment: { id: 'p1', amount: 118 } }))
     renderModal(CULQI)
 
@@ -58,7 +58,7 @@ describe('paying a charge with a card', () => {
 
     expect(await screen.findByText('Pago recibido. Gracias.')).toBeVisible()
     expect(culqi.ask).toHaveBeenCalledWith({ publicKey: 'pk_test_AbCdEf0123456789', amountCents: 11800, title: expect.stringContaining('2026'), email: 'dueno@cliente.pe' })
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ tokenId: 'tkn_test_AbCdEf0123456789', email: 'dueno@cliente.pe' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ tokenId: 'tkn_test_ABCDABCDABCDABCD', email: 'dueno@cliente.pe' })
   })
 
   it('says what the bank said when it refuses, and lets the person try again; a payment under review does not', async () => {
