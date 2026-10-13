@@ -67,6 +67,11 @@ import type {
   Series,
   SolCredential,
   SummaryResult,
+  GatewaySettings,
+  GatewaySettingsInput,
+  PayChargeResult,
+  PaymentAttempt,
+  PaymentConfig,
   SupportAvailable,
   SupportGrant,
   SupportSession,
@@ -116,6 +121,9 @@ export const keys = {
   webhooks: ['webhooks'] as const,
   supportGrants: ['support-grants'] as const,
   supportAvailable: ['support-available'] as const,
+  paymentConfig: ['payment-config'] as const,
+  gateway: ['payment-gateway'] as const,
+  attempts: ['payment-attempts'] as const,
   webhookDeliveries: (id: string, state: string) => ['webhooks', id, 'deliveries', state] as const,
   tenantProfile: (id: string) => ['platform', 'tenant', id, 'billing-profile'] as const,
   invoicing: ['platform', 'invoicing'] as const,
@@ -474,3 +482,12 @@ export const useGrantSupport = () =>
 export const useRevokeSupport = () => useAction((id: string) => post<SupportGrant>(`/api/v1/support-access/${id}/revoke`), [keys.supportGrants, ['audit']])
 export const useSupportAvailable = () => useQuery({ queryKey: keys.supportAvailable, queryFn: () => get<SupportAvailable[]>('/api/v1/support-sessions/available') })
 export const useEnterSupport = () => useAction((input: { tenantId: string; reason: string }) => post<SupportSession>('/api/v1/support-sessions', input), [])
+
+// Paying a charge with a card, and the gateway of the platform (ADR-073).
+export const usePaymentConfig = (enabled: boolean) => useQuery({ queryKey: keys.paymentConfig, queryFn: () => get<PaymentConfig>('/api/v1/payment-config'), enabled })
+export const usePayCharge = (chargeId: string) =>
+  useAction((input: { tokenId: string; email: string }) => post<PayChargeResult>(`/api/v1/charges/${chargeId}/pay`, input), [['charges'], keys.myPlan])
+export const useGatewaySettings = () => useQuery({ queryKey: keys.gateway, queryFn: () => get<GatewaySettings>('/api/v1/platform/payment-gateway') })
+export const useSetGateway = () => useAction((input: GatewaySettingsInput) => put<GatewaySettings>('/api/v1/platform/payment-gateway', input), [keys.gateway, ['audit']])
+export const usePaymentAttempts = () => useQuery({ queryKey: keys.attempts, queryFn: () => get<PaymentAttempt[]>('/api/v1/platform/payment-attempts') })
+export const useResolveAttempt = () => useAction((input: { id: string; note: string }) => post<PaymentAttempt>(`/api/v1/platform/payment-attempts/${input.id}/resolve`, { note: input.note }), [keys.attempts, ['charges']])

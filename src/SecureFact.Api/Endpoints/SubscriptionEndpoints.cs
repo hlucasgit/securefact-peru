@@ -18,6 +18,12 @@ internal static class SubscriptionEndpoints
 
     public sealed record ReasonBody(string Reason);
 
+    public sealed record NoteBody(string Note);
+
+    public sealed record PayBody(string TokenId, string Email);
+
+    public sealed record GatewayBody(PaymentGatewayProvider Provider, string? PublicKey, string? SecretKey, bool Enabled);
+
     public sealed record ScheduleBody(DateOnly EffectiveFrom, IReadOnlyList<CommissionTierInput> Tiers, string? Note);
 
     public sealed record SettleBody(DateOnly SettledOn, string? Reference, string? Note);
@@ -147,6 +153,26 @@ internal static class SubscriptionEndpoints
             user.TenantId is { } tenant
                 ? (await profiles.SetAsync(tenant, new BillingProfileInput(body.DocumentTypeCode, body.DocumentNumber, body.LegalName, body.Address, body.Email), ct)).ToHttp(http)
                 : Results.NotFound()).RequireAuthorization(Permissions.AccountBillingManage);
+
+        // ---------- pay a charge with a card (ADR-073) ----------
+
+        api.MapGet("/payment-config", async (ICurrentUser user, IChargePayments payments, HttpContext http, CancellationToken ct) =>
+            user.TenantId is null ? Results.NotFound() : (await payments.GetConfigAsync(ct)).ToHttp(http)).RequireAuthorization(Permissions.AccountBillingManage);
+
+        api.MapPost("/charges/{id:guid}/pay", async (Guid id, PayBody body, ICurrentUser user, IChargePayments payments, HttpContext http, CancellationToken ct) =>
+            user.TenantId is null ? Results.NotFound() : (await payments.PayAsync(id, new PayChargeRequest(body.TokenId, body.Email), ct)).ToHttp(http)).RequireAuthorization(Permissions.AccountBillingManage);
+
+        api.MapGet("/platform/payment-gateway", async (IGatewaySettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.GetAsync(ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsRead);
+
+        api.MapPut("/platform/payment-gateway", async (GatewayBody body, IGatewaySettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.SetAsync(new GatewaySettingsInput(body.Provider, body.PublicKey, body.SecretKey, body.Enabled), ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsManage);
+
+        api.MapGet("/platform/payment-attempts", async (IGatewaySettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.ListUnresolvedAsync(ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsRead);
+
+        api.MapPost("/platform/payment-attempts/{id:guid}/resolve", async (Guid id, NoteBody body, IGatewaySettings settings, HttpContext http, CancellationToken ct) =>
+            (await settings.ResolveAsync(id, body.Note, ct)).ToHttp(http)).RequireAuthorization(Permissions.SubscriptionsManage);
 
         api.MapGet("/charges/{id:guid}/documents/{kind}/pdf", async (Guid id, ChargeDocumentKind kind, ICurrentUser user, IChargeDocuments documents, HttpContext http, CancellationToken ct) =>
             user.TenantId is null ? Results.NotFound() : (await documents.GetPdfAsync(id, kind, ct)).ToHttp(http, pdf => Results.File(pdf, "application/pdf", $"{id:N}-{kind}.pdf")))

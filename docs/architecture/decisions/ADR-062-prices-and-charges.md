@@ -51,7 +51,7 @@ Consecuencia deliberada: una versión nueva solo alcanza a las cuentas que tomen
 - API con PostgreSQL (`SubscriptionsApiTests`, `CollectionPassTests`): permisos por rol, validación de versiones, precio que no alcanza a quien ya lo tiene, cargo único por mes y visible solo para su cuenta, pagos parciales, reversas y anulación, comprobantes que no se rechazan con excedente, excedente cobrado, tope de 24 cargos por pasada, fallo de una cuenta y falta de tasa, inmutabilidad (disparadores) y RLS con el rol de ejecución.
 
 ## Límites (P)
-- **No hay pasarela de cobro.** El cobro es manual: una persona registra la transferencia o el depósito. Integrar Culqi, Niubiz, Izipay o Stripe necesita elegir proveedor y una cuenta de pruebas, y no se puede verificar contra un tercero sin ellas.
+- **El cobro manual sigue siendo la base; la pasarela de tarjeta (ADR-073) es un camino más.** Antes: no había pasarela de cobro. El cobro es manual: una persona registra la transferencia o el depósito. Integrar Culqi, Niubiz, Izipay o Stripe necesita elegir proveedor y una cuenta de pruebas, y no se puede verificar contra un tercero sin ellas.
 - ~~El cargo no es un comprobante de pago~~: el comprobante de cada cargo lo emite la plataforma con una cuenta propia (ADR-065). El cargo calcula el IGV y el comprobante lo emite Billing; coinciden al centavo.
 - Solo soles. Los precios son decisión comercial y no fuente normativa; no se registran en `matrix.md`.
 - Una cuenta que cambia de plan a mitad de mes se cobra con el plan que tiene al cerrar el mes (el pase corre al comenzar el siguiente); no se prorratea.

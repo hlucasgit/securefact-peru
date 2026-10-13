@@ -18,6 +18,8 @@ const PROBLEM = { type: 'x', title: 'No encontrado', detail: 'No hay.', status: 
 const extras = (url: string): Response | null => {
   if (url.endsWith('/api/v1/platform/invoicing') || url.endsWith('/api/v1/billing-profile')) return json(404, PROBLEM)
   if (url.includes('/api/v1/platform/tenants?')) return json(200, [])
+  if (url.endsWith('/api/v1/platform/payment-gateway')) return json(200, { provider: 'Culqi', publicKey: null, hasSecretKey: false, environment: 'test', enabled: false, updatedAt: '0001-01-01T00:00:00Z' })
+  if (url.endsWith('/api/v1/platform/payment-attempts')) return json(200, [])
   return null
 }
 

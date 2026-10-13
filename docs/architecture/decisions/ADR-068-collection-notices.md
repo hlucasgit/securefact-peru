@@ -29,4 +29,4 @@ La cuenta se enteraba de lo que debe solo entrando a su pantalla de plan, y de l
 - Solo correo, solo a los propietarios de la cuenta: sin SMS ni WhatsApp ni un contacto de facturación aparte. El revendedor recibe su propio resumen (ADR-070).
 - El texto está en español y no se personaliza por revendedor más allá de la marca y el soporte (ADR-055).
 - No hay aviso por la factura que la plataforma emite por el cobro (ADR-065) ni por el cambio de datos de facturación; el cliente la descarga de su pantalla de plan.
-- No hay pasarela de pago: el aviso dice cuánto se debe y a quién escribir si ya se pagó, no incluye un enlace de pago.
+- El aviso dice cuánto se debe y a quién escribir si ya se pagó; no lleva un enlace de pago: la cuenta paga con tarjeta desde su pantalla de plan (ADR-073).

@@ -762,6 +762,7 @@
       "securefact.subscriptions": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Extensions.Http": "[10.0.12, )",
           "SecureFact.Audit.Contracts": "[1.0.0, )",
           "SecureFact.Billing.Contracts": "[1.0.0, )",
           "SecureFact.CpeEngine.Contracts": "[1.0.0, )",

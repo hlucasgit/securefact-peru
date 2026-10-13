@@ -35,6 +35,9 @@ public static class AuditActions
     public const string ChargeVoided = "subscriptions.charge.voided";
     public const string PaymentRecorded = "subscriptions.payment.recorded";
     public const string PaymentReversed = "subscriptions.payment.reversed";
+    public const string PaymentGatewayConfigured = "subscriptions.payment_gateway.configured";
+    public const string PaymentAttempted = "subscriptions.payment_attempt.completed";
+    public const string PaymentAttemptResolved = "subscriptions.payment_attempt.resolved";
     public const string CommissionScheduleCreated = "subscriptions.commission_schedule.published";
     public const string CommissionSettled = "subscriptions.commission.settled";
     public const string BillingProfileSet = "subscriptions.billing_profile.set";

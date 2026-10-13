@@ -19,6 +19,10 @@ internal sealed class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbCon
 
     public DbSet<InvoicingSetting> InvoicingSettings => Set<InvoicingSetting>();
 
+    public DbSet<GatewaySetting> GatewaySettings => Set<GatewaySetting>();
+
+    public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
+
     public DbSet<BillingProfile> Profiles => Set<BillingProfile>();
 
     public DbSet<ChargeDocument> ChargeDocuments => Set<ChargeDocument>();
@@ -141,6 +145,43 @@ internal sealed class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbCon
             b.Property(s => s.Enabled).HasColumnName("enabled");
             b.Property(s => s.UpdatedAt).HasColumnName("updated_at");
             b.Property(s => s.Version).IsRowVersion();
+        });
+
+        // How the platform takes card payments (ADR-073): platform staff only (RLS platform_only), the secret key encrypted.
+        modelBuilder.Entity<GatewaySetting>(b =>
+        {
+            b.ToTable("gateway_settings");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(s => s.Provider).HasColumnName("provider").HasConversion<string>().HasMaxLength(20);
+            b.Property(s => s.PublicKey).HasColumnName("public_key").HasMaxLength(100);
+            b.Property(s => s.ProtectedSecretKey).HasColumnName("protected_secret_key");
+            b.Property(s => s.Enabled).HasColumnName("enabled");
+            b.Property(s => s.UpdatedAt).HasColumnName("updated_at");
+            b.Property(s => s.Version).IsRowVersion();
+        });
+
+        // Each try to pay a charge with a card: the tenant reads its own (RLS tenant or platform), none is deleted.
+        modelBuilder.Entity<PaymentAttempt>(b =>
+        {
+            b.ToTable("payment_attempt");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(a => a.ChargeId).HasColumnName("charge_id");
+            b.Property(a => a.Amount).HasColumnName("amount").HasColumnType("numeric(14,2)");
+            b.Property(a => a.UserId).HasColumnName("user_id");
+            b.Property(a => a.State).HasColumnName("state").HasConversion<string>().HasMaxLength(30);
+            b.Property(a => a.GatewayChargeId).HasColumnName("gateway_charge_id").HasMaxLength(60);
+            b.Property(a => a.Code).HasColumnName("code").HasMaxLength(60);
+            b.Property(a => a.Message).HasColumnName("message").HasMaxLength(300);
+            b.Property(a => a.PaymentId).HasColumnName("payment_id");
+            b.Property(a => a.CreatedAt).HasColumnName("created_at");
+            b.Property(a => a.CompletedAt).HasColumnName("completed_at");
+            b.Property(a => a.Resolution).HasColumnName("resolution").HasMaxLength(300);
+            b.Property(a => a.Version).IsRowVersion();
+            b.HasIndex(a => new { a.ChargeId, a.CreatedAt });
+            b.HasIndex(a => a.State);
+            ConfigureTenantOwned(b);
         });
 
         // Who each tenant is invoiced as: the tenant reads and edits its own row (RLS tenant or platform).

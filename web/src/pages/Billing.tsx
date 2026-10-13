@@ -15,6 +15,7 @@ import {
   useMyCommissions,
   useMyCommissionStatement,
   useMyTerms,
+  usePaymentConfig,
   usePlanPrices,
   usePlans,
   usePublishPolicy,
@@ -32,6 +33,8 @@ import {
 } from '../api/queries'
 import type { BillingProfile, BillingProfileInput, Charge, ChargeDocument, ChargeStatus, CommissionMonth, CommissionStatement, InvoicingSettings, PaymentMethod, PlanRow, ResellerRow, TenantTerms } from '../api/types'
 import { useSession } from '../auth/session'
+import { PayChargeModal } from '../components/PayChargeModal'
+import { PaymentGatewayCard } from '../components/PaymentGatewayCard'
 import { Badge, Empty, ErrorAlert, KeyValues, Loading, Modal, PageHeader, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import {
   buildPayment,
@@ -61,7 +64,7 @@ export function ChargeBadge({ status }: { status: ChargeStatus }) {
 // ---------- charges ----------
 
 /** The charges of an account (or of all, for platform staff). Opening one shows what it is made of and its payments. */
-export function ChargesTable({ charges, withTenant, onOpen }: { charges: Charge[]; withTenant: boolean; onOpen: (charge: Charge) => void }) {
+export function ChargesTable({ charges, withTenant, onOpen, onPay }: { charges: Charge[]; withTenant: boolean; onOpen: (charge: Charge) => void; onPay?: (charge: Charge) => void }) {
   return (
     <div className="table-wrap">
       <table className="table">
@@ -95,6 +98,7 @@ export function ChargesTable({ charges, withTenant, onOpen }: { charges: Charge[
                 <button className="btn small" type="button" aria-label={`Ver cargo de ${monthLabel(charge.period)}${withTenant ? ` de ${charge.tenantName}` : ''}`} onClick={() => onOpen(charge)}>
                   Ver
                 </button>
+{onPay && charge.balance > 0 && charge.status !== 'Void' && (                  <button className="btn small primary" type="button" style={{ marginLeft: 6 }} aria-label={`Pagar el cargo de ${monthLabel(charge.period)}`} onClick={() => onPay(charge)}>                    Pagar                  </button>                )}
               </td>
             </tr>
           ))}
@@ -384,6 +388,7 @@ export function Collections() {
         )}
       </PageHeader>
       <InvoicingCard canManage={canManage} />
+      <PaymentGatewayCard canManage={canManage} />
       <div className="card">
         <ErrorAlert error={error ?? run.error} />
         <div className="row" style={{ alignItems: 'flex-end', marginBottom: 12 }}>
@@ -661,15 +666,19 @@ function InvoicingModal({ initial, onClose }: { initial: InvoicingSettings | nul
 export function MyCharges() {
   const terms = useMyTerms()
   const charges = useCharges({}, true)
+  const { hasRole } = useSession()
+  const config = usePaymentConfig(hasRole('TenantOwner', 'TenantAdmin', 'BillingAdmin'))
   const [open, setOpen] = useState<string | null>(null)
+  const [paying, setPaying] = useState<Charge | null>(null)
   return (
     <div className="card">
       <h2>Precio y cargos</h2>
       <ErrorAlert error={terms.error ?? charges.error} />
       {terms.isPending ? <Loading /> : terms.data && <TermsSummary terms={terms.data} />}
       <MyProfile />
-      {charges.isPending ? <Loading /> : charges.data && charges.data.length > 0 ? <ChargesTable charges={charges.data} withTenant={false} onOpen={(charge) => setOpen(charge.id)} /> : <Empty>Aún no tiene cargos.</Empty>}
+      {charges.isPending ? <Loading /> : charges.data && charges.data.length > 0 ? <ChargesTable charges={charges.data} withTenant={false} onOpen={(charge) => setOpen(charge.id)} onPay={config.data?.enabled ? setPaying : undefined} /> : <Empty>Aún no tiene cargos.</Empty>}
       {open && <ChargeModal id={open} own canManage={false} onClose={() => setOpen(null)} />}
+      {paying && config.data?.enabled && <PayChargeModal charge={paying} config={config.data} onClose={() => setPaying(null)} />}
     </div>
   )
 }

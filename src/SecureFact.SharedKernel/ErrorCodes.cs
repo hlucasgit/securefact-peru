@@ -54,6 +54,18 @@ public static class ErrorCodes
 
     public const string ChargeDocumentNotFound = "SF-SUB-011";
 
+    public const string PaymentsUnavailable = "SF-PAY-001";
+
+    public const string InvalidPaymentGateway = "SF-PAY-002";
+
+    public const string PaymentInProgress = "SF-PAY-003";
+
+    public const string NothingToPay = "SF-PAY-004";
+
+    public const string PaymentAttemptNotFound = "SF-PAY-005";
+
+    public const string PaymentAmountOutOfRange = "SF-PAY-006";
+
     public const string InvalidApiKey = "SF-KEY-001";
 
     public const string ApiKeyNotFound = "SF-KEY-002";

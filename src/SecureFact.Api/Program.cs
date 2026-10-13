@@ -148,7 +148,7 @@ if (appConnection is not null)
     builder.Services.AddCertificatesModule(appConnection);
     builder.Services.AddCpePipeline(appConnection);
     builder.Services.AddGreModule(appConnection);
-    builder.Services.AddSubscriptionsModule(appConnection);
+    builder.Services.AddSubscriptionsModule(appConnection, builder.Configuration.GetSection(SecureFact.Subscriptions.Application.PaymentOptions.SectionName).Get<SecureFact.Subscriptions.Application.PaymentOptions>(), builder.Environment.IsProduction());
     builder.Services.AddWebhooksModule(appConnection, builder.Configuration.GetSection(WebhookOptions.SectionName).Get<WebhookOptions>() ?? new WebhookOptions(), builder.Environment.IsProduction());
 
     // SUNAT is never reached implicitly: the environment must be named. Without it, documents are prepared and signed but not sent.

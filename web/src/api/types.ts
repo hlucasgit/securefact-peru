@@ -949,3 +949,53 @@ export interface SupportSession {
   expiresAt: string
   readOnly: boolean
 }
+
+// Pago de cargos con tarjeta (ADR-073)
+export type PaymentGatewayProvider = 'Culqi' | 'Sandbox'
+
+export interface GatewaySettings {
+  provider: PaymentGatewayProvider
+  publicKey: string | null
+  hasSecretKey: boolean
+  environment: 'test' | 'live' | 'sandbox'
+  enabled: boolean
+  updatedAt: string
+}
+
+export interface GatewaySettingsInput {
+  provider: PaymentGatewayProvider
+  publicKey: string | null
+  secretKey: string | null
+  enabled: boolean
+}
+
+export interface PaymentConfig {
+  enabled: boolean
+  provider: PaymentGatewayProvider | null
+  publicKey: string | null
+  environment: string | null
+}
+
+export type PayStatus = 'Paid' | 'Declined' | 'NeedsAuthentication' | 'Failed' | 'UnderReview'
+
+export interface PayChargeResult {
+  status: PayStatus
+  message: string
+  payment: { id: string; amount: number } | null
+}
+
+export interface PaymentAttempt {
+  id: string
+  tenantId: string
+  tenantName: string
+  chargeId: string
+  period: string
+  amount: number
+  state: string
+  gatewayChargeId: string | null
+  code: string | null
+  message: string | null
+  createdAt: string
+  completedAt: string | null
+  resolution: string | null
+}
