@@ -61,3 +61,5 @@ Prueba funcional (no de carga) del 2026-10-01 con `tools/SecureFact.BetaSmoke`: 
 
 ## Lección
 La hoja de reglas **no basta** para saber qué es obligatorio: las condiciones «C» pueden ser error por fecha de vigencia. Cada cambio del generador debe probarse contra el beta (de forma funcional, nunca con carga).
+
+- **ISC según precio de venta al público, sistema 03** (2026-10-13; `tools/SecureFact.BetaSmoke iscretail`, un solo envío con el usuario de pruebas público): una factura con tres unidades, tasa 30 % y precio sugerido de S/ 37 (base 94.02 = 37 × 0.847 × 3, ISC 28.21, `Percent` 30.00, `TierRange` 03) fue aceptada con código 0 y sin observaciones. El beta solo comprueba que el ISC sea la tasa por la base declarada (regla 3108); no valida el precio sugerido ni el factor (R-081, ADR-075).

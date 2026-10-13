@@ -26,6 +26,12 @@ public enum IscSystem
 
     /// <summary>02 – fixed amount per unit.</summary>
     FixedAmount = 2,
+
+    /// <summary>
+    /// 03 – ad valorem on the retail price (Apéndice IV, literal C): the base is the retail price suggested by the producer or importer times a factor that is one over one plus the IGV rate,
+    /// IPM included, rounded to three decimals (TUO de la Ley del IGV e ISC, art. 56 c).
+    /// </summary>
+    RetailPrice = 3,
 }
 
 /// <summary>
@@ -34,7 +40,10 @@ public enum IscSystem
 /// </summary>
 public sealed record TaxRates(decimal IgvRate, decimal IvapRate = 0m, decimal IcbperUnitAmount = 0m);
 
-public sealed record IscInput(IscSystem System, decimal RateOrUnitAmount);
+/// <param name="System">Catalogue 08 system.</param>
+/// <param name="RateOrUnitAmount">The rate as a fraction (systems 01 and 03) or the amount per unit (system 02).</param>
+/// <param name="SuggestedRetailPrice">Per unit, taxes included: only for system 03, where it is required.</param>
+public sealed record IscInput(IscSystem System, decimal RateOrUnitAmount, decimal? SuggestedRetailPrice = null);
 
 /// <summary>One document line. Amounts are in the document currency; <see cref="UnitValue"/> excludes every tax.</summary>
 /// <param name="Quantity">Positive, at most 10 decimals.</param>
@@ -89,7 +98,12 @@ public sealed record LineTaxResult(
     decimal IcbperAmount,
     decimal TotalTaxAmount,
     /// <summary>Precio de venta unitario incluidos tributos (10 decimals); null for free operations.</summary>
-    decimal? UnitPriceIncludingTaxes);
+    decimal? UnitPriceIncludingTaxes,
+    /// <summary>
+    /// The taxable amount of the ISC of the line (cbc:TaxableAmount of the 2000 subtotal): the value of the line for systems 01 and 02, the retail price based amount for system 03. Zero when the
+    /// line has no ISC, and in the totals of documents calculated before it existed (then the value of the line is the base).
+    /// </summary>
+    decimal IscBase = 0m);
 
 public sealed record TaxCalculationResult(
     IReadOnlyList<LineTaxResult> Lines,

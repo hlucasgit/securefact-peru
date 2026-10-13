@@ -15,8 +15,10 @@ export interface LineState {
   affectation: string
   discount: string
   referenceValue: string
-  isc: 'none' | 'AdValorem' | 'FixedAmount'
+  isc: 'none' | 'AdValorem' | 'FixedAmount' | 'RetailPrice'
   iscValue: string
+  /** The retail price suggested by the producer or the importer (system 03 of the ISC). */
+  iscRetailPrice: string
   bags: boolean
   /** The data that a line states in some operations; only the one the document asks for is sent. */
   transport: TransportState
@@ -27,7 +29,7 @@ export interface LineState {
 let counter = 0
 
 export function emptyLine(): LineState {
-  return { key: ++counter, description: '', unitCode: 'NIU', productCode: null, quantity: '1', unitValue: '', affectation: '10', discount: '', referenceValue: '', isc: 'none', iscValue: '', bags: false, transport: emptyTransport(), fishing: emptyFishing(), guest: emptyGuest() }
+  return { key: ++counter, description: '', unitCode: 'NIU', productCode: null, quantity: '1', unitValue: '', affectation: '10', discount: '', referenceValue: '', isc: 'none', iscValue: '', iscRetailPrice: '', bags: false, transport: emptyTransport(), fishing: emptyFishing(), guest: emptyGuest() }
 }
 
 /** A line prefilled from a document line (to adjust it with a note). */
@@ -41,7 +43,8 @@ export function lineFrom(line: DocumentLine): LineState {
     unitValue: String(line.unitValue),
     affectation: line.igvAffectationCode,
     isc: line.isc?.system ?? 'none',
-    iscValue: line.isc ? String(line.isc.system === 'AdValorem' ? Math.round(line.isc.rateOrUnitAmount * 10000) / 100 : line.isc.rateOrUnitAmount) : '',
+    iscValue: line.isc ? String(line.isc.system === 'FixedAmount' ? line.isc.rateOrUnitAmount : Math.round(line.isc.rateOrUnitAmount * 10000) / 100) : '',
+    iscRetailPrice: line.isc?.suggestedRetailPrice != null ? String(line.isc.suggestedRetailPrice) : '',
     bags: line.plasticBagCount > 0,
   }
 }
@@ -64,7 +67,9 @@ export function toRequestLine(line: LineState, isFree: boolean, detail?: LineDet
       igvAffectationCode: line.affectation,
       ...(num(line.discount) > 0 ? { discountAffectingBase: num(line.discount) } : {}),
       ...(isFree ? { referenceUnitValue: num(line.referenceValue) } : {}),
-      ...(line.isc !== 'none' ? { isc: { system: line.isc, rateOrUnitAmount: line.isc === 'AdValorem' ? num(line.iscValue) / 100 : num(line.iscValue) } } : {}),
+      ...(line.isc !== 'none'
+        ? { isc: { system: line.isc, rateOrUnitAmount: line.isc === 'FixedAmount' ? num(line.iscValue) : num(line.iscValue) / 100, ...(line.isc === 'RetailPrice' ? { suggestedRetailPrice: num(line.iscRetailPrice) } : {}) } }
+        : {}),
       plasticBagCount: line.bags ? quantity : 0,
     },
   }
@@ -136,9 +141,22 @@ export function LinesEditor({ lines, onChange, fixedAffectation, detail }: Props
                 <option value="none">Sin ISC</option>
                 <option value="AdValorem">Al valor (%)</option>
                 <option value="FixedAmount">Monto fijo por unidad</option>
+                <option value="RetailPrice">Según precio de venta al público (%)</option>
               </SelectField>
               {line.isc !== 'none' && (
-                <TextField label={line.isc === 'AdValorem' ? 'Tasa del ISC (%)' : 'ISC por unidad'} type="number" min="0" step="any" required value={line.iscValue} onChange={(event) => update(line.key, { iscValue: event.target.value })} />
+                <TextField label={line.isc === 'FixedAmount' ? 'ISC por unidad' : 'Tasa del ISC (%)'} type="number" min="0" step="any" required value={line.iscValue} onChange={(event) => update(line.key, { iscValue: event.target.value })} />
+              )}
+              {line.isc === 'RetailPrice' && (
+                <TextField
+                  label="Precio de venta al público sugerido"
+                  hint="por unidad, con impuestos; la base del ISC es este precio por el factor de la ley"
+                  type="number"
+                  min="0"
+                  step="any"
+                  required
+                  value={line.iscRetailPrice}
+                  onChange={(event) => update(line.key, { iscRetailPrice: event.target.value })}
+                />
               )}
               <label className="checkbox" style={{ alignSelf: 'end' }}>
                 <input type="checkbox" checked={line.bags} onChange={(event) => update(line.key, { bags: event.target.checked })} />

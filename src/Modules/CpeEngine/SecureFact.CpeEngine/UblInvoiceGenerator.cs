@@ -659,6 +659,11 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
                 return Invalid($"la línea {i + 1} tiene ISC y no declara su sistema y tasa, o su valor de venta es cero.");
             }
 
+            if (result.IscAmount > 0 && line.Isc is { System: IscSystem.RetailPrice } retail && retail.SuggestedRetailPrice is not > 0)
+            {
+                return Invalid($"la línea {i + 1} tiene ISC según precio de venta al público y no declara el precio sugerido.");
+            }
+
             if (result.IscAmount == 0 && line.Isc is not null)
             {
                 return Invalid($"la línea {i + 1} declara ISC pero el cálculo no lo tiene.");
@@ -1396,13 +1401,14 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
     }
 
     /// <summary>
-    /// ISC subtotal of a line (rules 2992, 3050, 3104, 3108, 2373, 2041): the base is the value of the line, the rate is stated in <c>cbc:Percent</c> (never zero) and the system of the
+    /// ISC subtotal of a line (rules 2992, 3050, 3104, 3108, 2373, 2041): the base is the value of the line (the retail price based amount for system 03), the rate is stated in <c>cbc:Percent</c> (never zero) and the system of the
     /// tax (catalogue 08) in <c>cbc:TierRange</c>. A fixed-amount ISC has no rate: the percent that results from the amount over the base is stated, so the amount stays
     /// the rate times the base.
     /// </summary>
     private static XElement IscSubtotal(IscInput isc, LineTaxResult result, string currency)
     {
-        var percent = isc.System == IscSystem.AdValorem ? isc.RateOrUnitAmount * 100m : result.IscAmount / result.LineExtensionAmount * 100m;
+        var baseAmount = IscBaseOf(result);
+        var percent = isc.System is IscSystem.AdValorem or IscSystem.RetailPrice ? isc.RateOrUnitAmount * 100m : result.IscAmount / baseAmount * 100m;
         var category = Category(TaxCodes.Isc, 0m, null);
         var scheme = category.Element(Cac + "TaxScheme")!;
         scheme.AddBeforeSelf(
@@ -1410,13 +1416,22 @@ internal sealed class UblInvoiceGenerator : IUblDocumentGenerator
             new XElement(Cbc + "TierRange", IscSystemCode(isc.System)));
         return new XElement(
             Cac + "TaxSubtotal",
-            Amount("TaxableAmount", result.LineExtensionAmount, currency),
+            Amount("TaxableAmount", baseAmount, currency),
             Amount("TaxAmount", result.IscAmount, currency),
             category);
     }
 
+    /// <summary>The base of the ISC of a line: its own amount, or the value of the line for the totals that were calculated before the retail price system existed.</summary>
+    private static decimal IscBaseOf(LineTaxResult result) => result.IscBase > 0 ? result.IscBase : result.LineExtensionAmount;
+
     /// <summary>Catalogue 08 code of the ISC system.</summary>
-    private static string IscSystemCode(IscSystem system) => system == IscSystem.AdValorem ? "01" : "02";
+    private static string IscSystemCode(IscSystem system) => system switch
+    {
+        IscSystem.AdValorem => "01",
+        IscSystem.FixedAmount => "02",
+        IscSystem.RetailPrice => "03",
+        _ => throw new InvalidOperationException("Unknown ISC system."),
+    };
 
     /// <summary>
     /// ICBPER subtotal of a line (rules 3236–3238, 4318, 4320, 4237): no taxable amount and no rate; the number of bags goes in <c>cbc:BaseUnitMeasure</c> (unit NIU) and the amount

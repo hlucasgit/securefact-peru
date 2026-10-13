@@ -53,8 +53,11 @@ var detractionOperation = fishingSale ? "1002" : passengerSale ? "1003" : cargoS
 var detractionCode = fishingSale ? "004" : passengerSale ? "028" : cargoSale ? "027" : "037";
 var detractionPercentage = detractionOperation == "1001" ? 12m : 4m;
 // "isc" (ad valorem 10 %) or "iscfixed" (S/ 1.50 per unit): a taxed line of three units with the ISC (tax 2000); "bags": the same line with three plastic bags (ICBPER, tax 7152).
-var iscSale = args.Contains("isc", StringComparer.Ordinal) || args.Contains("iscfixed", StringComparer.Ordinal);
-var iscInput = args.Contains("iscfixed", StringComparer.Ordinal) ? new IscInput(IscSystem.FixedAmount, 1.50m) : new IscInput(IscSystem.AdValorem, 0.10m);
+// "iscretail": the same line with the ISC on the suggested retail price (system 03): rate 30 % on a price of S/ 37 per unit, times the factor of the TUO (art. 56 c).
+var iscSale = args.Contains("isc", StringComparer.Ordinal) || args.Contains("iscfixed", StringComparer.Ordinal) || args.Contains("iscretail", StringComparer.Ordinal);
+var iscInput = args.Contains("iscfixed", StringComparer.Ordinal) ? new IscInput(IscSystem.FixedAmount, 1.50m)
+    : args.Contains("iscretail", StringComparer.Ordinal) ? new IscInput(IscSystem.RetailPrice, 0.30m, 37m)
+    : new IscInput(IscSystem.AdValorem, 0.10m);
 var bagSale = args.Contains("bags", StringComparer.Ordinal);
 // SF_BETA_ICBPER: amount per bag (0.50 by default, the one in force; another one makes SUNAT observe 4237).
 var icbperAmount = decimal.TryParse(Environment.GetEnvironmentVariable("SF_BETA_ICBPER"), NumberStyles.Number, CultureInfo.InvariantCulture, out var bagAmount) ? bagAmount : 0.50m;

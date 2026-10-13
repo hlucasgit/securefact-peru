@@ -103,7 +103,7 @@ internal sealed class TaxCalculator : ITaxCalculator
             if (iscAmount > 0)
             {
                 isc += iscAmount;
-                iscBase += result.LineExtensionAmount;
+                iscBase += result.IscBase;
             }
 
             icbper += result.IcbperAmount;
@@ -255,7 +255,7 @@ internal sealed class TaxCalculator : ITaxCalculator
             return Bad(ErrorCodes.TaxAmountOverflow, number, "El valor de venta de la línea excede 12 enteros y 2 decimales.");
         }
 
-        decimal iscAmount = 0;
+        decimal iscAmount = 0, iscBase = 0;
         if (line.Isc is { } isc)
         {
             if (isc.RateOrUnitAmount <= 0)
@@ -263,12 +263,36 @@ internal sealed class TaxCalculator : ITaxCalculator
                 return Bad(ErrorCodes.TaxInvalidInput, number, "La tasa o monto unitario del ISC debe ser mayor que cero.");
             }
 
-            iscAmount = isc.System switch
+            if (isc.System == IscSystem.RetailPrice)
             {
-                IscSystem.AdValorem => Round2(isc.RateOrUnitAmount * lineValue),
-                IscSystem.FixedAmount => Round2(isc.RateOrUnitAmount * line.Quantity),
-                _ => throw new InvalidOperationException("Unknown ISC system."),
-            };
+                if (isc.SuggestedRetailPrice is not > 0)
+                {
+                    return Bad(ErrorCodes.TaxInvalidInput, number, "El ISC según precio de venta al público necesita el precio de venta al público sugerido, mayor que cero.");
+                }
+
+                iscBase = Round2(isc.SuggestedRetailPrice.Value * RetailPriceFactor(rates.IgvRate) * line.Quantity);
+                if (iscBase > MaxAmount)
+                {
+                    return Bad(ErrorCodes.TaxAmountOverflow, number, "La base del ISC de la línea excede 12 enteros y 2 decimales.");
+                }
+
+                iscAmount = Round2(isc.RateOrUnitAmount * iscBase);
+            }
+            else
+            {
+                if (isc.SuggestedRetailPrice is not null)
+                {
+                    return Bad(ErrorCodes.TaxInvalidInput, number, "El precio de venta al público sugerido solo se declara en el ISC según precio de venta al público.");
+                }
+
+                iscBase = lineValue;
+                iscAmount = isc.System switch
+                {
+                    IscSystem.AdValorem => Round2(isc.RateOrUnitAmount * lineValue),
+                    IscSystem.FixedAmount => Round2(isc.RateOrUnitAmount * line.Quantity),
+                    _ => throw new InvalidOperationException("Unknown ISC system."),
+                };
+            }
         }
 
         decimal igvOrIvap = 0;
@@ -288,9 +312,12 @@ internal sealed class TaxCalculator : ITaxCalculator
             ? null
             : Round(lineValue + lineTax - line.DiscountNotAffectingBase + line.ChargeNotAffectingBase, UnitDecimals, line.Quantity);
 
-        var result = new LineTaxResult(number, lineValue, kind.TaxCode, iscAmount, igvOrIvap, icbper, lineTax, unitPrice);
+        var result = new LineTaxResult(number, lineValue, kind.TaxCode, iscAmount, igvOrIvap, icbper, lineTax, unitPrice, iscAmount > 0 ? iscBase : 0m);
         return (result, iscAmount);
     }
+
+    /// <summary>The factor of the system of the retail price: one over one plus the rate of the IGV, IPM included, rounded to three decimals (TUO de la Ley del IGV e ISC, art. 56 c).</summary>
+    public static decimal RetailPriceFactor(decimal igvRate) => Math.Round(1m / (1m + igvRate), 3, MidpointRounding.AwayFromZero);
 
     private static Error? ValidateRates(TaxRates rates)
     {

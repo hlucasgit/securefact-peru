@@ -208,7 +208,7 @@ function Detail({ document: doc, electronic, loadingElectronic, voidRequested, o
                     {line.description}
                     <div className="row" style={{ gap: 6 }}>
                       <span className="muted">Afectación {line.igvAffectationCode}</span>
-                      {line.isc && <Badge tone="info">ISC {line.isc.system === 'AdValorem' ? `${Math.round(line.isc.rateOrUnitAmount * 10000) / 100} %` : money(line.isc.rateOrUnitAmount, doc.currency)}</Badge>}
+                      {line.isc && <Badge tone="info">ISC {line.isc.system === 'FixedAmount' ? money(line.isc.rateOrUnitAmount, doc.currency) : `${Math.round(line.isc.rateOrUnitAmount * 10000) / 100} %`}{line.isc.system === 'RetailPrice' ? ' s/ PVP' : ''}</Badge>}
                       {line.plasticBagCount > 0 && <Badge tone="info">{line.plasticBagCount} bolsas</Badge>}
                     </div>
                     {line.fishing && (

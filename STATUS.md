@@ -147,7 +147,8 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 ## ISC e ICBPER
 - **ISC** (al valor y de monto fijo) **e ICBPER** en el UBL de facturas, boletas, notas y resumen diario, y en el PDF (ADR-037): subtotales de línea y globales según las hojas de reglas; el ISC entra en la base del IGV de la línea. Aceptados por el beta de SUNAT (factura, boleta, notas y resumen).
 - El monto por bolsa del ICBPER es `Verified` con el calendario de la Ley 30884 (S26): el beta **no** valida ese monto.
-- Pendiente: sistema 03 del ISC (precio de venta al público), anticipos de ISC y otros tributos (9999).
+- **ISC según precio de venta al público, sistema 03** (ADR-075): la base es el precio sugerido por unidad por el factor de la ley (1 / (1 + IGV con IPM), 0.847 con 18 %) por la cantidad; el XML lleva esa base y `TierRange` 03; aceptado por el beta (2026-10-13). Interfaz con la tasa y el precio sugerido. **P**: la lista de bienes y tasas del literal C vigente no se verificó (la declara quien emite) y la guía de SUNAT no aplica el factor en su ejemplo.
+- Pendiente: anticipos de ISC y otros tributos (9999).
 
 ## Cobertura
 - Medida con coverlet (`coverage.runsettings`) sobre las cuatro suites juntas y unida con ReportGenerator: **95.8 % de líneas y 85.2 % de ramas** (96.0 % y 85.5 % antes del archivo en el almacén de objetos), el 2026-10-06. Excluye migraciones, fábricas de tiempo de diseño, herramientas y pruebas. El CI la mide en cada corrida, la publica en el resumen del job y como artefacto, y **falla bajo un piso de 95 % de líneas y 84 % de ramas** (`.github/scripts/check_coverage.py`; los pisos solo suben).
@@ -158,12 +159,12 @@ Fase 0 completa. **Fase 1 completa** (outbox, bus de mensajes y almacenamiento d
 - Valores `Pending` en reglas: plazo de boletas (ver `/api/v1/rules`). El monto del ICBPER ya es `Verified` (Ley 30884, ADR-037).
 - Aceptación de SUNAT confirmada **solo en el beta** para factura, boleta y resumen simples; producción sin probar.
 - Auditoría fuera de la transacción de negocio (ADR-012; el outbox ya permitiría un origen propio para ella); la base conserva los bytes del XML y del CDR hasta la fase 2 del archivo (ADR-036).
-- ISC (sistemas al valor y de monto fijo) e ICBPER se emiten en el UBL (ADR-037); faltan el sistema 03 del ISC (precio de venta al público), los anticipos de ISC y otros tributos (9999).
+- ISC (sistemas al valor y de monto fijo) e ICBPER se emiten en el UBL (ADR-037); el sistema 03 es de ADR-075; faltan los anticipos de ISC y otros tributos (9999).
 - Notas de crédito/débito esperan el CDR (Fase 4).
 
 ## Pendientes
 1. Commit y push.
-2. Sistema 03 del ISC, anticipos y otros tributos (9999) en el UBL.
+2. Anticipos de ISC y otros tributos (9999) en el UBL.
 3. Prueba en el beta de SUNAT (con credenciales del usuario), bajas y notas, PDF.
 4. Fase 2 del archivo: leer el XML y el CDR desde el almacén y dejar solo metadatos en la base (condiciones en ADR-036).
 5. PDF y renderizado del QR.

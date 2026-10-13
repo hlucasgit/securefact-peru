@@ -18,7 +18,7 @@
 ## Supuestos explícitos (a confirmar, ver matriz)
 - **R-024** Modo de redondeo `MidpointRounding.AwayFromZero` (la norma publicada que leímos solo fija decimales y una tolerancia).
 - **R-025** Las reglas oficiales validan sumas con "tolerancia ± 1"; la unidad (¿1 sol?) debe confirmarse en la Guía XML. El motor produce valores exactos al centavo, por lo que queda dentro de cualquier tolerancia razonable; la tolerancia solo se usará en el validador de reglas SUNAT (Fase 3).
-- No soportados todavía (devuelven `SF-TAX-002`): mezcla IGV + IVAP, ISC sistema 03, anticipos (códigos 04/05/06/20), percepciones/retenciones, detracciones.
+- No soportados todavía (devuelven `SF-TAX-002`): mezcla IGV + IVAP, anticipos (códigos 04/05/06/20), percepciones/retenciones, detracciones.
 
 ## Verificación
 40 pruebas unitarias con casos calculados a mano más 3 000 documentos aleatorios que comprueban las identidades de las reglas oficiales (suma de líneas, precio de venta, importe total, deriva del IGV ≤ 1 centavo por línea).

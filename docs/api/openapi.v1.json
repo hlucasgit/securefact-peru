@@ -6483,13 +6483,23 @@
               "string"
             ],
             "format": "double"
+          },
+          "suggestedRetailPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
       "IscSystem": {
         "enum": [
           "AdValorem",
-          "FixedAmount"
+          "FixedAmount",
+          "RetailPrice"
         ]
       },
       "LoginRequest": {

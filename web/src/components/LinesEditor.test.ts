@@ -22,6 +22,14 @@ describe('toRequestLine', () => {
     expect(fixed.tax.isc).toEqual({ system: 'FixedAmount', rateOrUnitAmount: 1.5 })
   })
 
+  it('sends the suggested retail price only with the system of the retail price and takes its rate as a percentage', () => {
+    const retail = toRequestLine({ ...emptyLine(), quantity: '3', unitValue: '100', isc: 'RetailPrice', iscValue: '30', iscRetailPrice: '37' }, false)
+    const other = toRequestLine({ ...emptyLine(), quantity: '3', unitValue: '100', isc: 'AdValorem', iscValue: '10', iscRetailPrice: '37' }, false)
+
+    expect(retail.tax.isc).toEqual({ system: 'RetailPrice', rateOrUnitAmount: 0.3, suggestedRetailPrice: 37 })
+    expect(other.tax.isc).toEqual({ system: 'AdValorem', rateOrUnitAmount: 0.1 })
+  })
+
   it('sends the reference value, and no unit value, for a free operation', () => {
     const line = toRequestLine({ ...emptyLine(), affectation: '11', unitValue: '99', referenceValue: '30' }, true)
 

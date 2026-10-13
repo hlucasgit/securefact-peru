@@ -9,7 +9,7 @@ El `TaxCalculator` calculaba el ISC (tributo 2000) y el impuesto al consumo de l
 ## Decisión
 
 ### Qué se emite (hojas `Factura2_0`, `Boleta2_0`, `NotaCredito2_0`, `NotaDebito2_0`, `Resumen Diario1_1` y catálogos 05 y 08)
-- **ISC en la línea**: un `cac:TaxSubtotal` con base = valor de venta de la línea, monto = ISC, `cbc:Percent` (nunca cero, regla 3104) y `cbc:TierRange` con el sistema del catálogo 08 (`01` al valor, `02` monto fijo; el sistema 03, precio de venta al público, no existe en el motor); sin `TaxExemptionReasonCode` (regla 3050). Un ISC de monto fijo no tiene tasa: se declara el porcentaje que resulta del monto sobre la base, de modo que el monto siga siendo tasa × base (regla 3108).
+- **ISC en la línea**: un `cac:TaxSubtotal` con base = valor de venta de la línea, monto = ISC, `cbc:Percent` (nunca cero, regla 3104) y `cbc:TierRange` con el sistema del catálogo 08 (`01` al valor, `02` monto fijo, `03` precio de venta al público: ADR-075); sin `TaxExemptionReasonCode` (regla 3050). Un ISC de monto fijo no tiene tasa: se declara el porcentaje que resulta del monto sobre la base, de modo que el monto siga siendo tasa × base (regla 3108).
 - **El ISC entra en la base del IGV de la línea** (regla 3272): el subtotal 1000 de la línea lleva base = valor + ISC. **El total global** 1000 lleva solo el valor de venta (regla 3277) y el 2000 global la suma de las bases y de los montos de las líneas (reglas 3296 y 3298).
 - **ICBPER en la línea**: un subtotal sin base ni tasa, con `cbc:TaxAmount`, `cbc:BaseUnitMeasure unitCode="NIU"` = cantidad de bolsas y `cbc:PerUnitAmount` = monto por bolsa en `cac:TaxCategory` (reglas 3236–3238, 4318, 4320). Globalmente, un subtotal solo con el monto (regla 3306). El ICBPER **no** forma parte de la base del IGV y sí del total.
 - **Monto del tributo de la línea** = suma de los tributos de la línea (regla 3292); el subtotal del IGV de la línea lleva solo el IGV.
@@ -31,6 +31,6 @@ Ley 30884, art. 12.5 (texto en El Peruano, fuente S26): S/ 0,10 en 2019, 0,20 en
 
 ## Límites (P)
 - **El beta no comprobó el monto por bolsa**: una factura con S/ 0,10 por bolsa (distinto del vigente) también fue aceptada, sin la observación 4237. El valor sale de la ley, no del beta.
-- **Sistema 03 del ISC** (precio de venta al público), **anticipos de ISC** (descuento 20) y **otros tributos** (9999) no están soportados.
+- **Anticipos de ISC** (descuento 20) y **otros tributos** (9999) no están soportados.
 - Un ISC de monto fijo declara el porcentaje que resulta del cálculo; qué espera SUNAT en ese campo no está documentado (el beta lo aceptó).
 - Una nota debe repetir por su cuenta el ISC y las bolsas de sus líneas: no se derivan del documento que modifica.

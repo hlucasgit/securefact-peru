@@ -171,6 +171,53 @@ public class TaxCalculatorTests
     }
 
     [Fact]
+    public void Retail_price_isc_takes_the_suggested_price_times_the_factor_as_its_base_and_not_the_value_of_the_line()
+    {
+        // TUO de la Ley del IGV e ISC, art. 56 c: base = suggested retail price × 1 / (1 + 0.18) = 0.847, per unit sold; ISC = rate × base.
+        var r = Ok(Single(new TaxableLine(2, 100m, "10", Isc: new IscInput(IscSystem.RetailPrice, 0.30m, SuggestedRetailPrice: 37m))));
+
+        Assert.Equal(62.68m, r.Lines[0].IscBase); // 37 × 0.847 × 2 = 62.678
+        Assert.Equal(18.80m, r.TotalIsc); // 30 % of 62.68
+        Assert.Equal(200m, r.TotalTaxableGravado);
+        Assert.Equal(39.38m, r.TotalIgv); // 18 % of (200 + 18.80): the ISC enters the base of the IGV
+        Assert.Equal(258.18m, r.PayableAmount);
+        Assert.Contains(r.TaxSubtotals, s => s.TaxCode == "2000" && s.TaxableAmount == 62.68m && s.TaxAmount == 18.80m);
+    }
+
+    [Fact]
+    public void The_isc_base_of_the_totals_adds_the_base_of_each_line_whatever_its_system()
+    {
+        var r = Ok(new TaxCalculationRequest(
+            [
+                new TaxableLine(1, 100m, "10", Isc: new IscInput(IscSystem.AdValorem, 0.10m)),
+                new TaxableLine(2, 100m, "10", Isc: new IscInput(IscSystem.RetailPrice, 0.30m, 37m)),
+                new TaxableLine(3, 100m, "10", Isc: new IscInput(IscSystem.FixedAmount, 1.50m)),
+            ],
+            Rates));
+
+        Assert.Equal([100m, 62.68m, 300m], r.Lines.Select(l => l.IscBase));
+        Assert.Contains(r.TaxSubtotals, s => s.TaxCode == "2000" && s.TaxableAmount == 462.68m && s.TaxAmount == 10m + 18.80m + 4.50m);
+        Assert.Equal(0m, Ok(Single(new TaxableLine(1, 100m, "10"))).Lines[0].IscBase);
+    }
+
+    [Theory]
+    [InlineData("0.18", "0.847")]
+    [InlineData("0.19", "0.840")] // the 17 % of IGV and 2 % of IPM that the TUO shows as an example
+    [InlineData("0.105", "0.905")]
+    [InlineData("0.16", "0.862")]
+    public void The_factor_of_the_retail_price_is_one_over_one_plus_the_igv_rate_to_three_decimals(string rate, string factor) =>
+        Assert.Equal(decimal.Parse(factor, System.Globalization.CultureInfo.InvariantCulture), TaxCalculator.RetailPriceFactor(decimal.Parse(rate, System.Globalization.CultureInfo.InvariantCulture)));
+
+    [Theory]
+    [InlineData(IscSystem.RetailPrice, null)]
+    [InlineData(IscSystem.RetailPrice, 0)]
+    [InlineData(IscSystem.RetailPrice, -5)]
+    [InlineData(IscSystem.AdValorem, 37)]
+    [InlineData(IscSystem.FixedAmount, 37)]
+    public void The_suggested_price_is_required_by_the_retail_price_system_and_only_by_it(IscSystem system, int? price) =>
+        Assert.Equal(ErrorCodes.TaxInvalidInput, ErrorOf(Single(new TaxableLine(1, 100m, "10", Isc: new IscInput(system, 0.30m, price)))));
+
+    [Fact]
     public void Plastic_bag_tax_is_outside_the_igv_base_but_inside_the_total()
     {
         var r = Ok(Single(new TaxableLine(1, 10m, "10", PlasticBagCount: 3)));

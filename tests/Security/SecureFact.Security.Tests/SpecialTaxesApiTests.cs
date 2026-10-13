@@ -208,6 +208,54 @@ public sealed class SpecialTaxesApiTests(ApiFixture api)
         Assert.Equal(["1000", "2000", "7152"], root.Elements(Cac + "TaxTotal").Single().Elements(Cac + "TaxSubtotal").Select(t => t.Element(Cac + "TaxCategory")!.Element(Cac + "TaxScheme")!.Element(Cbc + "ID")!.Value));
     }
 
+    private static object[] RetailPriceLines(decimal? suggestedRetailPrice) =>
+        [new { description = "Cigarrillos en cajetilla", unitCode = "NIU", tax = new { quantity = 3, unitValue = 100m, igvAffectationCode = "10", isc = new { system = 3, rateOrUnitAmount = 0.30m, suggestedRetailPrice } } }];
+
+    [Fact]
+    public async Task An_invoice_with_isc_on_the_retail_price_has_its_own_base_is_stated_signed_and_accepted()
+    {
+        var setup = await NewTenantAsync("Retail Price Isc SAC");
+
+        var response = await IssueRawAsync(setup, receipt: false, RetailPriceLines(37m));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = (await response.Content.ReadFromJsonAsync<DocumentDto>(ApiFixture.JsonOptions))!;
+        // Value 300; base 37 × 0.847 × 3 = 94.02; ISC 30 % = 28.21; IGV 18 % of (300 + 28.21) = 59.08.
+        Assert.Equal(28.21m, invoice.Totals.TotalIsc);
+        Assert.Equal(59.08m, invoice.Totals.TotalIgv);
+        Assert.Equal(387.29m, invoice.Totals.PayableAmount);
+        var line = Assert.Single(invoice.Lines);
+        Assert.Equal(37m, line.Isc!.SuggestedRetailPrice);
+
+        var electronic = await AcceptAsync(setup, invoice);
+        var xml = await setup.Owner.GetStringAsync($"/api/v1/electronic-documents/{electronic.Id}/xml");
+        Assert.True(new XmlDsigSigner().Verify(xml).Value.IsValid);
+        var isc = XDocument.Parse(xml).Root!.Element(Cac + "InvoiceLine")!.Element(Cac + "TaxTotal")!.Elements(Cac + "TaxSubtotal")
+            .Single(t => t.Element(Cac + "TaxCategory")!.Element(Cac + "TaxScheme")!.Element(Cbc + "ID")!.Value == "2000");
+        Assert.Equal("94.02", isc.Element(Cbc + "TaxableAmount")!.Value);
+        Assert.Equal("28.21", isc.Element(Cbc + "TaxAmount")!.Value);
+        Assert.Equal("03", isc.Element(Cac + "TaxCategory")!.Element(Cbc + "TierRange")!.Value);
+    }
+
+    [Fact]
+    public async Task Isc_on_the_retail_price_without_the_suggested_price_is_refused_and_so_is_a_price_for_another_system()
+    {
+        var setup = await NewTenantAsync("Retail Price Rules SAC");
+
+        foreach (var lines in new[]
+        {
+            RetailPriceLines(null),
+            RetailPriceLines(0m),
+            [new { description = "Bebida", unitCode = "NIU", tax = new { quantity = 3, unitValue = 100m, igvAffectationCode = "10", isc = new { system = 1, rateOrUnitAmount = 0.10m, suggestedRetailPrice = (decimal?)37m } } }],
+        })
+        {
+            var response = await IssueRawAsync(setup, receipt: false, lines);
+
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+            Assert.StartsWith("SF-TAX-", ProblemCode(await response.Content.ReadAsStringAsync()), StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task Plastic_bags_that_are_not_as_many_as_the_units_of_the_line_are_refused()
     {

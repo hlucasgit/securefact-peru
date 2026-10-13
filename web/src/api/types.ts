@@ -153,11 +153,13 @@ export interface Tenant {
   createdAt: string
 }
 
-export type IscSystem = 'AdValorem' | 'FixedAmount'
+export type IscSystem = 'AdValorem' | 'FixedAmount' | 'RetailPrice'
 
 export interface IscInput {
   system: IscSystem
   rateOrUnitAmount: number
+  /** Per unit, taxes included: only for the system of the retail price, where it is required. */
+  suggestedRetailPrice?: number | null
 }
 
 export interface DocumentLine {

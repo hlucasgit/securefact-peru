@@ -1237,6 +1237,44 @@ public class UblInvoiceGeneratorTests
     }
 
     [Fact]
+    public void A_retail_price_isc_states_the_system_03_the_rate_and_the_base_that_comes_from_the_suggested_price()
+    {
+        // 3 units of 100: value 300; suggested price 37 × 0.847 × 3 = 94.02 of base; ISC 30 % = 28.21; IGV 18 % of (300 + 28.21) = 59.08.
+        var data = SpecialTaxes(new IscInput(IscSystem.RetailPrice, 0.30m, 37m), 0);
+
+        var result = _generator.GenerateInvoice(data);
+
+        Assert.True(result.IsSuccess, result.IsSuccess ? null : result.Error.Detail);
+        var xml = Parse(result.Value);
+        Assert.Empty(SchemaErrors(xml));
+        var subtotals = xml.XPathSelectElements("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cac:TaxSubtotal", Namespaces).ToList();
+        string Text(XElement e, string path) => e.XPathSelectElement(path, Namespaces)!.Value;
+        Assert.Equal("87.29", xml.XPathSelectElement("/inv:Invoice/cac:InvoiceLine/cac:TaxTotal/cbc:TaxAmount", Namespaces)!.Value);
+        Assert.Equal("328.21", Text(subtotals[0], "cbc:TaxableAmount"));
+        Assert.Equal("59.08", Text(subtotals[0], "cbc:TaxAmount"));
+        Assert.Equal("94.02", Text(subtotals[1], "cbc:TaxableAmount"));
+        Assert.Equal("28.21", Text(subtotals[1], "cbc:TaxAmount"));
+        Assert.Equal("30.00", Text(subtotals[1], "cac:TaxCategory/cbc:Percent"));
+        Assert.Equal("03", Text(subtotals[1], "cac:TaxCategory/cbc:TierRange"));
+        var global = xml.XPathSelectElements("/inv:Invoice/cac:TaxTotal/cac:TaxSubtotal", Namespaces).ToList();
+        Assert.Equal("94.02", Text(global[1], "cbc:TaxableAmount"));
+        Assert.Equal("28.21", Text(global[1], "cbc:TaxAmount"));
+    }
+
+    [Fact]
+    public void A_retail_price_isc_without_the_suggested_price_is_not_a_document()
+    {
+        var data = SpecialTaxes(new IscInput(IscSystem.RetailPrice, 0.30m, 37m), 0);
+        var line = data.Lines[0] with { Isc = new IscInput(IscSystem.RetailPrice, 0.30m) };
+
+        var result = _generator.GenerateInvoice(data with { Lines = [line] });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.CpeInvalidDocument, result.Error.Code);
+        Assert.Contains("precio sugerido", result.Error.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Plastic_bags_state_their_count_the_amount_per_bag_and_no_base()
     {
         var data = SpecialTaxes(null, 3);
