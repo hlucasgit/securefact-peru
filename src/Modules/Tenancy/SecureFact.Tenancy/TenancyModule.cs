@@ -25,6 +25,7 @@ public static class TenancyModule
         services.AddScoped<IPlanLimits, PlanLimitsReader>();
         services.AddScoped<IResellerAdministration, ResellerAdministration>();
         services.AddScoped<IBranding, BrandingService>();
+        services.TryAddScoped<SecureFact.Notifications.Contracts.IBusinessNotices, SecureFact.Notifications.Contracts.NullBusinessNotices>();
         services.AddScoped<IAccountExport, AccountExport>();
         services.AddScoped<IAccountDataContributor, TenancyAccountData>();
         services.TryAddScoped<ITenantNotices, NullTenantNotices>();

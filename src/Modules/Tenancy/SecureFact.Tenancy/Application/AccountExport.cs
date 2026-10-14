@@ -5,10 +5,12 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SecureFact.Audit.Contracts;
+using SecureFact.Notifications.Contracts;
 using SecureFact.Platform.Tenancy;
 using SecureFact.SharedKernel;
 using SecureFact.SharedKernel.Export;
 using SecureFact.SharedKernel.Results;
+using SecureFact.SharedKernel.Tenancy;
 using SecureFact.Tenancy.Contracts;
 using SecureFact.Tenancy.Infrastructure;
 
@@ -19,7 +21,7 @@ namespace SecureFact.Tenancy.Application;
 /// request that every read of the account goes through, so Row Level Security is what keeps another account out of the package.
 /// </summary>
 internal sealed partial class AccountExport(
-    TenancyDbContext db, IDataScope scope, IEnumerable<IAccountDataContributor> contributors, IAuditTrail audit, TimeProvider clock, ILogger<AccountExport> logger) : IAccountExport
+    TenancyDbContext db, IDataScope scope, ICurrentUser user, IEnumerable<IAccountDataContributor> contributors, IAuditTrail audit, IBusinessNotices notices, TimeProvider clock, ILogger<AccountExport> logger) : IAccountExport
 {
     public async Task<Result<AccountExportPackage>> PrepareAsync(CancellationToken cancellationToken)
     {
@@ -42,6 +44,7 @@ internal sealed partial class AccountExport(
             await BuildAsync(file, tenant.Name, now, cancellationToken);
             file.Position = 0;
             await audit.RecordAsync(new AuditEvent(AuditActions.AccountExported, "tenant", tenantId.Value.ToString("D"), tenantId.Value, NewValues: new Dictionary<string, object?> { ["areas"] = contributors.Count(), ["bytes"] = file.Length }), cancellationToken);
+            await notices.AccountExportedAsync(new AccountExportedNotice(tenantId.Value, Guid.CreateVersion7(), user.UserId, now), cancellationToken);
         }
         catch
         {

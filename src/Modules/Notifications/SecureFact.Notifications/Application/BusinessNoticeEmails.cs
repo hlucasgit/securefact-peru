@@ -66,6 +66,32 @@ internal sealed partial class BusinessNoticeEmails(IAccountDirectory directory, 
             cancellationToken);
     }
 
+    public async Task AccountExportedAsync(AccountExportedNotice notice, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        string who;
+        try
+        {
+            who = notice.UserId is { } userId ? await directory.UserNameAsync(notice.TenantId, userId, cancellationToken) ?? "Un propietario de su cuenta" : "Un propietario de su cuenta";
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException)
+        {
+            LogNotQueued(logger, "account export", failure.GetType().Name);
+            who = "Un propietario de su cuenta";
+        }
+
+        await SendToOwnersAsync(
+            notice.TenantId, $"account-exported:{notice.ExportId:N}", "account export",
+            (to, brand, portal) => NoticeEmail.Compose(
+                to, brand, "Se descargaron los datos de su cuenta",
+                [
+                    $"{who} descargó todos los datos de su cuenta (tablas, comprobantes firmados y constancias de SUNAT) el {notice.At.ToOffset(TimeSpan.FromHours(-5)).ToString("dd/MM/yyyy 'a las' HH:mm", System.Globalization.CultureInfo.InvariantCulture)} (hora de Lima).",
+                    "Si usted no lo esperaba, cambie su contraseña y revise los usuarios de la cuenta.",
+                ],
+                "Ver la auditoría de la cuenta", $"{portal}/auditoria"),
+            cancellationToken);
+    }
+
     private async Task SendToOwnersAsync(Guid tenantId, string dedupeKey, string kind, Func<string, EmailBrand, string, EmailMessage> compose, CancellationToken cancellationToken)
     {
         try

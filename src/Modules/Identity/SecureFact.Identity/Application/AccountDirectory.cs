@@ -18,6 +18,12 @@ internal sealed class AccountDirectory(IdentityDbContext db, DataScope scope) : 
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<string?> UserNameAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken)
+    {
+        using var elevated = scope.Elevate("notices: name of a person of an account");
+        return await db.Users.AsNoTracking().Where(u => u.Id == userId && u.TenantId == tenantId).Select(u => u.DisplayName).FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<string>> ResellerAdminEmailsAsync(Guid resellerId, CancellationToken cancellationToken)
     {
         using var elevated = scope.Elevate("notices: administrators of a reseller");

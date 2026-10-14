@@ -109,6 +109,9 @@ public interface IAccountDirectory
     Task<IReadOnlyList<string>> TenantOwnerEmailsAsync(Guid tenantId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<string>> ResellerAdminEmailsAsync(Guid resellerId, CancellationToken cancellationToken);
+
+    /// <summary>The name of a person of an account, or null when there is no such person in it.</summary>
+    Task<string?> UserNameAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
 }
 
 /// <summary>One-time creation of the first platform administrator (run from the operator command line, never from HTTP).</summary>

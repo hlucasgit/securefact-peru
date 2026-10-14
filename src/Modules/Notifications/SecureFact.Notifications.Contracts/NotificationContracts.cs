@@ -48,6 +48,9 @@ public sealed record DocumentRejectedNotice(Guid TenantId, Guid ElectronicDocume
 /// <summary>A person of the service provider entered the account with the authorization of its owner (ADR-069). <paramref name="Who"/> is the name of that person; <paramref name="Reason"/>, what they said it was for.</summary>
 public sealed record SupportAccessNotice(Guid TenantId, Guid SessionId, string Who, string Reason, DateTimeOffset EndsAt);
 
+/// <summary>The owner of an account took all its data with it (ADR-074). <paramref name="ExportId"/> names this export, so that it is told once; <paramref name="UserId"/> is who took it.</summary>
+public sealed record AccountExportedNotice(Guid TenantId, Guid ExportId, Guid? UserId, DateTimeOffset At);
+
 /// <summary>Tells the owners of an account about its business: the use of its plan and the fate of its documents. A failed notice never undoes what it announces.</summary>
 public interface IBusinessNotices
 {
@@ -56,6 +59,8 @@ public interface IBusinessNotices
     Task DocumentRejectedAsync(DocumentRejectedNotice notice, CancellationToken cancellationToken);
 
     Task SupportAccessAsync(SupportAccessNotice notice, CancellationToken cancellationToken);
+
+    Task AccountExportedAsync(AccountExportedNotice notice, CancellationToken cancellationToken);
 }
 
 /// <summary>The default when nobody listens (a host without the notices): the work goes on and nothing is sent.</summary>
@@ -66,6 +71,8 @@ public sealed class NullBusinessNotices : IBusinessNotices
     public Task DocumentRejectedAsync(DocumentRejectedNotice notice, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task SupportAccessAsync(SupportAccessNotice notice, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task AccountExportedAsync(AccountExportedNotice notice, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 /// <summary>What a collection notice tells (ADR-068). Each kind is told once per charge (and once per payment for <see cref="PaymentReceived"/>).</summary>

@@ -317,6 +317,26 @@ public sealed class AccountExportApiTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Every_owner_of_the_account_is_told_that_its_data_were_taken_and_by_whom()
+    {
+        var account = await NewAccountAsync("Aviso de exportación");
+        using var admin = await api.AdminClientAsync();
+        var second = await ApiFixture.CreateUserAsync(admin, Roles.TenantOwner, account.TenantId);
+
+        await TakeAsync(account.Owner);
+        await TakeAsync(account.Owner);
+        await api.DrainMailAsync();
+
+        const string subject = "Se descargaron los datos de su cuenta";
+        var first = api.Mail.To(account.OwnerEmail).Where(m => m.Subject == subject).ToList();
+        Assert.Equal(2, first.Count); // one for each export: each is a different fact
+        Assert.Equal(2, api.Mail.To(second.Email).Count(m => m.Subject == subject));
+        Assert.Contains("descargó todos los datos de su cuenta", first[0].Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(account.OwnerPassword, first[0].Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(account.Ruc, first[0].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_export_is_limited_by_credential_because_it_is_the_heaviest_read()
     {
         var account = await NewAccountAsync("Límite de exportación");
